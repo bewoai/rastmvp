@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+:root {
+  --background: #080c0a;
+  --surface: #101612;
+  --surface-2: #18211b;
+  --border: #29342c;
+  --foreground: #f2f6ef;
+  --muted: #bac5bb;
+  --amber: #b8f252;
+  --amber-hi: #d6ff88;
+  --success: #65d6a0;
+  --warning: #efbd58;
+  --danger: #ff6e76;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-amber: var(--amber);
+  --color-amber-hi: var(--amber-hi);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --radius: 0.875rem;
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background:
+    radial-gradient(circle at 88% -8%, rgba(184, 242, 82, 0.08), transparent 30rem),
+    radial-gradient(circle at 10% 100%, rgba(139, 220, 255, 0.055), transparent 34rem),
+    var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: rgba(184, 242, 82, 0.28); color: var(--foreground); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--background); }
+::-webkit-scrollbar-thumb { background: var(--surface-2); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border); }
+
+/* Utility classes used across the app */
+.card {
+  background: rgba(16, 22, 18, 0.88);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(14px);
+}
+.card-hover { transition: transform .22s ease, border-color .22s ease, background-color .22s ease, box-shadow .22s ease; }
+.card-hover:hover { transform: translateY(-2px); border-color: rgba(184, 242, 82, 0.38); background: rgba(21, 29, 23, 0.94); box-shadow: 0 18px 38px rgba(0, 0, 0, 0.18); }
+.btn-amber {
+  background: linear-gradient(135deg, var(--amber-hi), var(--amber));
+  color: #10140f;
+  box-shadow: 0 8px 18px rgba(184, 242, 82, 0.13);
+  transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+}
+.btn-amber:hover { filter: brightness(1.04); box-shadow: 0 10px 24px rgba(184, 242, 82, 0.2); }
+.btn-amber:active { transform: translateY(1px); }
+
+.app-main {
+  position: relative;
+  background: linear-gradient(180deg, rgba(8, 12, 10, 0.12), rgba(8, 12, 10, 0.5));
+}
+.app-main > * { animation: page-in .42s cubic-bezier(.22, .8, .25, 1) backwards; }
+.ambient-scene {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.ambient-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: .8;
+}
+.balance-panel {
+  background:
+    radial-gradient(circle at 88% 20%, rgba(184, 242, 82, .15), transparent 15rem),
+    linear-gradient(135deg, rgba(20, 29, 23, .96), rgba(13, 19, 15, .96));
+}
+.interactive-row {
+  border-radius: .65rem;
+  margin-inline: -.5rem;
+  padding: .55rem .5rem;
+  transition: background-color .18s ease, transform .18s ease;
+}
+.interactive-row:hover { background: rgba(184, 242, 82, .055); transform: translateX(2px); }
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}

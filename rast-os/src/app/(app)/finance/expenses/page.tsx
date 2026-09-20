@@ -56,7 +56,7 @@ function ExpenseModal({ initial, today, usd, eur, onClose }: { initial: Expense 
           </Select>
         </Field>
         <Field label="Tedarikçi"><Input {...f.text("vendor")} autoComplete="off" /></Field>
-        <Field label={`Tutar (${cur}) *`}><Input type="number" inputMode="decimal" min="0" {...f.num("amount", 0)} /></Field>
+        <Field label={`Tutar (${cur}) *`}><Input type="number" inputMode="decimal" min="0" data-autofocus {...f.num("amount", 0)} /></Field>
         <Field label={`KDV (${cur})`}><Input type="number" inputMode="decimal" min="0" {...f.num("vat", 0)} /></Field>
         <Field label="Para birimi">
           <Select value={cur} onChange={(e) => f.set("currency", e.target.value as Currency)}>

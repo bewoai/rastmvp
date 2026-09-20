@@ -67,7 +67,7 @@ function InvoiceModal({ initial, clients, today, onClose }: { initial: Invoice |
           </Select>
         </Field>
         <Field label="Fatura no"><Input {...f.text("invoice_no")} autoComplete="off" /></Field>
-        <Field label="Tutar (₺) *"><Input type="number" inputMode="decimal" min="0" {...f.num("amount", 0)} /></Field>
+        <Field label="Tutar (₺) *"><Input type="number" inputMode="decimal" min="0" data-autofocus {...f.num("amount", 0)} /></Field>
         <Field label="KDV (₺)"><Input type="number" inputMode="decimal" min="0" {...f.num("vat", 0)} /></Field>
         <Field label="Fatura tarihi"><Input type="date" {...f.text("issue_date")} /></Field>
         <Field label="Vade tarihi"><Input type="date" {...f.text("due_date")} /></Field>

@@ -1,16 +1,35 @@
 "use client";
 
+import { useMemo } from "react";
 import { PageHeader } from "@/components/ui";
 import { useStore, useHydrated } from "@/lib/store";
 import { leadStatus, leadPipeline, TRY } from "@/lib/labels";
-import type { LeadStatus } from "@/lib/types";
+import type { Lead, LeadStatus } from "@/lib/types";
 
 export default function PipelinePage() {
-  const hydrated = useHydrated();
+  const hydrated = useHydrated(["leads"]);
   const leads = useStore((s) => s.leads);
   const update = useStore((s) => s.update);
 
-  const columns = leadPipeline;
+  const columnsData = useMemo(() => {
+    const cols: Record<string, Lead[]> = {};
+    const totals: Record<string, number> = {};
+    for (const col of leadPipeline) {
+      cols[col] = [];
+      totals[col] = 0;
+    }
+    if (hydrated) {
+      for (const l of leads) {
+        if (cols[l.status]) {
+          cols[l.status].push(l);
+          totals[l.status] += l.est_budget ?? 0;
+        }
+      }
+    }
+    return { cols, totals };
+  }, [leads, hydrated]);
+
+  if (!hydrated) return <PageHeader title="Satış Pipeline" subtitle="Yükleniyor…" />;
 
   return (
     <>
@@ -20,14 +39,14 @@ export default function PipelinePage() {
       />
 
       <div className="flex gap-3 overflow-x-auto pb-4">
-        {columns.map((col) => {
-          const items = hydrated ? leads.filter((l) => l.status === col) : [];
-          const total = items.reduce((s, l) => s + (l.est_budget ?? 0), 0);
+        {leadPipeline.map((col) => {
+          const items = columnsData.cols[col] || [];
+          const total = columnsData.totals[col] || 0;
           return (
             <div key={col} className="flex w-64 shrink-0 flex-col">
               <div className="mb-2 flex items-center justify-between px-1">
                 <span className="text-xs font-semibold text-foreground">
-                  {leadStatus[col].label}
+                  {leadStatus[col as keyof typeof leadStatus].label}
                 </span>
                 <span className="text-xs text-muted">{items.length}</span>
               </div>
@@ -49,7 +68,7 @@ export default function PipelinePage() {
                       className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1 text-xs text-muted outline-none focus:border-amber/60"
                     >
                       {leadPipeline.map((s) => (
-                        <option key={s} value={s}>{leadStatus[s].label}</option>
+                        <option key={s} value={s}>{leadStatus[s as keyof typeof leadStatus].label}</option>
                       ))}
                     </select>
                   </div>

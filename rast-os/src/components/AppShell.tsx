@@ -1,11 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import dynamic from "next/dynamic";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
-
-const AmbientScene = dynamic(() => import("./AmbientScene"), { ssr: false });
 
 export default function AppShell({
   children,
@@ -18,7 +15,6 @@ export default function AppShell({
 
   return (
     <div className="relative flex h-dvh overflow-hidden bg-background">
-      <AmbientScene />
       {/* Masaüstü sidebar */}
       <div className="relative z-20 hidden md:block">
         <Sidebar />

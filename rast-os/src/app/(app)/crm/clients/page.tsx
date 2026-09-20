@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo, memo } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import { PageHeader, Badge } from "@/components/ui";
 import { Modal, Field, Input, Select, Textarea, Button } from "@/components/form";
@@ -37,35 +37,33 @@ function normalizeDateInput(value?: string): string | null {
   return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
-export default function ClientsPage() {
-  const hydrated = useHydrated();
-  const clients = useStore((s) => s.clients);
-  const brands = useStore((s) => s.brands);
-  const add = useStore((s) => s.add);
-  const update = useStore((s) => s.update);
-  const remove = useStore((s) => s.remove);
-
-  const [open, setOpen] = useState(false);
+const ClientModal = memo(function ClientModal({
+  open, onClose, initial
+}: {
+  open: boolean, onClose: () => void, initial: Client | null
+}) {
   const [form, setForm] = useState<Client>(empty);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const editing = Boolean(form.id);
 
-  function startNew() {
-    setForm({ ...empty });
-    setError(null);
-    setOpen(true);
-  }
+  useMemo(() => {
+    if (open) {
+      if (initial) {
+        setForm({
+          ...initial,
+          contract_start: formatDateInput(initial.contract_start),
+          contract_end: formatDateInput(initial.contract_end),
+        });
+      } else {
+        setForm(empty);
+      }
+      setError(null);
+    }
+  }, [open, initial]);
 
-  function startEdit(client: Client) {
-    setForm({
-      ...client,
-      contract_start: formatDateInput(client.contract_start),
-      contract_end: formatDateInput(client.contract_end),
-    });
-    setError(null);
-    setOpen(true);
-  }
+  const add = useStore((s) => s.add);
+  const update = useStore((s) => s.update);
 
   async function save() {
     setError(null);
@@ -101,8 +99,7 @@ export default function ClientsPage() {
         setError(result.error ?? "Müşteri kaydedilemedi. Lütfen tekrar deneyin.");
         return;
       }
-      setOpen(false);
-      setForm({ ...empty });
+      onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Müşteri kaydedilemedi. Lütfen tekrar deneyin.");
     } finally {
@@ -110,27 +107,106 @@ export default function ClientsPage() {
     }
   }
 
+  function handleClose() {
+    setError(null);
+    onClose();
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title={editing ? "Müşteri düzenle" : "Yeni müşteri"}
+      footer={
+        <>
+          <Button variant="ghost" onClick={handleClose}>Vazgeç</Button>
+          <Button disabled={saving} onClick={save}>{saving ? "Kaydediliyor…" : "Kaydet"}</Button>
+        </>
+      }
+    >
+      {error && <p className="mb-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">{error}</p>}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <Field label="Müşteri / firma adı *">
+            <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          </Field>
+        </div>
+        <Field label="Vergi no">
+          <Input value={form.tax_id} onChange={(e) => setForm({ ...form, tax_id: e.target.value })} />
+        </Field>
+        <Field label="Aylık ücret (₺)">
+          <Input type="number" value={form.monthly_fee ?? ""} onChange={(e) => setForm({ ...form, monthly_fee: e.target.value ? Number(e.target.value) : undefined })} />
+        </Field>
+        <Field label="Sözleşme başlangıç">
+          <Input type="text" inputMode="numeric" placeholder="GG.AA.YYYY" value={form.contract_start ?? ""} onChange={(e) => setForm({ ...form, contract_start: e.target.value })} />
+        </Field>
+        <Field label="Sözleşme bitiş">
+          <Input type="text" inputMode="numeric" placeholder="GG.AA.YYYY" value={form.contract_end ?? ""} onChange={(e) => setForm({ ...form, contract_end: e.target.value })} />
+        </Field>
+        <Field label="Ödeme günü">
+          <Input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} placeholder="1-31" value={form.payment_day ?? ""} onChange={(e) => {
+            const digits = e.target.value.replace(/\D/g, "").slice(0, 2);
+            setForm({ ...form, payment_day: digits ? Number(digits) : undefined });
+          }} />
+        </Field>
+        <Field label="Durum">
+          <Select value={form.is_active ? "1" : "0"} onChange={(e) => setForm({ ...form, is_active: e.target.value === "1" })}>
+            <option value="1">Aktif</option>
+            <option value="0">Pasif</option>
+          </Select>
+        </Field>
+        <div className="sm:col-span-2">
+          <Field label="Notlar">
+            <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+          </Field>
+        </div>
+      </div>
+    </Modal>
+  );
+});
+
+export default function ClientsPage() {
+  const hydrated = useHydrated(["clients", "brands"]);
+  const clients = useStore((s) => s.clients);
+  const brands = useStore((s) => s.brands);
+  const remove = useStore((s) => s.remove);
+
+  const [open, setOpen] = useState(false);
+  const [initialForm, setInitialForm] = useState<Client | null>(null);
+
+  const brandCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const b of brands) {
+        if (b.client_id) {
+            counts.set(b.client_id, (counts.get(b.client_id) || 0) + 1);
+        }
+    }
+    return counts;
+  }, [brands]);
+
+  if (!hydrated) return <PageHeader title="Müşteriler" subtitle="Yükleniyor…" />;
+
   return (
     <>
       <PageHeader
         title="Müşteriler"
         subtitle="Aktif müşteriler, hizmet paketleri ve sözleşme takibi"
         action={
-          <Button onClick={startNew}>
+          <Button onClick={() => { setInitialForm(empty); setOpen(true); }}>
             <span className="flex items-center gap-1.5"><Plus className="h-4 w-4" /> Yeni Müşteri</span>
           </Button>
         }
       />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {hydrated && clients.map((c) => {
-          const brandCount = brands.filter((b) => b.client_id === c.id).length;
+        {clients.map((c) => {
+          const count = brandCounts.get(c.id) || 0;
           return (
             <div key={c.id} className="card p-4">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="font-semibold text-foreground">{c.name}</p>
-                  <p className="mt-0.5 text-xs text-muted">{brandCount} marka</p>
+                  <p className="mt-0.5 text-xs text-muted">{count} marka</p>
                 </div>
                 <Badge tone={c.is_active ? "success" : "muted"}>
                   {c.is_active ? "Aktif" : "Pasif"}
@@ -151,66 +227,18 @@ export default function ClientsPage() {
                 </div>
               </dl>
               <div className="mt-3 flex justify-end gap-1 border-t border-border pt-2">
-                <button onClick={() => startEdit(c)} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-foreground"><Pencil className="h-4 w-4" /></button>
+                <button onClick={() => { setInitialForm(c); setOpen(true); }} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-foreground"><Pencil className="h-4 w-4" /></button>
                 <button onClick={() => remove("clients", c.id)} className="rounded-md p-1.5 text-muted hover:bg-danger/15 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
               </div>
             </div>
           );
         })}
-        {hydrated && clients.length === 0 && (
+        {clients.length === 0 && (
           <p className="col-span-full py-10 text-center text-muted">Henüz müşteri yok.</p>
         )}
       </div>
 
-      <Modal
-        open={open}
-        onClose={() => { setOpen(false); setError(null); }}
-        title={editing ? "Müşteri düzenle" : "Yeni müşteri"}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => { setOpen(false); setError(null); }}>Vazgeç</Button>
-            <Button disabled={saving} onClick={save}>{saving ? "Kaydediliyor…" : "Kaydet"}</Button>
-          </>
-        }
-      >
-        {error && <p className="mb-3 rounded-lg border border-danger/30 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">{error}</p>}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="sm:col-span-2">
-            <Field label="Müşteri / firma adı *">
-              <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            </Field>
-          </div>
-          <Field label="Vergi no">
-            <Input value={form.tax_id} onChange={(e) => setForm({ ...form, tax_id: e.target.value })} />
-          </Field>
-          <Field label="Aylık ücret (₺)">
-            <Input type="number" value={form.monthly_fee ?? ""} onChange={(e) => setForm({ ...form, monthly_fee: e.target.value ? Number(e.target.value) : undefined })} />
-          </Field>
-          <Field label="Sözleşme başlangıç">
-            <Input type="text" inputMode="numeric" placeholder="GG.AA.YYYY" value={form.contract_start ?? ""} onChange={(e) => setForm({ ...form, contract_start: e.target.value })} />
-          </Field>
-          <Field label="Sözleşme bitiş">
-            <Input type="text" inputMode="numeric" placeholder="GG.AA.YYYY" value={form.contract_end ?? ""} onChange={(e) => setForm({ ...form, contract_end: e.target.value })} />
-          </Field>
-          <Field label="Ödeme günü">
-            <Input type="text" inputMode="numeric" pattern="[0-9]*" maxLength={2} placeholder="1-31" value={form.payment_day ?? ""} onChange={(e) => {
-              const digits = e.target.value.replace(/\D/g, "").slice(0, 2);
-              setForm({ ...form, payment_day: digits ? Number(digits) : undefined });
-            }} />
-          </Field>
-          <Field label="Durum">
-            <Select value={form.is_active ? "1" : "0"} onChange={(e) => setForm({ ...form, is_active: e.target.value === "1" })}>
-              <option value="1">Aktif</option>
-              <option value="0">Pasif</option>
-            </Select>
-          </Field>
-          <div className="sm:col-span-2">
-            <Field label="Notlar">
-              <Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-            </Field>
-          </div>
-        </div>
-      </Modal>
+      <ClientModal open={open} onClose={() => setOpen(false)} initial={initialForm} />
     </>
   );
 }

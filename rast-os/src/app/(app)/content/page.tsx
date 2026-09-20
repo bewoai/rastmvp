@@ -41,7 +41,7 @@ function safeFileName(name: string) {
 }
 
 export default function ContentPage() {
-  const hydrated = useHydrated();
+  const hydrated = useHydrated(["contents", "clients", "brands"]);
   const contents = useStore((s) => s.contents);
   const brands = useStore((s) => s.brands);
   const supabaseEnabled = useStore((s) => s.supabase);

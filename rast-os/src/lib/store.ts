@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import type { RastData } from "./types";
 import { seed } from "./seed";
 import { isSupabaseConfigured } from "./env";
@@ -43,7 +43,9 @@ interface StoreState extends RastData {
   supabase: boolean;
   orgId: string | null;
   initStarted: boolean;
+  loadedCollections: Record<Collections, boolean>;
   init: () => Promise<void>;
+  load: (collections: Collections[]) => Promise<void>;
   add: <K extends Collections>(key: K, item: RastData[K][number]) => Promise<MutationResult>;
   update: <K extends Collections>(key: K, id: string, patch: Partial<RastData[K][number]>) => Promise<MutationResult>;
   remove: <K extends Collections>(key: K, id: string) => Promise<void>;
@@ -57,49 +59,59 @@ export const useStore = create<StoreState>()((set, get) => ({
   supabase: false,
   orgId: null,
   initStarted: false,
+  loadedCollections: COLLECTIONS.reduce((acc, c) => ({ ...acc, [c]: false }), {} as Record<Collections, boolean>),
 
-  init: async () => {
+    init: async () => {
     // Supabase yoksa: bellek içi örnek verilerle çalış (demo modu)
     if (!isSupabaseConfigured) {
       set({ ...seed, loaded: true, supabase: false });
       return;
     }
 
+    if (get().loaded && get().orgId !== null) {
+      return;
+    }
+
     const sb = createClient();
-    const { data: { user } } = await sb.auth.getUser();
+    const { data: { session } } = await sb.auth.getSession();
+    const user = session?.user;
 
     // Supabase is configured but there is no active session: stay in demo mode
-    // instead of attempting RLS-protected writes with a null organization.
     if (!user) {
       set({ ...seed, loaded: true, supabase: false, orgId: null });
       return;
     }
 
-    let orgId: string | null = null;
-    if (user) {
-      const { data: profile } = await sb
-        .from("profiles")
-        .select("organization_id")
-        .eq("id", user.id)
-        .single();
-      orgId = profile?.organization_id ?? null;
-    }
+    const { data: profile } = await sb
+      .from("profiles")
+      .select("organization_id")
+      .eq("id", user.id)
+      .single();
+    const orgId = profile?.organization_id ?? null;
 
-    // Tüm koleksiyonları çek
+    set({ loaded: true, supabase: true, orgId });
+  },
+
+  load: async (collections) => {
+    const s = get();
+    if (!s.supabase || !s.orgId) return;
+
+    const sb = createClient();
     const next: Partial<RastData> = {};
+    const nextLoaded = { ...s.loadedCollections };
+
     await Promise.all(
-      COLLECTIONS.map(async (c) => {
+      collections.map(async (c) => {
+        if (s.loadedCollections[c]) return; // Zaten yüklüyse geç
         const { data } = await sb.from(c).select("*").order("created_at", { ascending: false });
         (next as Record<string, unknown>)[c] = data ?? [];
+        nextLoaded[c] = true;
       }),
     );
 
-    if (!orgId) {
-      set({ ...emptyData, loaded: true, supabase: true, orgId: null });
-      return;
+    if (Object.keys(next).length > 0) {
+      set({ ...(next as RastData), loadedCollections: nextLoaded });
     }
-
-    set({ ...(next as RastData), loaded: true, supabase: true, orgId });
   },
 
   add: async (key, item) => {
@@ -181,8 +193,11 @@ export const useStore = create<StoreState>()((set, get) => ({
  * Veriyi yükler (Supabase veya demo) ve oturum değişiminde yeniler.
  * Sayfalar `loaded` true olana kadar iskelet/boş gösterir.
  */
-export function useHydrated() {
+export function useHydrated(requiredCollections?: Collections[]) {
   const loaded = useStore((s) => s.loaded);
+  const loadedCollections = useStore((s) => s.loadedCollections);
+  const load = useStore((s) => s.load);
+  const isSupabase = useStore((s) => s.supabase);
 
   useEffect(() => {
     const st = useStore.getState();
@@ -199,5 +214,20 @@ export function useHydrated() {
     }
   }, []);
 
-  return loaded;
+  const reqStr = requiredCollections?.join(",") || "";
+  const reqCols = useMemo(() => requiredCollections, [reqStr]);
+
+  useEffect(() => {
+    if (loaded && isSupabase && reqCols) {
+      const missing = reqCols.filter((c) => !useStore.getState().loadedCollections[c]);
+      if (missing.length > 0) {
+        load(missing);
+      }
+    }
+  }, [loaded, isSupabase, reqCols, load]);
+
+  if (!loaded) return false;
+  if (!isSupabase) return true; // demo mode
+  if (!reqCols) return true;
+  return reqCols.every((c) => loadedCollections[c]);
 }

@@ -14,7 +14,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border/80 bg-surface/90 backdrop-blur-xl">
       <div className="border-b border-border/80 px-5 py-4">
-        <Link href="/" onClick={onNavigate} aria-label="Ana sayfa" className="flex items-center rounded-lg outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-amber/60">
+        <Link href="/" prefetch={false} onClick={onNavigate} aria-label="Ana sayfa" className="flex items-center rounded-lg outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-amber/60">
         <Image
           src="/brand/rast-white-tight.svg"
           alt="Rast Creative"
@@ -41,6 +41,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      prefetch={false}
                       onClick={onNavigate}
                       aria-current={active ? "page" : undefined}
                       className={`group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-all ${

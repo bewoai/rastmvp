@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useMemo, memo } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
-import { PageHeader, Badge, StatCard } from "@/components/ui";
-import { Modal, Field, Input, Select, Textarea, Button } from "@/components/form";
+import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
+import { PageHeader, Badge, EmptyState, StatStrip } from "@/components/ui";
+import { FormModal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
+import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
+import type { Column } from "@/components/list";
+import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
+import { patchRecord } from "@/lib/mutate";
 import { jobStatus, paymentStatus, TRY, dateTR } from "@/lib/labels";
 import type { Job, JobStatus, PaymentStatus } from "@/lib/types";
 
@@ -15,85 +19,128 @@ const empty: Job = {
 };
 
 const jobTypes = ["Gelir", "Çekim", "Video", "Tasarım", "Etkinlik", "Drone", "Fotoğraf", "Web", "Baskı", "Diğer"];
+const statusOptions = (Object.keys(jobStatus) as JobStatus[]).map((value) => ({ value, ...jobStatus[value] }));
 
-const JobModal = memo(function JobModal({
-  open, onClose, initial
-}: {
-  open: boolean, onClose: () => void, initial: Job | null
-}) {
-  const [form, setForm] = useState<Job>(empty);
-  const editing = Boolean(form.id);
+type Scope = "all" | "running" | "unpaid";
+const SCOPES: readonly Scope[] = ["all", "running", "unpaid"];
 
-  useMemo(() => {
-    if (open) setForm(initial || empty);
-  }, [open, initial]);
+// ödeme durumunu tahsilata göre otomatik ayarla
+const paymentOf = (price: number, paid: number): PaymentStatus => (paid <= 0 ? "unpaid" : paid >= price ? "paid" : "partial");
 
-  const add = useStore((s) => s.add);
-  const update = useStore((s) => s.update);
+function JobModal({ initial, onClose }: { initial: Job | null; onClose: () => void }) {
+  const f = useFormState<Job>(initial ?? empty);
+  const editing = Boolean(initial?.id);
+  const { form } = f;
 
-  function save() {
-    if (!form.customer_name.trim()) return;
-    // ödeme durumunu tahsilata göre otomatik ayarla
+  async function submit() {
+    if (!form.customer_name.trim()) return { ok: false, error: "Müşteri / kişi adı zorunludur." };
     const price = Number(form.price) || 0;
     const paid = Number(form.paid_amount) || 0;
-    const payment_status: PaymentStatus =
-      paid <= 0 ? "unpaid" : paid >= price ? "paid" : "partial";
-    const next = { ...form, price, paid_amount: paid, payment_status };
-    if (editing) update("jobs", form.id, next);
-    else add("jobs", { ...next, id: uid(), created_at: nowISO() });
-    onClose();
+    const next = { ...form, customer_name: form.customer_name.trim(), price, paid_amount: paid, payment_status: paymentOf(price, paid) };
+    const s = useStore.getState();
+    return editing ? s.update("jobs", form.id, next) : s.add("jobs", { ...next, id: uid(), created_at: nowISO() });
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
+    <FormModal
       title={editing ? "Tekil iş düzenle" : "Yeni tekil iş"}
-      footer={<><Button variant="ghost" onClick={onClose}>Vazgeç</Button><Button onClick={save}>Kaydet</Button></>}
+      onClose={onClose}
+      onSubmit={submit}
+      successMessage={editing ? "İş güncellendi" : "İş eklendi"}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field label="Müşteri / kişi *"><Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} placeholder="Ad veya firma" /></Field>
-        <Field label="İletişim"><Input value={form.contact} onChange={(e) => setForm({ ...form, contact: e.target.value })} placeholder="Telefon / e-posta" /></Field>
-        <div className="sm:col-span-2"><Field label="Hizmet / iş"><Input value={form.service} onChange={(e) => setForm({ ...form, service: e.target.value })} placeholder="Düğün çekimi, tanıtım videosu…" /></Field></div>
-        <Field label="Tür">
-          <Select value={form.job_type} onChange={(e) => setForm({ ...form, job_type: e.target.value })}>
-            <option value="">Seçin</option>
-            {jobTypes.map((t) => <option key={t}>{t}</option>)}
-          </Select>
-        </Field>
-        <Field label="İş / teslim tarihi"><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></Field>
-        <Field label="Ücret (₺)"><Input type="number" value={form.price || ""} onChange={(e) => setForm({ ...form, price: Number(e.target.value) })} /></Field>
-        <Field label="Tahsil edilen (₺)"><Input type="number" value={form.paid_amount || ""} onChange={(e) => setForm({ ...form, paid_amount: Number(e.target.value) })} /></Field>
-        <Field label="Maliyet (₺, ops.)"><Input type="number" value={form.cost ?? ""} onChange={(e) => setForm({ ...form, cost: e.target.value ? Number(e.target.value) : undefined })} /></Field>
+        <div className="sm:col-span-2"><Field label="Müşteri / kişi *"><Input {...f.text("customer_name")} placeholder="Ad veya firma" autoComplete="off" /></Field></div>
+        <div className="sm:col-span-2"><Field label="Hizmet / iş"><Input {...f.text("service")} placeholder="Düğün çekimi, tanıtım videosu…" /></Field></div>
+        <Field label="Ücret (₺)"><Input type="number" inputMode="decimal" min="0" {...f.num("price", 0)} /></Field>
+        <Field label="Tahsil edilen (₺)"><Input type="number" inputMode="decimal" min="0" {...f.num("paid_amount", 0)} /></Field>
+        <Field label="İş / teslim tarihi"><Input type="date" {...f.text("date")} /></Field>
         <Field label="Durum">
-          <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as JobStatus })}>
-            {Object.entries(jobStatus).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          <Select {...f.text("status")}>
+            {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </Select>
         </Field>
-        <div className="sm:col-span-2"><Field label="Notlar"><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field></div>
+        <MoreFields label="Ek alanlar (iletişim, tür, maliyet, not)" defaultOpen={editing}>
+          <Field label="İletişim"><Input {...f.text("contact")} placeholder="Telefon / e-posta" /></Field>
+          <Field label="Tür">
+            <Select {...f.text("job_type")}>
+              <option value="">Seçin</option>
+              {jobTypes.map((t) => <option key={t}>{t}</option>)}
+            </Select>
+          </Field>
+          <Field label="Maliyet (₺, ops.)"><Input type="number" inputMode="decimal" min="0" {...f.num("cost")} /></Field>
+          <div className="sm:col-span-2"><Field label="Notlar"><Textarea {...f.text("notes")} /></Field></div>
+        </MoreFields>
       </div>
-    </Modal>
+    </FormModal>
   );
-});
+}
 
 export default function JobsPage() {
   const hydrated = useHydrated(["jobs"]);
   const jobs = useStore((s) => s.jobs);
-  const update = useStore((s) => s.update);
-  const remove = useStore((s) => s.remove);
 
-  const [open, setOpen] = useState(false);
-  const [initialForm, setInitialForm] = useState<Job | null>(null);
+  const wantNew = useNewIntent();
+  const [modal, setModal] = useState<{ initial: Job | null } | null>(() => (wantNew ? { initial: null } : null));
+  const [scope, setScope] = usePersistentState<Scope>("jobs-scope", "all", SCOPES);
+  const [query, setQuery] = useState("");
+  const del = useDeleteConfirm();
 
   const stats = useMemo(() => {
-    const active = hydrated ? jobs.filter((j) => j.status !== "cancelled") : [];
-    const revenue = active.reduce((a, j) => a + j.price, 0);
-    const collected = active.reduce((a, j) => a + j.paid_amount, 0);
-    const outstanding = revenue - collected;
-    return { active, revenue, collected, outstanding };
-  }, [jobs, hydrated]);
+    let revenue = 0, collected = 0, count = 0, running = 0, unpaid = 0;
+    for (const j of jobs) {
+      if (j.status === "cancelled") continue;
+      count++;
+      revenue += j.price;
+      collected += j.paid_amount;
+      if (j.status !== "delivered") running++;
+      if (j.paid_amount < j.price) unpaid++;
+    }
+    return { revenue, collected, outstanding: revenue - collected, count, running, unpaid };
+  }, [jobs]);
 
-  if (!hydrated) return <PageHeader title="Tekil İşler" subtitle="Yükleniyor…" />;
+  const scoped = useMemo(() => {
+    if (scope === "running") return jobs.filter((j) => j.status !== "delivered" && j.status !== "cancelled");
+    if (scope === "unpaid") return jobs.filter((j) => j.status !== "cancelled" && j.paid_amount < j.price);
+    return jobs;
+  }, [jobs, scope]);
+  const visible = useListSearch(scoped, query, (j) => `${j.customer_name} ${j.contact ?? ""} ${j.service ?? ""} ${j.job_type ?? ""}`);
+
+  const columns = useMemo<Column<Job>[]>(() => [
+    {
+      key: "customer", header: "Müşteri", tone: "primary", mobile: "title", sort: (j) => j.customer_name,
+      cell: (j) => (
+        <>
+          <span className="block max-w-[20rem] truncate">{j.customer_name}</span>
+          {j.contact && <span className="block max-w-[20rem] truncate text-xs font-normal text-muted">{j.contact}</span>}
+        </>
+      ),
+    },
+    { key: "service", header: "Hizmet", sort: (j) => j.service, cell: (j) => <span className="block max-w-[16rem] truncate">{j.service || "—"}</span> },
+    { key: "type", header: "Tür", mobile: "hide", sort: (j) => j.job_type, cell: (j) => j.job_type || "—" },
+    { key: "date", header: "Tarih", sort: (j) => j.date, cell: (j) => dateTR(j.date) },
+    { key: "price", header: "Ücret", tone: "strong", sort: (j) => j.price, cell: (j) => TRY(j.price) },
+    {
+      key: "paid", header: "Tahsil", sort: (j) => j.paid_amount,
+      cell: (j) => (
+        <>
+          <span>{TRY(j.paid_amount)}</span>
+          {j.status !== "cancelled" && j.price > j.paid_amount && <span className="block text-xs text-warning">Kalan {TRY(j.price - j.paid_amount)}</span>}
+        </>
+      ),
+    },
+    {
+      key: "status", header: "Durum", mobile: "badge", sort: (j) => Object.keys(jobStatus).indexOf(j.status),
+      cell: (j) => (
+        <StatusSelect value={j.status} options={statusOptions} label={`Durum: ${j.customer_name}`} onChange={(status) => patchRecord("jobs", j.id, { status }, "Durum güncellenemedi")} />
+      ),
+    },
+    {
+      key: "payment", header: "Ödeme", mobile: "badge", sort: (j) => ["unpaid", "partial", "paid"].indexOf(j.payment_status),
+      cell: (j) => <Badge tone={paymentStatus[j.payment_status].tone}>{paymentStatus[j.payment_status].label}</Badge>,
+    },
+  ], []);
+
+  if (!hydrated) return <PageLoading title="Tekil İşler" />;
 
   return (
     <>
@@ -101,74 +148,55 @@ export default function JobsPage() {
         title="Tekil İşler"
         subtitle="Aylık müşteri olmayan, tek seferlik ücretli işler — çekim, video, tasarım, etkinlik…"
         action={
-          <Button onClick={() => { setInitialForm(empty); setOpen(true); }}>
-            <span className="flex items-center gap-1.5"><Plus className="h-4 w-4" /> Yeni Tekil İş</span>
+          <Button onClick={() => setModal({ initial: null })}>
+            <Plus className="h-4 w-4" aria-hidden /> Yeni Tekil İş
           </Button>
         }
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Toplam ciro" value={TRY(stats.revenue)} tone="amber" />
-        <StatCard label="Tahsil edilen" value={TRY(stats.collected)} tone="success" />
-        <StatCard label="Bekleyen tahsilat" value={TRY(stats.outstanding)} tone="warning" />
-        <StatCard label="İş sayısı" value={String(stats.active.length)} />
-      </div>
+      <StatStrip
+        items={[
+          { label: "Toplam ciro", value: TRY(stats.revenue), tone: "amber" },
+          { label: "Tahsil edilen", value: TRY(stats.collected), tone: "success" },
+          { label: "Bekleyen tahsilat", value: TRY(stats.outstanding), tone: "warning" },
+          { label: "İş sayısı", value: String(stats.count) },
+        ]}
+      />
 
-      <div className="card overflow-x-auto">
-        <table className="w-full min-w-[900px] text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-muted">
-              <th className="px-4 py-3 font-medium">Müşteri</th>
-              <th className="px-4 py-3 font-medium">Hizmet</th>
-              <th className="px-4 py-3 font-medium">Tür</th>
-              <th className="px-4 py-3 font-medium">Tarih</th>
-              <th className="px-4 py-3 font-medium">Ücret</th>
-              <th className="px-4 py-3 font-medium">Tahsil</th>
-              <th className="px-4 py-3 font-medium">Durum</th>
-              <th className="px-4 py-3 font-medium">Ödeme</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {jobs.map((j) => (
-              <tr key={j.id} className="border-b border-border/60 hover:bg-surface-2/50">
-                <td className="px-4 py-3">
-                  <p className="font-medium text-foreground">{j.customer_name}</p>
-                  {j.contact && <p className="text-xs text-muted">{j.contact}</p>}
-                </td>
-                <td className="px-4 py-3 text-muted">{j.service || "—"}</td>
-                <td className="px-4 py-3 text-muted">{j.job_type || "—"}</td>
-                <td className="px-4 py-3 text-muted">{dateTR(j.date)}</td>
-                <td className="px-4 py-3 text-foreground">{TRY(j.price)}</td>
-                <td className="px-4 py-3 text-muted">{TRY(j.paid_amount)}</td>
-                <td className="px-4 py-3">
-                  <select
-                    value={j.status}
-                    onChange={(e) => update("jobs", j.id, { status: e.target.value as JobStatus })}
-                    className="rounded-md border border-border bg-background px-2 py-1 text-xs text-muted outline-none focus:border-amber/60"
-                  >
-                    {Object.entries(jobStatus).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                  </select>
-                </td>
-                <td className="px-4 py-3">
-                  <Badge tone={paymentStatus[j.payment_status].tone}>{paymentStatus[j.payment_status].label}</Badge>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex justify-end gap-1">
-                    <button onClick={() => { setInitialForm(j); setOpen(true); }} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-foreground"><Pencil className="h-4 w-4" /></button>
-                    <button onClick={() => remove("jobs", j.id)} className="rounded-md p-1.5 text-muted hover:bg-danger/15 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {jobs.length === 0 && (
-              <tr><td colSpan={9} className="px-4 py-10 text-center text-muted">Henüz tekil iş yok. “Yeni Tekil İş” ile ekleyin.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Toolbar>
+        <FilterChips
+          label="İş kapsamı"
+          value={scope}
+          onChange={setScope}
+          options={[
+            { id: "all", label: "Tümü", count: jobs.length },
+            { id: "running", label: "Devam eden", count: stats.running },
+            { id: "unpaid", label: "Tahsilat bekleyen", count: stats.unpaid },
+          ]}
+        />
+        <SearchBox value={query} onChange={setQuery} placeholder="Müşteri, hizmet ara…" label="Tekil iş ara" />
+      </Toolbar>
 
-      <JobModal open={open} onClose={() => setOpen(false)} initial={initialForm} />
+      <DataTable
+        columns={columns}
+        rows={visible}
+        rowKey={(j) => j.id}
+        onOpen={(j) => setModal({ initial: j })}
+        openLabel={(j) => `Düzenle: ${j.customer_name}`}
+        actions={(j) => (
+          <RowActions label={j.customer_name} onEdit={() => setModal({ initial: j })} onDelete={() => del.ask({ key: "jobs", id: j.id, label: j.customer_name })} />
+        )}
+        empty={
+          jobs.length === 0 ? (
+            <EmptyState title="Henüz tekil iş yok" hint="Tek seferlik çekim, video veya tasarım işlerini buradan takip et." action={{ label: "Yeni Tekil İş", onClick: () => setModal({ initial: null }) }} />
+          ) : (
+            <EmptyState title="Eşleşen iş yok" hint={query ? "Aramayı değiştir." : "Bu kapsamda iş bulunmuyor."} />
+          )
+        }
+      />
+
+      {modal && <JobModal initial={modal.initial} onClose={() => setModal(null)} />}
+      {del.dialog}
     </>
   );
 }

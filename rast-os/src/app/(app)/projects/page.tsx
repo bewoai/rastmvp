@@ -1,10 +1,14 @@
 "use client";
 
-import { useState, useMemo, memo } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
-import { PageHeader, Badge } from "@/components/ui";
-import { Modal, Field, Input, Select, Button } from "@/components/form";
+import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
+import { PageHeader, Badge, EmptyState } from "@/components/ui";
+import { FormModal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
+import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
+import type { Column } from "@/components/list";
+import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
+import { patchRecord } from "@/lib/mutate";
 import { projectStatus, priority as prioMap, TRY, dateTR } from "@/lib/labels";
 import type { Project, ProjectStatus, Priority, Client, Brand } from "@/lib/types";
 
@@ -14,71 +18,73 @@ const empty: Project = {
   priority: "medium", notes: "", created_at: "",
 };
 
-const ProjectModal = memo(function ProjectModal({
-  open, onClose, initial, clients, brands
-}: {
-  open: boolean, onClose: () => void, initial: Project | null, clients: Client[], brands: Brand[]
+const statusOptions = (Object.keys(projectStatus) as ProjectStatus[]).map((value) => ({ value, ...projectStatus[value] }));
+const ACTIVE: ProjectStatus[] = ["planning", "active", "on_hold", "review"];
+type Scope = "active" | "closed" | "all";
+const SCOPES: readonly Scope[] = ["active", "closed", "all"];
+
+/** Form state'i burada yaşar: yazarken sayfa listesi render olmaz; her açılışta temiz başlar. */
+function ProjectModal({ initial, clients, brands, onClose }: {
+  initial: Project | null; clients: Client[]; brands: Brand[]; onClose: () => void;
 }) {
-  const [form, setForm] = useState<Project>(empty);
-  const editing = Boolean(form.id);
-  
-  // Update local form state when initial changes
-  useMemo(() => {
-    if (open) setForm(initial || empty);
-  }, [open, initial]);
+  const f = useFormState<Project>(initial ?? empty);
+  const editing = Boolean(initial?.id);
+  const { form } = f;
 
-  const add = useStore((s) => s.add);
-  const update = useStore((s) => s.update);
-
-  function save() {
-    if (!form.name.trim()) return;
-    if (editing) update("projects", form.id, form);
-    else add("projects", { ...form, id: uid(), created_at: nowISO() });
-    onClose();
+  async function submit() {
+    if (!form.name.trim()) return { ok: false, error: "Proje adı zorunludur." };
+    const payload = { ...form, name: form.name.trim() };
+    const s = useStore.getState();
+    return editing
+      ? s.update("projects", form.id, payload)
+      : s.add("projects", { ...payload, id: uid(), created_at: nowISO() });
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
+    <FormModal
       title={editing ? "Proje düzenle" : "Yeni proje"}
-      footer={<><Button variant="ghost" onClick={onClose}>Vazgeç</Button><Button onClick={save}>Kaydet</Button></>}
+      onClose={onClose}
+      onSubmit={submit}
+      successMessage={editing ? "Proje güncellendi" : "Proje eklendi"}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
-          <Field label="Proje adı *"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
+          <Field label="Proje adı *"><Input {...f.text("name")} autoComplete="off" /></Field>
         </div>
         <Field label="Müşteri">
-          <Select value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value, brand_id: "" })}>
+          <Select value={form.client_id ?? ""} onChange={(e) => { f.set("client_id", e.target.value); f.set("brand_id", ""); }}>
             <option value="">Seçin</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         </Field>
         <Field label="Marka">
-          <Select value={form.brand_id} onChange={(e) => setForm({ ...form, brand_id: e.target.value })}>
+          <Select {...f.text("brand_id")}>
             <option value="">Seçin</option>
             {brands.filter((b) => !form.client_id || b.client_id === form.client_id).map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
           </Select>
         </Field>
-        <Field label="Tür"><Input value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })} placeholder="Aylık yönetim, video…" /></Field>
-        <Field label="Sorumlu"><Input value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })} /></Field>
-        <Field label="Başlangıç"><Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} /></Field>
-        <Field label="Bitiş"><Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></Field>
-        <Field label="Bütçe (₺)"><Input type="number" value={form.budget ?? ""} onChange={(e) => setForm({ ...form, budget: e.target.value ? Number(e.target.value) : undefined })} /></Field>
         <Field label="Durum">
-          <Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as ProjectStatus })}>
-            {Object.entries(projectStatus).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+          <Select {...f.text("status")}>
+            {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </Select>
         </Field>
-        <Field label="Öncelik">
-          <Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as Priority })}>
-            <option value="low">Düşük</option><option value="medium">Orta</option><option value="high">Yüksek</option><option value="urgent">Acil</option>
-          </Select>
-        </Field>
+        <Field label="Bitiş"><Input type="date" {...f.text("end_date")} /></Field>
+        <MoreFields label="Ek alanlar (tür, sorumlu, bütçe, öncelik…)" defaultOpen={editing}>
+          <Field label="Tür"><Input {...f.text("type")} placeholder="Aylık yönetim, video…" /></Field>
+          <Field label="Sorumlu"><Input {...f.text("owner")} /></Field>
+          <Field label="Başlangıç"><Input type="date" {...f.text("start_date")} /></Field>
+          <Field label="Bütçe (₺)"><Input type="number" inputMode="decimal" min="0" {...f.num("budget")} /></Field>
+          <Field label="Öncelik">
+            <Select {...f.text("priority")}>
+              {(Object.keys(prioMap) as Priority[]).reverse().map((p) => <option key={p} value={p}>{prioMap[p].label}</option>)}
+            </Select>
+          </Field>
+          <div className="sm:col-span-2"><Field label="Notlar"><Textarea {...f.text("notes")} /></Field></div>
+        </MoreFields>
       </div>
-    </Modal>
+    </FormModal>
   );
-});
+}
 
 export default function ProjectsPage() {
   const hydrated = useHydrated(["projects", "clients", "tasks", "brands"]);
@@ -86,26 +92,68 @@ export default function ProjectsPage() {
   const clients = useStore((s) => s.clients);
   const brands = useStore((s) => s.brands);
   const tasks = useStore((s) => s.tasks);
-  const remove = useStore((s) => s.remove);
 
-  const [open, setOpen] = useState(false);
-  const [initialForm, setInitialForm] = useState<Project | null>(null);
+  const wantNew = useNewIntent();
+  const [modal, setModal] = useState<{ initial: Project | null } | null>(() => (wantNew ? { initial: null } : null));
+  const [scope, setScope] = usePersistentState<Scope>("projects-scope", "active", SCOPES);
+  const [query, setQuery] = useState("");
+  const del = useDeleteConfirm();
 
   // O(1) lookups
   const { clientMap, taskCounts } = useMemo(() => {
     const _clientMap = new Map<string, string>();
     for (const c of clients) _clientMap.set(c.id, c.name);
-
     const _taskCounts = new Map<string, number>();
     for (const t of tasks) {
-      if (t.status !== "done") {
-        _taskCounts.set(t.project_id || "", ((t.project_id ? _taskCounts.get(t.project_id) : 0) || 0) + 1);
-      }
+      if (t.status !== "done" && t.project_id) _taskCounts.set(t.project_id, (_taskCounts.get(t.project_id) ?? 0) + 1);
     }
     return { clientMap: _clientMap, taskCounts: _taskCounts };
   }, [clients, tasks]);
 
-  if (!hydrated) return <PageHeader title="Projeler" subtitle="Yükleniyor…" />;
+  const counts = useMemo(() => {
+    let active = 0;
+    for (const p of projects) if (ACTIVE.includes(p.status)) active++;
+    return { active, closed: projects.length - active, all: projects.length };
+  }, [projects]);
+
+  const scoped = useMemo(
+    () => (scope === "all" ? projects : projects.filter((p) => ACTIVE.includes(p.status) === (scope === "active"))),
+    [projects, scope],
+  );
+  const visible = useListSearch(scoped, query, (p) => `${p.name} ${clientMap.get(p.client_id ?? "") ?? ""} ${p.type ?? ""} ${p.owner ?? ""}`);
+
+  const columns = useMemo<Column<Project>[]>(() => [
+    {
+      key: "name", header: "Proje", tone: "primary", mobile: "title",
+      sort: (p) => p.name,
+      cell: (p) => (
+        <>
+          <span className="block max-w-[26rem] truncate">{p.name}</span>
+          <span className="block max-w-[26rem] truncate text-xs font-normal text-muted">{clientMap.get(p.client_id ?? "") || "Müşterisiz"}{p.type ? ` · ${p.type}` : ""}</span>
+        </>
+      ),
+    },
+    {
+      key: "status", header: "Durum", mobile: "badge",
+      sort: (p) => Object.keys(projectStatus).indexOf(p.status),
+      cell: (p) => (
+        <StatusSelect value={p.status} options={statusOptions} label={`Durum: ${p.name}`} onChange={(status) => patchRecord("projects", p.id, { status }, "Durum güncellenemedi")} />
+      ),
+    },
+    {
+      key: "priority", header: "Öncelik", mobile: "hide",
+      sort: (p) => ["low", "medium", "high", "urgent"].indexOf(p.priority),
+      cell: (p) => <Badge tone={prioMap[p.priority].tone}>{prioMap[p.priority].label}</Badge>,
+    },
+    { key: "budget", header: "Bütçe", tone: "strong", sort: (p) => p.budget, cell: (p) => (p.budget ? TRY(p.budget) : "—") },
+    { key: "end", header: "Bitiş", sort: (p) => p.end_date, cell: (p) => dateTR(p.end_date) },
+    {
+      key: "tasks", header: "Açık görev", sort: (p) => taskCounts.get(p.id) ?? 0,
+      cell: (p) => taskCounts.get(p.id) ?? 0,
+    },
+  ], [clientMap, taskCounts]);
+
+  if (!hydrated) return <PageLoading title="Projeler" />;
 
   return (
     <>
@@ -113,42 +161,50 @@ export default function ProjectsPage() {
         title="Projeler"
         subtitle="Müşteri projeleri, durum, bütçe ve teslim takibi"
         action={
-          <Button onClick={() => { setInitialForm(empty); setOpen(true); }}>
-            <span className="flex items-center gap-1.5"><Plus className="h-4 w-4" /> Yeni Proje</span>
+          <Button onClick={() => setModal({ initial: null })}>
+            <Plus className="h-4 w-4" aria-hidden /> Yeni Proje
           </Button>
         }
       />
 
-      <div className="grid gap-3 md:grid-cols-2">
-        {projects.map((p) => {
-          const clientName = clientMap.get(p.client_id || "") || "—";
-          const openTasks = taskCounts.get(p.id) || 0;
-          return (
-            <div key={p.id} className="card p-4">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-semibold text-foreground">{p.name}</p>
-                  <p className="mt-0.5 text-xs text-muted">{clientName} · {p.type || "—"}</p>
-                </div>
-                <Badge tone={projectStatus[p.status].tone}>{projectStatus[p.status].label}</Badge>
-              </div>
-              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                <span className="text-muted">Bütçe: <span className="text-foreground">{p.budget ? TRY(p.budget) : "—"}</span></span>
-                <span className="text-muted">Bitiş: <span className="text-foreground">{dateTR(p.end_date)}</span></span>
-                <Badge tone={prioMap[p.priority].tone}>{prioMap[p.priority].label}</Badge>
-                <span className="text-muted">{openTasks} açık görev</span>
-              </div>
-              <div className="mt-3 flex justify-end gap-1 border-t border-border pt-2">
-                <button onClick={() => { setInitialForm(p); setOpen(true); }} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-foreground"><Pencil className="h-4 w-4" /></button>
-                <button onClick={() => remove("projects", p.id)} className="rounded-md p-1.5 text-muted hover:bg-danger/15 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
-              </div>
-            </div>
-          );
-        })}
-        {projects.length === 0 && <p className="col-span-full py-10 text-center text-muted">Henüz proje yok.</p>}
-      </div>
+      <Toolbar>
+        <FilterChips
+          label="Proje kapsamı"
+          value={scope}
+          onChange={setScope}
+          options={[
+            { id: "active", label: "Aktif", count: counts.active },
+            { id: "closed", label: "Kapanan", count: counts.closed },
+            { id: "all", label: "Tümü", count: counts.all },
+          ]}
+        />
+        <SearchBox value={query} onChange={setQuery} placeholder="Proje, müşteri ara…" label="Proje ara" />
+      </Toolbar>
 
-      <ProjectModal open={open} onClose={() => setOpen(false)} initial={initialForm} clients={clients} brands={brands} />
+      <DataTable
+        columns={columns}
+        rows={visible}
+        rowKey={(p) => p.id}
+        onOpen={(p) => setModal({ initial: p })}
+        openLabel={(p) => `Düzenle: ${p.name}`}
+        actions={(p) => (
+          <RowActions
+            label={p.name}
+            onEdit={() => setModal({ initial: p })}
+            onDelete={() => del.ask({ key: "projects", id: p.id, label: p.name, warning: "Projeye bağlı tüm görevler (tamamlananlar dahil) de silinir." })}
+          />
+        )}
+        empty={
+          projects.length === 0 ? (
+            <EmptyState title="Henüz proje yok" hint="İlk müşteri projesini ekleyerek başla." action={{ label: "Yeni Proje", onClick: () => setModal({ initial: null }) }} />
+          ) : (
+            <EmptyState title="Eşleşen proje yok" hint={query ? "Aramayı veya filtreyi değiştir." : "Bu kapsamda proje bulunmuyor."} />
+          )
+        }
+      />
+
+      {modal && <ProjectModal initial={modal.initial} clients={clients} brands={brands} onClose={() => setModal(null)} />}
+      {del.dialog}
     </>
   );
 }

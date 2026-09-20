@@ -1,11 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useMemo, memo } from "react";
-import { ArrowRight, PackageCheck, Pencil, Plus, ShoppingCart, Trash2 } from "lucide-react";
-import { PageHeader, EmptyState, StatCard } from "@/components/ui";
-import { Modal, Field, Input, Select, Button } from "@/components/form";
+import { useMemo, useState } from "react";
+import { ArrowRight, Plus, ShoppingCart } from "lucide-react";
+import { PageHeader, EmptyState, StatStrip } from "@/components/ui";
+import { FormModal, Field, Input, Select, MoreFields, Button, useFormState } from "@/components/form";
+import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
+import type { Column } from "@/components/list";
+import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
+import { useToday } from "@/lib/useToday";
+import { daysBetween } from "@/lib/taskLogic";
+import { patchRecord } from "@/lib/mutate";
+import { useToasts } from "@/lib/toast";
 import { equipmentStatus, TRY, dateTR } from "@/lib/labels";
 import type { Equipment, EquipmentStatus } from "@/lib/types";
 
@@ -22,160 +29,224 @@ const categories = [
   "Güç & Yazılım", "Lojistik", "Diğer",
 ];
 
-const EquipmentModal = memo(function EquipmentModal({
-  open, onClose, initial, isPlanned
-}: {
-  open: boolean, onClose: () => void, initial: Equipment | null, isPlanned: boolean
-}) {
-  const [form, setForm] = useState<Equipment>({ ...baseEmpty, status: isPlanned ? "planned" : "idle" });
-  const editing = Boolean(form.id);
+const activeStatusOptions = (Object.keys(equipmentStatus) as EquipmentStatus[])
+  .filter((value) => value !== "planned")
+  .map((value) => ({ value, ...equipmentStatus[value] }));
 
-  useMemo(() => {
-    if (open) setForm(initial || { ...baseEmpty, status: isPlanned ? "planned" : "idle" });
-  }, [open, initial, isPlanned]);
+type Scope = "all" | "idle" | "busy" | "issue";
+const SCOPES: readonly Scope[] = ["all", "idle", "busy", "issue"];
+const scopeOf = (s: EquipmentStatus): Scope =>
+  s === "idle" ? "idle" : s === "maintenance" || s === "broken" || s === "lost" ? "issue" : "busy";
 
-  const add = useStore((s) => s.add);
-  const update = useStore((s) => s.update);
+function EquipmentModal({ initial, isPlanned, onClose }: { initial: Equipment | null; isPlanned: boolean; onClose: () => void }) {
+  const f = useFormState<Equipment>(initial ?? { ...baseEmpty, status: isPlanned ? "planned" : "idle" });
+  const editing = Boolean(initial?.id);
+  const { form } = f;
 
-  async function save() {
-    if (!form.name.trim()) return;
-    const payload = { ...form, status: isPlanned ? "planned" as const : form.status };
-    if (editing) await update("equipment", form.id, payload);
-    else await add("equipment", { ...payload, id: uid(), created_at: nowISO() });
-    onClose();
+  async function submit() {
+    if (!form.name.trim()) return { ok: false, error: "Ekipman adı zorunludur." };
+    const payload = { ...form, name: form.name.trim(), status: isPlanned ? ("planned" as const) : form.status };
+    const s = useStore.getState();
+    return editing ? s.update("equipment", form.id, payload) : s.add("equipment", { ...payload, id: uid(), created_at: nowISO() });
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
+    <FormModal
       title={editing ? (isPlanned ? "Alınacak ekipmanı düzenle" : "Ekipmanı düzenle") : (isPlanned ? "Alınacak ekipman ekle" : "Yeni ekipman")}
-      footer={<><Button variant="ghost" onClick={onClose}>Vazgeç</Button><Button onClick={save}>Kaydet</Button></>}
+      onClose={onClose}
+      onSubmit={submit}
+      successMessage={editing ? "Ekipman güncellendi" : "Ekipman eklendi"}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2"><Field label="Ekipman adı *"><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field></div>
-        <Field label="Marka / model"><Input value={form.brand_model} onChange={(event) => setForm({ ...form, brand_model: event.target.value })} /></Field>
+        <div className="sm:col-span-2"><Field label="Ekipman adı *"><Input {...f.text("name")} autoComplete="off" /></Field></div>
+        <Field label="Marka / model"><Input {...f.text("brand_model")} /></Field>
         <Field label="Kategori">
-          <Select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>
+          <Select {...f.text("category")}>
             <option value="">Seçin</option>
             {categories.map((category) => <option key={category}>{category}</option>)}
           </Select>
         </Field>
-        {!isPlanned && <Field label="Durum">
-          <Select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as EquipmentStatus })}>
-            {Object.entries(equipmentStatus).filter(([key]) => key !== "planned").map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
-          </Select>
-        </Field>}
-        {!isPlanned && <Field label="Zimmet (kişi)"><Input value={form.assigned_to} onChange={(event) => setForm({ ...form, assigned_to: event.target.value })} /></Field>}
-        <Field label={isPlanned ? "Tahmini fiyat (₺)" : "Değer (₺)"}><Input type="number" value={form.purchase_price ?? ""} onChange={(event) => setForm({ ...form, purchase_price: event.target.value ? Number(event.target.value) : undefined })} /></Field>
-        {!isPlanned && <Field label="Sonraki bakım"><Input type="date" value={form.next_service} onChange={(event) => setForm({ ...form, next_service: event.target.value })} /></Field>}
-        <div className="sm:col-span-2"><Field label={isPlanned ? "İhtiyaç / satın alma notu" : "Not"}><Input value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></Field></div>
+        {!isPlanned && (
+          <Field label="Durum">
+            <Select {...f.text("status")}>
+              {activeStatusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </Select>
+          </Field>
+        )}
+        <Field label={isPlanned ? "Tahmini fiyat (₺)" : "Değer (₺)"}><Input type="number" inputMode="decimal" min="0" {...f.num("purchase_price")} /></Field>
+        <MoreFields label={isPlanned ? "Ek alanlar (not)" : "Ek alanlar (zimmet, bakım, not)"} defaultOpen={editing}>
+          {!isPlanned && <Field label="Zimmet (kişi)"><Input {...f.text("assigned_to")} /></Field>}
+          {!isPlanned && <Field label="Sonraki bakım"><Input type="date" {...f.text("next_service")} /></Field>}
+          <div className="sm:col-span-2"><Field label={isPlanned ? "İhtiyaç / satın alma notu" : "Not"}><Input {...f.text("notes")} /></Field></div>
+        </MoreFields>
       </div>
-    </Modal>
+    </FormModal>
   );
-});
+}
 
 export default function EquipmentManager({ view }: { view: EquipmentView }) {
   const hydrated = useHydrated(["equipment"]);
   const equipment = useStore((s) => s.equipment);
-  const update = useStore((s) => s.update);
-  const remove = useStore((s) => s.remove);
+  const today = useToday();
   const isPlanned = view === "planned";
+  const title = isPlanned ? "Alınacak Ekipmanlar" : "Aktif Ekipmanlar";
 
-  const [open, setOpen] = useState(false);
-  const [initialForm, setInitialForm] = useState<Equipment | null>(null);
+  const wantNew = useNewIntent();
+  const [modal, setModal] = useState<{ initial: Equipment | null } | null>(() => (wantNew ? { initial: null } : null));
+  const [scope, setScope] = usePersistentState<Scope>("equipment-scope", "all", SCOPES);
+  const [query, setQuery] = useState("");
+  const del = useDeleteConfirm();
 
-  const { rows, inventoryValue } = useMemo(() => {
-    const r = hydrated ? equipment.filter((item) => isPlanned ? item.status === "planned" : item.status !== "planned") : [];
-    const val = r.reduce((sum, item) => sum + (item.purchase_price ?? 0), 0);
-    return { rows: r, inventoryValue: val };
-  }, [hydrated, equipment, isPlanned]);
+  const { rows, inventoryValue, counts } = useMemo(() => {
+    const r = equipment.filter((item) => (isPlanned ? item.status === "planned" : item.status !== "planned"));
+    const counts = { all: r.length, idle: 0, busy: 0, issue: 0 };
+    let val = 0;
+    for (const item of r) {
+      val += item.purchase_price ?? 0;
+      if (!isPlanned) counts[scopeOf(item.status)]++;
+    }
+    return { rows: r, inventoryValue: val, counts };
+  }, [equipment, isPlanned]);
 
-  async function moveToInventory(item: Equipment) {
-    await update("equipment", item.id, { status: "idle", assigned_to: "" });
+  const scoped = useMemo(
+    () => (isPlanned || scope === "all" ? rows : rows.filter((item) => scopeOf(item.status) === scope)),
+    [rows, scope, isPlanned],
+  );
+  const visible = useListSearch(scoped, query, (e) => `${e.name} ${e.brand_model ?? ""} ${e.category ?? ""} ${e.assigned_to ?? ""}`);
+
+  function moveToInventory(item: Equipment) {
+    patchRecord("equipment", item.id, { status: "idle", assigned_to: "" }, "Envantere alınamadı");
+    useToasts.getState().push({ message: `“${item.name}” envantere alındı`, href: "/equipment", hrefLabel: "Aktif ekipmanlar" });
   }
 
-  if (!hydrated) return <PageHeader title={isPlanned ? "Alınacak Ekipmanlar" : "Aktif Ekipmanlar"} subtitle="Yükleniyor…" />;
+  const columns = useMemo<Column<Equipment>[]>(() => {
+    const cols: Column<Equipment>[] = [
+      {
+        key: "name", header: "Ekipman", tone: "primary", mobile: "title", sort: (e) => e.name,
+        cell: (e) => (
+          <>
+            <span className="block max-w-[22rem] truncate">{e.name}</span>
+            {e.brand_model && <span className="block max-w-[22rem] truncate text-xs font-normal text-muted">{e.brand_model}</span>}
+          </>
+        ),
+      },
+      { key: "category", header: "Kategori", sort: (e) => e.category, cell: (e) => e.category || "—" },
+    ];
+    if (!isPlanned) {
+      cols.push(
+        {
+          key: "status", header: "Durum", mobile: "badge", sort: (e) => Object.keys(equipmentStatus).indexOf(e.status),
+          cell: (e) => (
+            <StatusSelect value={e.status} options={activeStatusOptions} label={`Durum: ${e.name}`} onChange={(status) => patchRecord("equipment", e.id, { status }, "Durum güncellenemedi")} />
+          ),
+        },
+        { key: "assigned", header: "Zimmet", sort: (e) => e.assigned_to, cell: (e) => e.assigned_to || "—" },
+      );
+    }
+    cols.push({ key: "price", header: isPlanned ? "Tahmini fiyat" : "Değer", tone: "strong", sort: (e) => e.purchase_price, cell: (e) => (e.purchase_price ? TRY(e.purchase_price) : "—") });
+    cols.push(
+      isPlanned
+        ? { key: "notes", header: "Not", cell: (e) => <span className="block max-w-[20rem] truncate">{e.notes || "—"}</span> }
+        : {
+            key: "service", header: "Bakım", sort: (e) => e.next_service,
+            cell: (e) => {
+              const due = e.next_service?.slice(0, 10);
+              if (!due) return "—";
+              const left = daysBetween(today, due);
+              if (left < 0) return <span className="text-danger">{dateTR(due)} · gecikti</span>;
+              if (left <= 14) return <span className="text-warning">{dateTR(due)} · {left} gün</span>;
+              return dateTR(due);
+            },
+          },
+    );
+    return cols;
+  }, [isPlanned, today]);
+
+  if (!hydrated) return <PageLoading title={title} />;
+
+  const add = () => setModal({ initial: null });
 
   return (
     <>
       <PageHeader
-        title={isPlanned ? "Alınacak Ekipmanlar" : "Aktif Ekipmanlar"}
+        title={title}
         subtitle={isPlanned
           ? "Henüz envanterde olmayan ihtiyaçlar ve tahmini bütçeleri"
           : "Yalnızca elinizde bulunan ekipmanların durum, zimmet ve bakım takibi"}
         action={
           <div className="flex flex-wrap gap-2">
-            <Link prefetch={false} href={isPlanned ? "/equipment" : "/equipment/planned"} className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2">
+            <Link prefetch={false} href={isPlanned ? "/equipment" : "/equipment/planned"} className="inline-flex min-h-10 items-center rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2">
               {isPlanned ? "Aktif ekipmanları gör" : "Alınacakları gör"}
             </Link>
-            <Button onClick={() => { setInitialForm({ ...baseEmpty, status: isPlanned ? "planned" : "idle" }); setOpen(true); }}>
-              <span className="flex items-center gap-1.5"><Plus className="h-4 w-4" /> {isPlanned ? "Alınacak Ekle" : "Ekipman Ekle"}</span>
+            <Button onClick={add}>
+              <Plus className="h-4 w-4" aria-hidden /> {isPlanned ? "Alınacak Ekle" : "Ekipman Ekle"}
             </Button>
           </div>
         }
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <StatCard label={isPlanned ? "Alınacak sayısı" : "Aktif ekipman"} value={String(rows.length)} icon={isPlanned ? ShoppingCart : PackageCheck} />
-        <StatCard label={isPlanned ? "Tahmini toplam bütçe" : "Toplam envanter değeri"} value={TRY(inventoryValue)} tone="amber" />
-        {!isPlanned && <StatCard label="Bakımda / arızalı" value={String(rows.filter((item) => item.status === "maintenance" || item.status === "broken").length)} tone="warning" />}
-      </div>
+      <StatStrip
+        items={[
+          { label: isPlanned ? "Alınacak sayısı" : "Aktif ekipman", value: String(rows.length) },
+          { label: isPlanned ? "Tahmini toplam bütçe" : "Toplam envanter değeri", value: TRY(inventoryValue), tone: "amber" },
+          ...(!isPlanned ? [{ label: "Bakımda / arızalı", value: String(counts.issue), tone: "warning" as const }] : []),
+        ]}
+      />
 
-      {rows.length === 0 ? (
-        <EmptyState
-          title={isPlanned ? "Alınacak ekipman bulunmuyor" : "Aktif ekipman bulunmuyor"}
-          hint={isPlanned ? "İhtiyaç listenize kamera, lens veya diğer ekipmanları ekleyebilirsiniz." : "Elinizde bulunan ilk ekipmanı ekleyerek envanteri oluşturabilirsiniz."}
-        />
-      ) : (
-        <div className="card overflow-x-auto">
-          <table className="w-full min-w-[820px] text-sm">
-            <thead>
-              <tr className="border-b border-border text-left text-xs text-muted">
-                <th className="px-4 py-3 font-medium">Ekipman</th>
-                <th className="px-4 py-3 font-medium">Kategori</th>
-                {!isPlanned && <th className="px-4 py-3 font-medium">Durum</th>}
-                {!isPlanned && <th className="px-4 py-3 font-medium">Zimmet</th>}
-                <th className="px-4 py-3 font-medium">{isPlanned ? "Tahmini fiyat" : "Değer"}</th>
-                <th className="px-4 py-3 font-medium">{isPlanned ? "Not" : "Bakım"}</th>
-                <th className="px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((item) => (
-                <tr key={item.id} className="border-b border-border/60 hover:bg-surface-2/50">
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-foreground">{item.name}</p>
-                    <p className="text-xs text-muted">{item.brand_model || "—"}</p>
-                  </td>
-                  <td className="px-4 py-3 text-muted">{item.category || "—"}</td>
-                  {!isPlanned && <td className="px-4 py-3">
-                    <select
-                      value={item.status}
-                      onChange={(event) => update("equipment", item.id, { status: event.target.value as EquipmentStatus })}
-                      className="rounded-md border border-border bg-background px-2 py-1 text-xs text-muted outline-none focus:border-amber/60"
-                    >
-                      {Object.entries(equipmentStatus).filter(([key]) => key !== "planned").map(([key, value]) => <option key={key} value={key}>{value.label}</option>)}
-                    </select>
-                  </td>}
-                  {!isPlanned && <td className="px-4 py-3 text-muted">{item.assigned_to || "—"}</td>}
-                  <td className="px-4 py-3 text-foreground">{item.purchase_price ? TRY(item.purchase_price) : "—"}</td>
-                  <td className="max-w-[280px] px-4 py-3 text-muted">{isPlanned ? (item.notes || "—") : dateTR(item.next_service)}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      {isPlanned && <button onClick={() => moveToInventory(item)} title="Envantere taşı" className="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs text-success hover:bg-success/10"><ArrowRight className="h-4 w-4" /> Envantere al</button>}
-                      <button onClick={() => { setInitialForm(item); setOpen(true); }} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-foreground"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => remove("equipment", item.id)} className="rounded-md p-1.5 text-muted hover:bg-danger/15 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <Toolbar>
+        {isPlanned ? (
+          <span className="flex items-center gap-1.5 text-xs text-muted"><ShoppingCart className="h-3.5 w-3.5" aria-hidden /> {visible.length} kalem</span>
+        ) : (
+          <FilterChips
+            label="Ekipman durumu"
+            value={scope}
+            onChange={setScope}
+            options={[
+              { id: "all", label: "Tümü", count: counts.all },
+              { id: "idle", label: "Boşta", count: counts.idle },
+              { id: "busy", label: "Kullanımda", count: counts.busy },
+              { id: "issue", label: "Bakım / arıza", count: counts.issue },
+            ]}
+          />
+        )}
+        <SearchBox value={query} onChange={setQuery} placeholder="Ekipman, kategori ara…" label="Ekipman ara" />
+      </Toolbar>
 
-      <EquipmentModal open={open} onClose={() => setOpen(false)} initial={initialForm} isPlanned={isPlanned} />
+      <DataTable
+        columns={columns}
+        rows={visible}
+        rowKey={(e) => e.id}
+        onOpen={(e) => setModal({ initial: e })}
+        openLabel={(e) => `Düzenle: ${e.name}`}
+        actions={(e) => (
+          <RowActions label={e.name} onEdit={() => setModal({ initial: e })} onDelete={() => del.ask({ key: "equipment", id: e.id, label: e.name })}>
+            {isPlanned && (
+              <button
+                type="button"
+                onClick={() => moveToInventory(e)}
+                aria-label={`Envantere al: ${e.name}`}
+                className="mr-1 flex h-10 items-center gap-1 rounded-lg px-2.5 text-xs font-medium text-success hover:bg-success/10 md:h-8"
+              >
+                <ArrowRight className="h-4 w-4" aria-hidden /> Envantere al
+              </button>
+            )}
+          </RowActions>
+        )}
+        empty={
+          rows.length === 0 ? (
+            <EmptyState
+              title={isPlanned ? "Alınacak ekipman bulunmuyor" : "Aktif ekipman bulunmuyor"}
+              hint={isPlanned ? "İhtiyaç listenize kamera, lens veya diğer ekipmanları ekleyebilirsiniz." : "Elinizde bulunan ilk ekipmanı ekleyerek envanteri oluşturabilirsiniz."}
+              action={{ label: isPlanned ? "Alınacak Ekle" : "Ekipman Ekle", onClick: add }}
+            />
+          ) : (
+            <EmptyState title="Eşleşen ekipman yok" hint={query ? "Aramayı değiştir." : "Bu durumda ekipman bulunmuyor."} />
+          )
+        }
+      />
+
+      {modal && <EquipmentModal initial={modal.initial} isPlanned={isPlanned} onClose={() => setModal(null)} />}
+      {del.dialog}
     </>
   );
 }

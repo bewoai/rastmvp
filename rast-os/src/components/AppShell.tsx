@@ -3,6 +3,8 @@
 import { useState } from "react";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
+import QuickAddHost from "./QuickAddTask";
+import Toaster from "./Toaster";
 
 export default function AppShell({
   children,
@@ -37,6 +39,10 @@ export default function AppShell({
         <Topbar onMenu={() => setOpen(true)} userName={userName} />
         <main className="app-main flex-1 overflow-y-auto p-4 md:p-7">{children}</main>
       </div>
+
+      {/* Global Q Hızlı Görev Ekle + bildirimler (kendi state'leri; kabuğu render etmez) */}
+      <QuickAddHost />
+      <Toaster />
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { createClient } from "./supabase/client";
 
 type Collections = keyof RastData;
 type Row = { id: string } & Record<string, unknown>;
-type MutationResult = { ok: boolean; error?: string };
+export type MutationResult = { ok: boolean; error?: string };
 
 export const COLLECTIONS: Collections[] = [
   "leads", "jobs", "clients", "brands", "contacts", "projects",
@@ -97,21 +97,32 @@ export const useStore = create<StoreState>()((set, get) => ({
     if (!s.supabase || !s.orgId) return;
 
     const sb = createClient();
-    const next: Partial<RastData> = {};
-    const nextLoaded = { ...s.loadedCollections };
+    const fetched: Partial<Record<Collections, Row[]>> = {};
 
     await Promise.all(
       collections.map(async (c) => {
         if (s.loadedCollections[c]) return; // Zaten yüklüyse geç
         const { data } = await sb.from(c).select("*").order("created_at", { ascending: false });
-        (next as Record<string, unknown>)[c] = data ?? [];
-        nextLoaded[c] = true;
+        fetched[c] = (data ?? []) as Row[];
       }),
     );
 
-    if (Object.keys(next).length > 0) {
-      set({ ...(next as RastData), loadedCollections: nextLoaded });
+    const keys = Object.keys(fetched) as Collections[];
+    if (keys.length === 0) return;
+
+    // Yükleme sürerken eklenen (iyimser) kayıtlar — ör. başka sayfadan global Hızlı Ekle —
+    // gelen listeyle ezilmesin; state en güncel haliyle okunur.
+    const cur = get();
+    const next: Partial<RastData> = {};
+    const nextLoaded = { ...cur.loadedCollections };
+    for (const c of keys) {
+      const rows = fetched[c]!;
+      const ids = new Set(rows.map((r) => r.id));
+      const pending = (cur[c] as unknown as Row[]).filter((r) => !ids.has(r.id));
+      (next as Record<string, unknown>)[c] = [...pending, ...rows];
+      nextLoaded[c] = true;
     }
+    set({ ...(next as RastData), loadedCollections: nextLoaded });
   },
 
   add: async (key, item) => {

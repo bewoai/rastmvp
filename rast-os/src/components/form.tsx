@@ -31,7 +31,7 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 backdrop-blur-sm md:items-center">
       <div className="fixed inset-0 bg-black/70" onClick={onClose} />
-      <div className={`card relative z-10 w-full overflow-hidden shadow-2xl ${size === "xl" ? "max-w-5xl" : size === "lg" ? "max-w-3xl" : "max-w-lg"}`}>
+      <div role="dialog" aria-modal="true" aria-label={title} className={`card relative z-10 w-full overflow-hidden shadow-2xl ${size === "xl" ? "max-w-5xl" : size === "lg" ? "max-w-3xl" : "max-w-lg"}`}>
         <div className="flex items-center justify-between border-b border-border/80 bg-white/[0.02] px-5 py-4">
           <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
           <button

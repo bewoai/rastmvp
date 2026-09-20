@@ -1,102 +1,59 @@
 "use client";
 
-import { useState, useMemo, memo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
-import { PageHeader, Badge } from "@/components/ui";
-import { Modal, Field, Input, Select, Button } from "@/components/form";
-import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
-import { taskStatus, taskBoard, priority as prioMap, dateTR } from "@/lib/labels";
-import type { Task, TaskStatus, Priority, Project } from "@/lib/types";
+import { PageHeader, EmptyState } from "@/components/ui";
+import { Button } from "@/components/form";
+import TaskRow from "@/components/TaskRow";
+import { useStore, useHydrated } from "@/lib/store";
+import { useQuickAdd } from "@/lib/quickAdd";
+import { useToday } from "@/lib/useToday";
+import { addDaysKey, bucketTasks, groupTasks, sortTasks } from "@/lib/taskLogic";
+import type { TaskView } from "@/lib/taskLogic";
 
-const empty: Task = {
-  id: "", project_id: "", title: "", assignee: "", due_date: "",
-  priority: "medium", status: "todo", created_at: "",
+const VIEWS: { id: TaskView; label: string }[] = [
+  { id: "today", label: "Bugün" },
+  { id: "upcoming", label: "Yaklaşan" },
+  { id: "all", label: "Tümü" },
+  { id: "completed", label: "Tamamlanan" },
+];
+
+const EMPTY: Record<TaskView, { title: string; hint: string }> = {
+  today: { title: "Bugün için görev yok", hint: "Q'ya basıp yeni görev ekleyebilirsin." },
+  upcoming: { title: "Yaklaşan görev yok", hint: "Tarihi ileride olan görevler burada görünür." },
+  all: { title: "Açık görev yok", hint: "Q'ya basıp ilk görevini ekle." },
+  completed: { title: "Tamamlanan görev yok", hint: "Tamamladığın görevler burada görünür." },
 };
-
-const NewTaskModal = memo(function NewTaskModal({ open, onClose, projects }: { open: boolean, onClose: () => void, projects: Project[] }) {
-  const [form, setForm] = useState<Task>(empty);
-  const add = useStore((s) => s.add);
-
-  function save() {
-    if (!form.title.trim()) return;
-    add("tasks", { ...form, id: uid(), created_at: nowISO() });
-    setForm({ ...empty });
-    onClose();
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Yeni görev"
-      footer={
-        <>
-          <Button variant="ghost" onClick={onClose}>Vazgeç</Button>
-          <Button onClick={save}>Kaydet</Button>
-        </>
-      }
-    >
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2">
-          <Field label="Görev başlığı *">
-            <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
-          </Field>
-        </div>
-        <Field label="Proje">
-          <Select value={form.project_id} onChange={(e) => setForm({ ...form, project_id: e.target.value })}>
-            <option value="">Seçin</option>
-            {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-          </Select>
-        </Field>
-        <Field label="Sorumlu">
-          <Input value={form.assignee} onChange={(e) => setForm({ ...form, assignee: e.target.value })} />
-        </Field>
-        <Field label="Son tarih">
-          <Input type="date" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} />
-        </Field>
-        <Field label="Öncelik">
-          <Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value as Priority })}>
-            <option value="low">Düşük</option>
-            <option value="medium">Orta</option>
-            <option value="high">Yüksek</option>
-            <option value="urgent">Acil</option>
-          </Select>
-        </Field>
-      </div>
-    </Modal>
-  );
-});
 
 export default function TasksPage() {
   const hydrated = useHydrated(["tasks", "projects"]);
   const tasks = useStore((s) => s.tasks);
   const projects = useStore((s) => s.projects);
-  const update = useStore((s) => s.update);
+  const openComposer = useQuickAdd((s) => s.openComposer);
+  const today = useToday();
+  // "Tümü" varsayılan: tarihsiz dahil her açık görev görünür (başka sayfadan Q ile eklenen de)
+  const [view, setView] = useState<TaskView>("all");
 
-  const [open, setOpen] = useState(false);
-
-  // O(1) project lookups
+  // O(1) proje adı araması
   const projectMap = useMemo(() => {
     const map = new Map<string, string>();
-    for (const p of projects) {
-      map.set(p.id, p.name);
-    }
+    for (const p of projects) map.set(p.id, p.name);
     return map;
   }, [projects]);
-  
-  // O(N) grouping by column before render
-  const columns = useMemo(() => {
-    const cols: Record<string, Task[]> = {};
-    for (const col of taskBoard) cols[col] = [];
-    if (hydrated) {
-      for (const t of tasks) {
-        if (cols[t.status]) {
-           cols[t.status].push(t);
-        }
-      }
-    }
-    return cols;
-  }, [tasks, hydrated]);
+
+  // Tüm görünümler tek O(N) geçişte; yalnızca aktif görünüm sıralanır/gruplanır.
+  const buckets = useMemo(() => bucketTasks(hydrated ? tasks : [], today), [tasks, hydrated, today]);
+  const groups = useMemo(
+    () => groupTasks(view, sortTasks(view, buckets[view]), today),
+    [buckets, view, today],
+  );
+
+  // Quick Add, aktif görünümde anında görünsün diye varsayılan son tarihi görünüme göre ayarlar.
+  useEffect(() => {
+    const due = view === "today" ? today : view === "upcoming" ? addDaysKey(today, 1) : "";
+    useQuickAdd.getState().setDefaultDue(due);
+    return () => useQuickAdd.getState().setDefaultDue("");
+  }, [view, today]);
 
   if (!hydrated) return <PageHeader title="Görevler" subtitle="Yükleniyor…" />;
 
@@ -104,54 +61,75 @@ export default function TasksPage() {
     <>
       <PageHeader
         title="Görevler"
-        subtitle="Bekliyor → Yapılıyor → İç kontrol → Müşteri onayı → Revize → Tamamlandı"
+        subtitle="Hızlı ekle için Q'ya bas. Başlığa tıklayarak düzenle, daireye tıklayarak tamamla."
         action={
-          <Button onClick={() => setOpen(true)}>
-            <span className="flex items-center gap-1.5"><Plus className="h-4 w-4" /> Yeni Görev</span>
+          <Button className="hidden md:block" onClick={openComposer}>
+            <span className="flex items-center gap-1.5">
+              <Plus className="h-4 w-4" /> Yeni Görev
+              <kbd className="ml-1 rounded border border-black/25 px-1 text-[10px] font-semibold leading-4">Q</kbd>
+            </span>
           </Button>
         }
       />
 
-      <div className="flex gap-3 overflow-x-auto pb-4">
-        {taskBoard.map((col) => {
-          const items = columns[col] || [];
+      <div role="tablist" aria-label="Görev görünümleri" className="mb-4 flex gap-1 overflow-x-auto border-b border-border/70">
+        {VIEWS.map((v) => {
+          const active = v.id === view;
           return (
-            <div key={col} className="flex w-64 shrink-0 flex-col">
-              <div className="mb-2 flex items-center justify-between px-1">
-                <span className="text-xs font-semibold text-foreground">{taskStatus[col as keyof typeof taskStatus].label}</span>
-                <span className="text-xs text-muted">{items.length}</span>
-              </div>
-              <div className="flex-1 space-y-2 rounded-lg bg-surface/40 p-2">
-                {items.map((t) => {
-                  const projectName = projectMap.get(t.project_id || "");
-                  return (
-                    <div key={t.id} className="card p-3">
-                      <p className="text-sm font-medium text-foreground">{t.title}</p>
-                      {projectName && <p className="mt-0.5 text-xs text-muted">{projectName}</p>}
-                      <div className="mt-2 flex items-center justify-between">
-                        <Badge tone={prioMap[t.priority as keyof typeof prioMap].tone}>{prioMap[t.priority as keyof typeof prioMap].label}</Badge>
-                        <span className="text-[11px] text-muted">{dateTR(t.due_date)}</span>
-                      </div>
-                      <select
-                        value={t.status}
-                        onChange={(e) => update("tasks", t.id, { status: e.target.value as TaskStatus })}
-                        className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1 text-xs text-muted outline-none focus:border-amber/60"
-                      >
-                        {taskBoard.map((st) => (
-                          <option key={st} value={st}>{taskStatus[st as keyof typeof taskStatus].label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  );
-                })}
-                {items.length === 0 && <p className="px-1 py-4 text-center text-xs text-muted">—</p>}
-              </div>
-            </div>
+            <button
+              key={v.id}
+              role="tab"
+              aria-selected={active}
+              onClick={() => setView(v.id)}
+              className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors ${
+                active
+                  ? "border-amber text-foreground"
+                  : "border-transparent text-muted hover:text-foreground"
+              }`}
+            >
+              {v.label}
+              <span className="text-xs text-muted">{buckets[v.id].length}</span>
+            </button>
           );
         })}
       </div>
 
-      <NewTaskModal open={open} onClose={() => setOpen(false)} projects={projects} />
+      {groups.length === 0 ? (
+        <EmptyState title={EMPTY[view].title} hint={EMPTY[view].hint} />
+      ) : (
+        <div className="space-y-5 pb-24 md:pb-4">
+          {groups.map((g) => (
+            <section key={g.id} aria-label={g.label || undefined}>
+              {g.label && (
+                <h2 className="mb-1 flex items-baseline gap-2 px-2 text-xs font-semibold text-foreground">
+                  {g.label}
+                  <span className="font-normal text-muted">{g.tasks.length}</span>
+                </h2>
+              )}
+              <ul className="divide-y divide-border/40">
+                {g.tasks.map((t) => (
+                  <TaskRow
+                    key={t.id}
+                    task={t}
+                    projectName={t.project_id ? projectMap.get(t.project_id) : undefined}
+                    today={today}
+                  />
+                ))}
+              </ul>
+            </section>
+          ))}
+        </div>
+      )}
+
+      {/* Mobil: klavye/Q yok — sabit + Yeni Görev */}
+      <button
+        type="button"
+        onClick={openComposer}
+        aria-label="Yeni görev"
+        className="btn-amber fixed bottom-5 right-5 z-30 flex items-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold md:hidden"
+      >
+        <Plus className="h-5 w-5" /> Yeni Görev
+      </button>
     </>
   );
 }

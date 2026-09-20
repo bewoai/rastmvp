@@ -126,7 +126,7 @@ export default function Topbar({
         <input ref={searchRef} value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setSearchOpen(true); }} onFocus={() => setSearchOpen(Boolean(searchTerm.trim()))} aria-label="Müşteri, proje, içerik ara" placeholder="Müşteri, proje, içerik ara…" className="w-full rounded-xl border border-border/80 bg-surface/60 py-2.5 pl-10 pr-20 text-sm text-foreground outline-none transition-shadow placeholder:text-muted focus:border-amber/60 focus:ring-4 focus:ring-amber/10" />
         <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-border bg-surface-2/70 px-1.5 py-0.5 text-[10px] text-muted">Ctrl K</kbd>
         {searchOpen && searchTerm.trim() && <div className="absolute left-0 right-0 top-14 z-50 overflow-hidden rounded-2xl border border-border bg-surface p-2 shadow-2xl">
-          {searchResults.length ? searchResults.map((item) => { const Icon = item.icon; return <Link key={item.href} href={item.href} onClick={() => { setSearchOpen(false); setSearchTerm(""); }} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted hover:bg-surface-2 hover:text-foreground"><Icon className="h-4 w-4 text-amber" /><span>{item.label}</span><ArrowUpRight className="ml-auto h-3.5 w-3.5" /></Link>; }) : <p className="px-3 py-3 text-sm text-muted">Eşleşen ekran bulunamadı.</p>}
+          {searchResults.length ? searchResults.map((item) => { const Icon = item.icon; return <Link prefetch={false} key={item.href} href={item.href} onClick={() => { setSearchOpen(false); setSearchTerm(""); }} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted hover:bg-surface-2 hover:text-foreground"><Icon className="h-4 w-4 text-amber" /><span>{item.label}</span><ArrowUpRight className="ml-auto h-3.5 w-3.5" /></Link>; }) : <p className="px-3 py-3 text-sm text-muted">Eşleşen ekran bulunamadı.</p>}
         </div>}
       </div>
 
@@ -142,7 +142,7 @@ export default function Topbar({
               {unreadCount > 0 && <button onClick={() => setReadIds(notifications.map((notice) => notice.id))} className="flex items-center gap-1 text-xs text-amber hover:text-foreground"><Check className="h-3.5 w-3.5" /> Tümünü okundu işaretle</button>}
             </div>
             {notifications.length ? <div className="max-h-[min(22rem,60vh)] overflow-y-auto p-2.5">
-              {notifications.map((notice) => { const Icon = notice.icon; return <Link key={notice.id} href={notice.href} onClick={() => { setReadIds((ids) => ids.includes(notice.id) ? ids : [...ids, notice.id]); setNotificationOpen(false); }} className={`flex gap-3 rounded-lg p-3 hover:bg-surface-2 ${readIds.includes(notice.id) ? "opacity-60" : ""}`}>
+              {notifications.map((notice) => { const Icon = notice.icon; return <Link prefetch={false} key={notice.id} href={notice.href} onClick={() => { setReadIds((ids) => ids.includes(notice.id) ? ids : [...ids, notice.id]); setNotificationOpen(false); }} className={`flex gap-3 rounded-lg p-3 hover:bg-surface-2 ${readIds.includes(notice.id) ? "opacity-60" : ""}`}>
                 <span className={`mt-0.5 rounded-lg p-2 ${notice.tone === "danger" ? "bg-danger/10 text-danger" : notice.tone === "warning" ? "bg-warning/10 text-warning" : "bg-amber/10 text-amber"}`}><Icon className="h-4 w-4" /></span>
                 <span className="min-w-0"><span className="block text-sm font-medium text-foreground">{notice.title}</span><span className="mt-0.5 block text-xs text-muted">{notice.body}</span></span>
               </Link>; })}
@@ -158,7 +158,7 @@ export default function Topbar({
           {accountOpen && <div className="absolute right-0 top-14 z-50 w-64 overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl">
             <div className="border-b border-border/80 px-4 py-4"><p className="text-sm font-semibold text-foreground">{userName || "Rast kullanıcısı"}</p><p className="mt-0.5 text-xs text-muted">Rast Creative hesabı</p></div>
             <div className="p-2">
-              <Link href="/settings" onClick={() => setAccountOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted hover:bg-surface-2 hover:text-foreground"><Settings className="h-4 w-4" /> Hesap ve ayarlar</Link>
+              <Link prefetch={false} href="/settings" onClick={() => setAccountOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted hover:bg-surface-2 hover:text-foreground"><Settings className="h-4 w-4" /> Hesap ve ayarlar</Link>
               <form action="/auth/signout" method="post"><button type="submit" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted hover:bg-danger/10 hover:text-danger"><span className="h-4 w-4 text-center">↪</span> Çıkış yap</button></form>
             </div>
           </div>}

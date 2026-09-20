@@ -11,17 +11,17 @@ export default async function AppGroupLayout({
 
   if (isSupabaseConfigured) {
     const supabase = await createClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    const user = session?.user;
-    if (user) {
+    // Proxy kimliği zaten doğruladı; burada imzası YEREL doğrulanmış claims okunur (ağ çağrısı yok,
+    // sunucuda güvenilmeyen getSession() kullanılmaz). Tek ağ çağrısı: görünen ad için profil.
+    const { data } = await supabase.auth.getClaims();
+    const claims = data?.claims;
+    if (claims?.sub) {
       const { data: profile } = await supabase
         .from("profiles")
         .select("full_name")
-        .eq("id", user.id)
+        .eq("id", claims.sub)
         .single();
-      userName = profile?.full_name ?? user.email ?? null;
+      userName = profile?.full_name ?? claims.email ?? null;
     }
   }
 

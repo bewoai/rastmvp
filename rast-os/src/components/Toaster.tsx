@@ -24,7 +24,7 @@ export default function Toaster() {
         >
           <span className="min-w-0 flex-1">{t.message}</span>
           {t.href && (
-            <Link href={t.href} onClick={() => dismiss(t.id)} className="shrink-0 text-xs font-medium text-amber hover:text-amber-hi">
+            <Link prefetch={false} href={t.href} onClick={() => dismiss(t.id)} className="shrink-0 text-xs font-medium text-amber hover:text-amber-hi">
               {t.hrefLabel ?? "Görüntüle"}
             </Link>
           )}

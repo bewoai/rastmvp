@@ -58,7 +58,7 @@ export function StatCard({
   );
 
   const className = "card card-hover group relative block overflow-hidden p-4 outline-none focus-visible:ring-2 focus-visible:ring-amber/70";
-  return href ? <Link href={href} className={className}>{content}</Link> : <div className={className}>{content}</div>;
+  return href ? <Link href={href} prefetch={false} className={className}>{content}</Link> : <div className={className}>{content}</div>;
 }
 
 export function Panel({
@@ -97,6 +97,7 @@ export function EmptyState({
       {cta && (
         <Link
           href={cta.href}
+          prefetch={false}
           className="btn-amber mt-4 rounded-lg px-4 py-2 text-sm font-medium"
         >
           {cta.label}

@@ -1,9 +1,26 @@
 "use client";
 
-import Link from "next/link";
+import Link, { useLinkStatus } from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { NAV } from "@/lib/nav";
+
+/**
+ * Prefetch kapalı olduğundan tıklama ile yeni sayfa arasında ağ beklemesi olur; tıklanan öğede
+ * anında dönen bir gösterge çıkar. Sabit boyutlu (layout kayması yok); çok hızlı geçişlerde
+ * yanıp sönmesin diye 100 ms gecikmeyle görünür.
+ */
+function PendingHint() {
+  const { pending } = useLinkStatus();
+  return (
+    <span
+      aria-hidden
+      className={`ml-auto h-3.5 w-3.5 shrink-0 rounded-full border-2 border-amber/30 border-t-amber transition-opacity ${
+        pending ? "animate-spin opacity-100 delay-100" : "opacity-0"
+      }`}
+    />
+  );
+}
 
 export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -55,6 +72,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                         strokeWidth={active ? 2.4 : 2}
                       />
                       {item.label}
+                      <PendingHint />
                     </Link>
                   </li>
                 );

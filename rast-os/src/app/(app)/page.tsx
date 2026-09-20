@@ -81,7 +81,7 @@ export default function DashboardPage() {
   }
 
   const panelLink = (href: string) => (
-    <Link href={href} className="flex items-center gap-1 text-xs text-muted transition-colors hover:text-amber">
+    <Link prefetch={false} href={href} className="flex items-center gap-1 text-xs text-muted transition-colors hover:text-amber">
       Tümü <ArrowRight className="h-3.5 w-3.5" />
     </Link>
   );
@@ -94,7 +94,7 @@ export default function DashboardPage() {
       <PageHeader title="Dashboard" subtitle={monthLabel} />
 
       <div className="mb-5 grid gap-4 lg:grid-cols-[1.45fr_.55fr]">
-        <Link href="/finance/invoices" className="balance-panel card card-hover group relative overflow-hidden p-5 outline-none focus-visible:ring-2 focus-visible:ring-amber/70 md:p-6">
+        <Link prefetch={false} href="/finance/invoices" className="balance-panel card card-hover group relative overflow-hidden p-5 outline-none focus-visible:ring-2 focus-visible:ring-amber/70 md:p-6">
           <div className="relative z-10 flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted">Aylık net</p>
@@ -121,7 +121,7 @@ export default function DashboardPage() {
             { href: "/content", label: "İçerik ekle", icon: CalendarPlus },
             { href: "/finance/invoices", label: "Tahsilatlar", icon: Receipt },
           ].map(({ href, label, icon: Icon }) => (
-            <Link key={href} href={href} className="group flex min-h-24 flex-col justify-between bg-surface/95 p-4 outline-none transition-colors hover:bg-surface-2 focus-visible:bg-surface-2">
+            <Link prefetch={false} key={href} href={href} className="group flex min-h-24 flex-col justify-between bg-surface/95 p-4 outline-none transition-colors hover:bg-surface-2 focus-visible:bg-surface-2">
               <Icon className="h-4 w-4 text-muted transition-colors group-hover:text-amber" />
               <span className="flex items-end justify-between gap-2 text-sm font-medium text-foreground">{label}<ArrowRight className="h-3.5 w-3.5 text-muted transition-transform group-hover:translate-x-0.5" /></span>
             </Link>
@@ -146,7 +146,7 @@ export default function DashboardPage() {
             <ul className="space-y-1">
               {stats.upcomingShoots.map((shoot) => (
                 <li key={shoot.id}>
-                  <Link href="/shoots" className="interactive-row flex items-center justify-between gap-3">
+                  <Link prefetch={false} href="/shoots" className="interactive-row flex items-center justify-between gap-3">
                     <div className="min-w-0"><p className="truncate text-sm text-foreground">{shoot.title}</p><p className="text-xs text-muted">{shoot.location || "—"}</p></div>
                     <div className="text-right"><Badge tone={shootStatus[shoot.status as keyof typeof shootStatus].tone}>{shootStatus[shoot.status as keyof typeof shootStatus].label}</Badge><p className="mt-1 text-xs text-muted">{dateTR(shoot.scheduled_at)}</p></div>
                   </Link>
@@ -161,7 +161,7 @@ export default function DashboardPage() {
             <ul className="space-y-1">
               {stats.openTasks.map((task) => (
                 <li key={task.id}>
-                  <Link href="/tasks" className="interactive-row flex items-center justify-between gap-3">
+                  <Link prefetch={false} href="/tasks" className="interactive-row flex items-center justify-between gap-3">
                     <div className="min-w-0"><p className="truncate text-sm text-foreground">{task.title}</p><p className="text-xs text-muted">{task.assignee || "—"} · {dateTR(task.due_date)}</p></div>
                     <Badge tone={prioMap[task.priority as keyof typeof prioMap].tone}>{prioMap[task.priority as keyof typeof prioMap].label}</Badge>
                   </Link>
@@ -176,7 +176,7 @@ export default function DashboardPage() {
             <ul className="space-y-1">
               {stats.awaiting.slice(0, 5).map((content) => (
                 <li key={content.id}>
-                  <Link href="/content" className="interactive-row flex items-center justify-between gap-3">
+                  <Link prefetch={false} href="/content" className="interactive-row flex items-center justify-between gap-3">
                     <div className="min-w-0"><p className="truncate text-sm text-foreground">{content.title}</p><p className="text-xs text-muted">{content.platform} · {content.content_type}</p></div>
                     <Badge tone="warning">Bekliyor</Badge>
                   </Link>

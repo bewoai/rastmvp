@@ -1,15 +1,22 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import { PageHeader } from "@/components/ui";
+import { Button } from "@/components/form";
+import { PageLoading } from "@/components/list";
+import LeadModal from "@/components/LeadModal";
 import { useStore, useHydrated } from "@/lib/store";
-import { leadStatus, leadPipeline, TRY } from "@/lib/labels";
+import { useToday } from "@/lib/useToday";
+import { patchRecord } from "@/lib/mutate";
+import { leadStatus, leadPipeline, TRY, dateTR } from "@/lib/labels";
 import type { Lead, LeadStatus } from "@/lib/types";
 
 export default function PipelinePage() {
   const hydrated = useHydrated(["leads"]);
   const leads = useStore((s) => s.leads);
-  const update = useStore((s) => s.update);
+  const today = useToday();
+  const [modal, setModal] = useState<{ initial: Lead | null } | null>(null);
 
   const columnsData = useMemo(() => {
     const cols: Record<string, Lead[]> = {};
@@ -29,61 +36,70 @@ export default function PipelinePage() {
     return { cols, totals };
   }, [leads, hydrated]);
 
-  if (!hydrated) return <PageHeader title="Satış Pipeline" subtitle="Yükleniyor…" />;
+  if (!hydrated) return <PageLoading title="Satış Pipeline" />;
 
   return (
     <>
       <PageHeader
         title="Satış Pipeline"
-        subtitle="Lead'leri sürece göre takip edin — kartların durumunu değiştirin"
+        subtitle="Lead'leri sürece göre takip edin — karta tıklayıp düzenleyin, aşamayı listeden değiştirin"
+        action={
+          <Button onClick={() => setModal({ initial: null })}>
+            <Plus className="h-4 w-4" aria-hidden /> Yeni Lead
+          </Button>
+        }
       />
 
-      <div className="flex gap-3 overflow-x-auto pb-4">
+      <div className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 md:mx-0 md:px-0">
         {leadPipeline.map((col) => {
           const items = columnsData.cols[col] || [];
           const total = columnsData.totals[col] || 0;
           return (
-            <div key={col} className="flex w-64 shrink-0 flex-col">
-              <div className="mb-2 flex items-center justify-between px-1">
-                <span className="text-xs font-semibold text-foreground">
-                  {leadStatus[col as keyof typeof leadStatus].label}
-                </span>
-                <span className="text-xs text-muted">{items.length}</span>
+            <section key={col} aria-label={leadStatus[col].label} className="flex w-[78vw] max-w-72 shrink-0 snap-start flex-col md:w-64">
+              <div className="mb-2 flex items-baseline justify-between gap-2 px-1">
+                <h2 className="truncate text-xs font-semibold text-foreground">
+                  {leadStatus[col].label} <span className="font-normal text-muted">{items.length}</span>
+                </h2>
+                {total > 0 && <span className="shrink-0 text-[11px] text-muted">{TRY(total)}</span>}
               </div>
               <div className="flex-1 space-y-2 rounded-lg bg-surface/40 p-2">
-                {items.map((l) => (
-                  <div key={l.id} className="card p-3">
-                    <p className="text-sm font-medium text-foreground">{l.company_name}</p>
-                    {l.contact_person && (
-                      <p className="mt-0.5 text-xs text-muted">{l.contact_person}</p>
-                    )}
-                    {l.est_budget ? (
-                      <p className="mt-1 text-xs text-amber">{TRY(l.est_budget)}</p>
-                    ) : null}
-                    <select
-                      value={l.status}
-                      onChange={(e) =>
-                        update("leads", l.id, { status: e.target.value as LeadStatus })
-                      }
-                      className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1 text-xs text-muted outline-none focus:border-amber/60"
-                    >
-                      {leadPipeline.map((s) => (
-                        <option key={s} value={s}>{leadStatus[s as keyof typeof leadStatus].label}</option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
-                {items.length === 0 && (
-                  <p className="px-1 py-4 text-center text-xs text-muted">—</p>
-                )}
-                {total > 0 && (
-                  <p className="px-1 pt-1 text-[11px] text-muted">Toplam: {TRY(total)}</p>
-                )}
+                {items.map((l) => {
+                  const due = l.next_followup_at?.slice(0, 10);
+                  const overdue = Boolean(due) && due! < today && col !== "won" && col !== "lost";
+                  return (
+                    <div key={l.id} className="card p-3">
+                      <button
+                        type="button"
+                        onClick={() => setModal({ initial: l })}
+                        aria-label={`Düzenle: ${l.company_name}`}
+                        className="block w-full rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+                      >
+                        <span className="block truncate text-sm font-medium text-foreground">{l.company_name}</span>
+                        {l.contact_person && <span className="mt-0.5 block truncate text-xs text-muted">{l.contact_person}</span>}
+                        {l.est_budget ? <span className="mt-1 block text-xs text-amber">{TRY(l.est_budget)}</span> : null}
+                        {due && <span className={`mt-1 block text-xs ${overdue ? "text-danger" : "text-muted"}`}>Takip: {dateTR(l.next_followup_at)}{overdue ? " · gecikti" : ""}</span>}
+                      </button>
+                      <select
+                        aria-label={`Aşama: ${l.company_name}`}
+                        value={l.status}
+                        onChange={(e) => patchRecord("leads", l.id, { status: e.target.value as LeadStatus }, "Aşama güncellenemedi")}
+                        className="mt-2 h-9 w-full rounded-md border border-border bg-background px-2 text-base text-muted outline-none focus:border-amber/60 md:h-8 md:text-xs"
+                      >
+                        {leadPipeline.map((s) => (
+                          <option key={s} value={s}>{leadStatus[s].label}</option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+                {items.length === 0 && <p className="px-1 py-4 text-center text-xs text-muted">—</p>}
               </div>
-            </div>
+            </section>
           );
         })}
       </div>
+
+      {modal && <LeadModal initial={modal.initial} onClose={() => setModal(null)} />}
     </>
   );
 }

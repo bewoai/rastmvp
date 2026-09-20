@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useMemo, memo } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
-import { PageHeader, Badge } from "@/components/ui";
-import { Modal, Field, Input, Select, Button } from "@/components/form";
+import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
+import { PageHeader, Badge, EmptyState } from "@/components/ui";
+import { FormModal, Field, Input, Select, Button, useFormState } from "@/components/form";
+import { DataTable, PageLoading, RowActions, SearchBox, Toolbar, useListSearch, useNewIntent } from "@/components/list";
+import type { Column } from "@/components/list";
+import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
 import type { Contact, Client } from "@/lib/types";
 
@@ -12,64 +15,57 @@ const empty: Contact = {
   is_approver: false, created_at: "",
 };
 
-const ContactModal = memo(function ContactModal({
-  open, onClose, initial, clients
-}: {
-  open: boolean, onClose: () => void, initial: Contact | null, clients: Client[]
-}) {
-  const [form, setForm] = useState<Contact>(empty);
-  const editing = Boolean(form.id);
+function ContactModal({ initial, clients, onClose }: { initial: Contact | null; clients: Client[]; onClose: () => void }) {
+  const f = useFormState<Contact>(initial ?? empty);
+  const editing = Boolean(initial?.id);
+  const { form } = f;
 
-  useMemo(() => {
-    if (open) setForm(initial || empty);
-  }, [open, initial]);
-
-  const add = useStore((s) => s.add);
-  const update = useStore((s) => s.update);
-
-  function save() {
-    if (!form.full_name.trim()) return;
-    if (editing) update("contacts", form.id, form);
-    else add("contacts", { ...form, id: uid(), created_at: nowISO() });
-    onClose();
+  async function submit() {
+    if (!form.full_name.trim()) return { ok: false, error: "Ad soyad zorunludur." };
+    const payload = { ...form, full_name: form.full_name.trim() };
+    const s = useStore.getState();
+    return editing ? s.update("contacts", form.id, payload) : s.add("contacts", { ...payload, id: uid(), created_at: nowISO() });
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
+    <FormModal
       title={editing ? "Kişi düzenle" : "Yeni kişi"}
-      footer={<><Button variant="ghost" onClick={onClose}>Vazgeç</Button><Button onClick={save}>Kaydet</Button></>}
+      onClose={onClose}
+      onSubmit={submit}
+      successMessage={editing ? "Kişi güncellendi" : "Kişi eklendi"}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field label="Ad soyad *"><Input value={form.full_name} onChange={(e) => setForm({ ...form, full_name: e.target.value })} /></Field>
+        <Field label="Ad soyad *"><Input {...f.text("full_name")} autoComplete="off" /></Field>
         <Field label="Müşteri">
-          <Select value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })}>
+          <Select {...f.text("client_id")}>
             <option value="">Seçin</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         </Field>
-        <Field label="Ünvan"><Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} /></Field>
-        <Field label="Telefon"><Input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></Field>
-        <Field label="E-posta"><Input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></Field>
+        <Field label="Telefon"><Input type="tel" inputMode="tel" {...f.text("phone")} /></Field>
+        <Field label="E-posta"><Input type="email" inputMode="email" {...f.text("email")} /></Field>
+        <Field label="Ünvan"><Input {...f.text("title")} /></Field>
         <Field label="Onay yetkisi">
-          <Select value={form.is_approver ? "1" : "0"} onChange={(e) => setForm({ ...form, is_approver: e.target.value === "1" })}>
+          <Select {...f.bool("is_approver")}>
             <option value="0">Hayır</option><option value="1">Evet</option>
           </Select>
         </Field>
       </div>
-    </Modal>
+    </FormModal>
   );
-});
+}
+
+const linkCls = "rounded outline-none hover:text-amber focus-visible:ring-2 focus-visible:ring-amber/60";
 
 export default function ContactsPage() {
   const hydrated = useHydrated(["contacts", "clients", "brands"]);
   const contacts = useStore((s) => s.contacts);
   const clients = useStore((s) => s.clients);
-  const remove = useStore((s) => s.remove);
 
-  const [open, setOpen] = useState(false);
-  const [initialForm, setInitialForm] = useState<Contact | null>(null);
+  const wantNew = useNewIntent();
+  const [modal, setModal] = useState<{ initial: Contact | null } | null>(() => (wantNew ? { initial: null } : null));
+  const [query, setQuery] = useState("");
+  const del = useDeleteConfirm();
 
   const clientMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -77,7 +73,25 @@ export default function ContactsPage() {
     return map;
   }, [clients]);
 
-  if (!hydrated) return <PageHeader title="İletişim Kişileri" subtitle="Yükleniyor…" />;
+  const visible = useListSearch(contacts, query, (ct) => `${ct.full_name} ${clientMap.get(ct.client_id ?? "") ?? ""} ${ct.title ?? ""} ${ct.phone ?? ""} ${ct.email ?? ""}`);
+
+  const columns = useMemo<Column<Contact>[]>(() => [
+    {
+      key: "name", header: "İsim", tone: "primary", mobile: "title", sort: (ct) => ct.full_name,
+      cell: (ct) => (
+        <>
+          <span className="block max-w-[20rem] truncate">{ct.full_name}</span>
+          {ct.title && <span className="block max-w-[20rem] truncate text-xs font-normal text-muted">{ct.title}</span>}
+        </>
+      ),
+    },
+    { key: "client", header: "Müşteri", sort: (ct) => clientMap.get(ct.client_id ?? ""), cell: (ct) => clientMap.get(ct.client_id ?? "") || "—" },
+    { key: "phone", header: "Telefon", cell: (ct) => (ct.phone ? <a className={linkCls} href={`tel:${ct.phone.replace(/[^\d+]/g, "")}`}>{ct.phone}</a> : "—") },
+    { key: "email", header: "E-posta", cell: (ct) => (ct.email ? <a className={`${linkCls} block max-w-[16rem] truncate`} href={`mailto:${ct.email}`}>{ct.email}</a> : "—") },
+    { key: "approver", header: "Onay", mobile: "badge", sort: (ct) => (ct.is_approver ? 0 : 1), cell: (ct) => (ct.is_approver ? <Badge tone="success">Onaycı</Badge> : <span className="text-muted">—</span>) },
+  ], [clientMap]);
+
+  if (!hydrated) return <PageLoading title="İletişim Kişileri" />;
 
   return (
     <>
@@ -85,53 +99,37 @@ export default function ContactsPage() {
         title="İletişim Kişileri"
         subtitle="Müşteri tarafındaki yetkililer ve onay verecek kişiler"
         action={
-          <Button onClick={() => { setInitialForm(empty); setOpen(true); }}>
-            <span className="flex items-center gap-1.5"><Plus className="h-4 w-4" /> Yeni Kişi</span>
+          <Button onClick={() => setModal({ initial: null })}>
+            <Plus className="h-4 w-4" aria-hidden /> Yeni Kişi
           </Button>
         }
       />
 
-      <div className="card overflow-x-auto">
-        <table className="w-full min-w-[720px] text-sm">
-          <thead>
-            <tr className="border-b border-border text-left text-xs text-muted">
-              <th className="px-4 py-3 font-medium">İsim</th>
-              <th className="px-4 py-3 font-medium">Müşteri</th>
-              <th className="px-4 py-3 font-medium">Ünvan</th>
-              <th className="px-4 py-3 font-medium">Telefon</th>
-              <th className="px-4 py-3 font-medium">E-posta</th>
-              <th className="px-4 py-3 font-medium">Onay</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {contacts.map((ct) => {
-              const clientName = clientMap.get(ct.client_id || "") || "—";
-              return (
-                <tr key={ct.id} className="border-b border-border/60 hover:bg-surface-2/50">
-                  <td className="px-4 py-3 font-medium text-foreground">{ct.full_name}</td>
-                  <td className="px-4 py-3 text-muted">{clientName}</td>
-                  <td className="px-4 py-3 text-muted">{ct.title || "—"}</td>
-                  <td className="px-4 py-3 text-muted">{ct.phone || "—"}</td>
-                  <td className="px-4 py-3 text-muted">{ct.email || "—"}</td>
-                  <td className="px-4 py-3">{ct.is_approver ? <Badge tone="success">Onaycı</Badge> : <span className="text-muted">—</span>}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-end gap-1">
-                      <button onClick={() => { setInitialForm(ct); setOpen(true); }} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-foreground"><Pencil className="h-4 w-4" /></button>
-                      <button onClick={() => remove("contacts", ct.id)} className="rounded-md p-1.5 text-muted hover:bg-danger/15 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-            {contacts.length === 0 && (
-              <tr><td colSpan={7} className="py-6 text-center text-muted">Henüz kayıt yok.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      <Toolbar>
+        <span className="text-xs text-muted">{visible.length} kişi</span>
+        <SearchBox value={query} onChange={setQuery} placeholder="Kişi, müşteri, telefon ara…" label="Kişi ara" />
+      </Toolbar>
 
-      <ContactModal open={open} onClose={() => setOpen(false)} initial={initialForm} clients={clients} />
+      <DataTable
+        columns={columns}
+        rows={visible}
+        rowKey={(ct) => ct.id}
+        onOpen={(ct) => setModal({ initial: ct })}
+        openLabel={(ct) => `Düzenle: ${ct.full_name}`}
+        actions={(ct) => (
+          <RowActions label={ct.full_name} onEdit={() => setModal({ initial: ct })} onDelete={() => del.ask({ key: "contacts", id: ct.id, label: ct.full_name })} />
+        )}
+        empty={
+          contacts.length === 0 ? (
+            <EmptyState title="Henüz kişi yok" hint="Müşteri tarafındaki yetkilileri ve onaycıları ekle." action={{ label: "Yeni Kişi", onClick: () => setModal({ initial: null }) }} />
+          ) : (
+            <EmptyState title="Eşleşen kişi yok" hint="Aramayı değiştir." />
+          )
+        }
+      />
+
+      {modal && <ContactModal initial={modal.initial} clients={clients} onClose={() => setModal(null)} />}
+      {del.dialog}
     </>
   );
 }

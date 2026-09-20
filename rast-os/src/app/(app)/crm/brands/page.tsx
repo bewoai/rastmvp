@@ -1,9 +1,12 @@
 "use client";
 
-import { useState, useMemo, memo } from "react";
-import { Plus, Pencil, Trash2 } from "lucide-react";
-import { PageHeader } from "@/components/ui";
-import { Modal, Field, Input, Select, Textarea, Button } from "@/components/form";
+import { useMemo, useState } from "react";
+import { Plus } from "lucide-react";
+import { PageHeader, EmptyState } from "@/components/ui";
+import { FormModal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
+import { DataTable, PageLoading, RowActions, SearchBox, Toolbar, useListSearch, useNewIntent } from "@/components/list";
+import type { Column } from "@/components/list";
+import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
 import type { Brand, Client } from "@/lib/types";
 
@@ -12,61 +15,56 @@ const empty: Brand = {
   color_palette: "", website: "", instagram: "", notes: "", created_at: "",
 };
 
-const BrandModal = memo(function BrandModal({
-  open, onClose, initial, clients
-}: {
-  open: boolean, onClose: () => void, initial: Brand | null, clients: Client[]
-}) {
-  const [form, setForm] = useState<Brand>(empty);
-  const editing = Boolean(form.id);
+function BrandModal({ initial, clients, onClose }: { initial: Brand | null; clients: Client[]; onClose: () => void }) {
+  const f = useFormState<Brand>(initial ?? empty);
+  const editing = Boolean(initial?.id);
+  const { form } = f;
 
-  useMemo(() => {
-    if (open) setForm(initial || empty);
-  }, [open, initial]);
-
-  const add = useStore((s) => s.add);
-  const update = useStore((s) => s.update);
-
-  function save() {
-    if (!form.name.trim()) return;
-    if (editing) update("brands", form.id, form);
-    else add("brands", { ...form, id: uid(), created_at: nowISO() });
-    onClose();
+  async function submit() {
+    if (!form.name.trim()) return { ok: false, error: "Marka adı zorunludur." };
+    // brands.client_id veritabanında zorunlu (NOT NULL): boş bırakılırsa kayıt reddedilirdi
+    if (!form.client_id) return { ok: false, error: "Marka bir müşteriye bağlı olmalı — müşteri seçin." };
+    const payload = { ...form, name: form.name.trim() };
+    const s = useStore.getState();
+    return editing ? s.update("brands", form.id, payload) : s.add("brands", { ...payload, id: uid(), created_at: nowISO() });
   }
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
+    <FormModal
       title={editing ? "Marka düzenle" : "Yeni marka"}
-      footer={<><Button variant="ghost" onClick={onClose}>Vazgeç</Button><Button onClick={save}>Kaydet</Button></>}
+      onClose={onClose}
+      onSubmit={submit}
+      successMessage={editing ? "Marka güncellendi" : "Marka eklendi"}
     >
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Field label="Marka adı *"><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></Field>
-        <Field label="Müşteri">
-          <Select value={form.client_id} onChange={(e) => setForm({ ...form, client_id: e.target.value })}>
+        <Field label="Marka adı *"><Input {...f.text("name")} autoComplete="off" /></Field>
+        <Field label="Müşteri *" hint={clients.length === 0 ? "Önce Müşteriler sayfasından bir müşteri ekleyin." : undefined}>
+          <Select {...f.text("client_id")}>
             <option value="">Seçin</option>
             {clients.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         </Field>
-        <Field label="Marka tonu"><Input value={form.tone} onChange={(e) => setForm({ ...form, tone: e.target.value })} /></Field>
-        <Field label="Hedef kitle"><Input value={form.target_audience} onChange={(e) => setForm({ ...form, target_audience: e.target.value })} /></Field>
-        <Field label="Instagram"><Input value={form.instagram} onChange={(e) => setForm({ ...form, instagram: e.target.value })} placeholder="@marka" /></Field>
-        <Field label="Web sitesi"><Input value={form.website} onChange={(e) => setForm({ ...form, website: e.target.value })} /></Field>
-        <div className="sm:col-span-2"><Field label="Notlar"><Textarea value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></Field></div>
+        <Field label="Instagram"><Input {...f.text("instagram")} placeholder="@marka" /></Field>
+        <Field label="Web sitesi"><Input type="url" inputMode="url" {...f.text("website")} /></Field>
+        <MoreFields label="Ek alanlar (ton, hedef kitle, not)" defaultOpen={editing}>
+          <Field label="Marka tonu"><Input {...f.text("tone")} /></Field>
+          <Field label="Hedef kitle"><Input {...f.text("target_audience")} /></Field>
+          <div className="sm:col-span-2"><Field label="Notlar"><Textarea {...f.text("notes")} /></Field></div>
+        </MoreFields>
       </div>
-    </Modal>
+    </FormModal>
   );
-});
+}
 
 export default function BrandsPage() {
   const hydrated = useHydrated(["brands", "clients"]);
   const brands = useStore((s) => s.brands);
   const clients = useStore((s) => s.clients);
-  const remove = useStore((s) => s.remove);
 
-  const [open, setOpen] = useState(false);
-  const [initialForm, setInitialForm] = useState<Brand | null>(null);
+  const wantNew = useNewIntent();
+  const [modal, setModal] = useState<{ initial: Brand | null } | null>(() => (wantNew ? { initial: null } : null));
+  const [query, setQuery] = useState("");
+  const del = useDeleteConfirm();
 
   const clientMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -74,7 +72,24 @@ export default function BrandsPage() {
     return map;
   }, [clients]);
 
-  if (!hydrated) return <PageHeader title="Markalar" subtitle="Yükleniyor…" />;
+  const visible = useListSearch(brands, query, (b) => `${b.name} ${clientMap.get(b.client_id) ?? ""} ${b.tone ?? ""} ${b.instagram ?? ""}`);
+
+  const columns = useMemo<Column<Brand>[]>(() => [
+    {
+      key: "name", header: "Marka", tone: "primary", mobile: "title", sort: (b) => b.name,
+      cell: (b) => (
+        <>
+          <span className="block max-w-[20rem] truncate">{b.name}</span>
+          <span className="block max-w-[20rem] truncate text-xs font-normal text-muted">{clientMap.get(b.client_id) || "Müşterisiz"}</span>
+        </>
+      ),
+    },
+    { key: "tone", header: "Ton", sort: (b) => b.tone, cell: (b) => <span className="block max-w-[16rem] truncate">{b.tone || "—"}</span> },
+    { key: "audience", header: "Hedef kitle", sort: (b) => b.target_audience, cell: (b) => <span className="block max-w-[16rem] truncate">{b.target_audience || "—"}</span> },
+    { key: "ig", header: "Instagram", sort: (b) => b.instagram, cell: (b) => (b.instagram ? <span className="text-amber">{b.instagram}</span> : "—") },
+  ], [clientMap]);
+
+  if (!hydrated) return <PageLoading title="Markalar" />;
 
   return (
     <>
@@ -82,37 +97,37 @@ export default function BrandsPage() {
         title="Markalar"
         subtitle="Her müşterinin bir veya birden fazla markası olabilir"
         action={
-          <Button onClick={() => { setInitialForm(empty); setOpen(true); }}>
-            <span className="flex items-center gap-1.5"><Plus className="h-4 w-4" /> Yeni Marka</span>
+          <Button onClick={() => setModal({ initial: null })}>
+            <Plus className="h-4 w-4" aria-hidden /> Yeni Marka
           </Button>
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {brands.map((b) => {
-          const clientName = clientMap.get(b.client_id || "") || "—";
-          return (
-            <div key={b.id} className="card p-4">
-              <div className="flex items-start justify-between">
-                <div>
-                  <p className="font-semibold text-foreground">{b.name}</p>
-                  <p className="mt-0.5 text-xs text-muted">{clientName}</p>
-                </div>
-                <div className="flex gap-1">
-                  <button onClick={() => { setInitialForm(b); setOpen(true); }} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-foreground"><Pencil className="h-4 w-4" /></button>
-                  <button onClick={() => remove("brands", b.id)} className="rounded-md p-1.5 text-muted hover:bg-danger/15 hover:text-danger"><Trash2 className="h-4 w-4" /></button>
-                </div>
-              </div>
-              {b.tone && <p className="mt-2 text-sm text-muted"><span className="text-foreground">Ton:</span> {b.tone}</p>}
-              {b.target_audience && <p className="mt-1 text-sm text-muted"><span className="text-foreground">Kitle:</span> {b.target_audience}</p>}
-              {b.instagram && <p className="mt-1 text-sm text-amber">{b.instagram}</p>}
-            </div>
-          );
-        })}
-        {brands.length === 0 && <p className="col-span-full py-10 text-center text-muted">Henüz marka yok.</p>}
-      </div>
+      <Toolbar>
+        <span className="text-xs text-muted">{visible.length} marka</span>
+        <SearchBox value={query} onChange={setQuery} placeholder="Marka, müşteri ara…" label="Marka ara" />
+      </Toolbar>
 
-      <BrandModal open={open} onClose={() => setOpen(false)} initial={initialForm} clients={clients} />
+      <DataTable
+        columns={columns}
+        rows={visible}
+        rowKey={(b) => b.id}
+        onOpen={(b) => setModal({ initial: b })}
+        openLabel={(b) => `Düzenle: ${b.name}`}
+        actions={(b) => (
+          <RowActions label={b.name} onEdit={() => setModal({ initial: b })} onDelete={() => del.ask({ key: "brands", id: b.id, label: b.name })} />
+        )}
+        empty={
+          brands.length === 0 ? (
+            <EmptyState title="Henüz marka yok" hint="Markalar bir müşteriye bağlıdır." action={{ label: "Yeni Marka", onClick: () => setModal({ initial: null }) }} />
+          ) : (
+            <EmptyState title="Eşleşen marka yok" hint="Aramayı değiştir." />
+          )
+        }
+      />
+
+      {modal && <BrandModal initial={modal.initial} clients={clients} onClose={() => setModal(null)} />}
+      {del.dialog}
     </>
   );
 }

@@ -57,30 +57,34 @@ export default function LoginPage() {
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
             <div>
-              <label className="mb-1 block text-sm text-muted">E-posta</label>
+              <label htmlFor="login-email" className="mb-1 block text-sm text-muted">E-posta</label>
               <input
+                id="login-email"
                 type="email"
+                autoComplete="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-amber/60"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-foreground outline-none focus:border-amber/60 focus:ring-4 focus:ring-amber/10 md:text-sm"
                 placeholder="ornek@rastcreative.com"
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm text-muted">Şifre</label>
+              <label htmlFor="login-password" className="mb-1 block text-sm text-muted">Şifre</label>
               <input
+                id="login-password"
                 type="password"
+                autoComplete="current-password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-amber/60"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-foreground outline-none focus:border-amber/60 focus:ring-4 focus:ring-amber/10 md:text-sm"
                 placeholder="••••••••"
               />
             </div>
 
             {error && (
-              <p className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
+              <p role="alert" className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger">
                 {error}
               </p>
             )}
@@ -88,7 +92,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="btn-amber w-full rounded-lg py-2.5 text-sm font-medium disabled:opacity-60"
+              className="btn-amber min-h-11 w-full rounded-lg py-2.5 text-sm font-medium disabled:opacity-60"
             >
               {loading ? "Giriş yapılıyor…" : "Giriş yap"}
             </button>

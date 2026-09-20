@@ -1,9 +1,35 @@
 "use client";
 
+import { useState } from "react";
 import { PageHeader, Panel, Badge } from "@/components/ui";
 import { Button, Field, Input } from "@/components/form";
-import { useStore } from "@/lib/store";
+import { useStore, useHydrated } from "@/lib/store";
 import { useFx } from "@/lib/fx";
+
+/**
+ * Kur alanı: yazılan metin yerel taslakta tutulur, geçerli (>0) sayı olunca hemen kaydedilir.
+ * Eskiden değer doğrudan store'a bağlıydı ve geçersiz/boş giriş yok sayıldığı için alan silinemiyor,
+ * "46" → "50" yazmak için önce 46'nın üzerine tek tek yazmak gerekiyordu. Blur'da geçersizse eski değer döner.
+ */
+function RateInput({ value, onCommit, label }: { value: number; onCommit: (n: number) => void; label: string }) {
+  const [draft, setDraft] = useState(String(value));
+  return (
+    <Field label={label}>
+      <Input
+        type="text"
+        inputMode="decimal"
+        value={draft}
+        onChange={(e) => {
+          const text = e.target.value;
+          setDraft(text);
+          const n = Number(text.replace(",", "."));
+          if (text.trim() !== "" && Number.isFinite(n) && n > 0) onCommit(n);
+        }}
+        onBlur={() => setDraft(String(value))}
+      />
+    </Field>
+  );
+}
 
 const roles = [
   { name: "Yönetici", desc: "Tüm müşteriler, finans, teklifler, raporlar, ekip, ayarlar" },
@@ -14,6 +40,9 @@ const roles = [
 ];
 
 export default function SettingsPage() {
+  // Yalnızca oturum/mod bilgisi için init (koleksiyon yüklenmez). Bu olmadan Ayarlar ilk açılan sayfaysa
+  // "Yerel (demo)" yanlış gösteriliyordu.
+  useHydrated();
   const supabase = useStore((s) => s.supabase);
   const { usd, eur, updated, setRate } = useFx();
 
@@ -64,12 +93,8 @@ export default function SettingsPage() {
             otomatik güncellenir.
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3">
-            <Field label="USD/TRY">
-              <Input type="number" min="0.01" step="0.01" value={usd} onChange={(e) => setRate("usd", Number(e.target.value))} />
-            </Field>
-            <Field label="EUR/TRY">
-              <Input type="number" min="0.01" step="0.01" value={eur} onChange={(e) => setRate("eur", Number(e.target.value))} />
-            </Field>
+            <RateInput label="USD/TRY" value={usd} onCommit={(n) => setRate("usd", n)} />
+            <RateInput label="EUR/TRY" value={eur} onCommit={(n) => setRate("eur", n)} />
           </div>
           {updated && <p className="mt-2 text-xs text-muted">Son güncelleme: {updated}</p>}
         </Panel>

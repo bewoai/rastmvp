@@ -1,6 +1,9 @@
+import type { Metadata } from "next";
 import AppShell from "@/components/AppShell";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = { title: "Dashboard · Rast OS" };
 
 export default async function AppGroupLayout({
   children,

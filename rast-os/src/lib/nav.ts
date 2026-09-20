@@ -73,3 +73,12 @@ export const NAV: NavGroup[] = [
     ],
   },
 ];
+
+const FLAT = NAV.flatMap((group) => group.items);
+
+/** Yola en uzun eşleşen menü öğesi (ör. /equipment/planned → "Alınacak Ekipmanlar"). */
+export function activeNavItem(pathname: string): NavItem | undefined {
+  return FLAT
+    .filter((item) => (item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`)))
+    .sort((a, b) => b.href.length - a.href.length)[0];
+}

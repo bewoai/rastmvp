@@ -28,7 +28,7 @@ const prioRing: Record<Priority, string> = {
 };
 
 const chipCls =
-  "relative inline-flex h-6 items-center gap-1 rounded-md px-1.5 text-xs transition-colors hover:bg-surface-2 focus-within:ring-2 focus-within:ring-amber/60";
+  "relative inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs transition-colors hover:bg-surface-2 focus-within:ring-2 focus-within:ring-amber/60 md:h-6";
 
 // Masaüstünde ikincil chip'ler hover/focus'ta belirir; dokunmatikte (mobil) hep görünür.
 const revealCls = "md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100";
@@ -96,7 +96,8 @@ const TaskRow = memo(function TaskRow({
         aria-checked={done}
         aria-label={done ? "Görevi yeniden aç" : "Görevi tamamla"}
         onClick={() => patchTask(task.id, { status: done ? "todo" : "done" })}
-        className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
+        // before: pseudo-öğe dokunma alanını ~36 px'e büyütür (görsel daire 20 px kalır)
+        className={`relative flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors before:absolute before:-inset-2 before:content-[''] ${
           done
             ? "border-success bg-success text-background"
             : `${prioRing[task.priority] ?? prioRing.medium} text-transparent hover:bg-white/10 hover:text-muted`

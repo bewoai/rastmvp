@@ -7,8 +7,8 @@ import { useToasts } from "@/lib/toast";
 export default function Toaster() {
   const toasts = useToasts((s) => s.toasts);
   const dismiss = useToasts((s) => s.dismiss);
-  if (toasts.length === 0) return null;
 
+  // Canlı bölge her zaman DOM'da: ekran okuyucular sonradan eklenen toast'ları duyurabilsin.
   return (
     <div
       aria-live="polite"

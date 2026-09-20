@@ -75,7 +75,8 @@ body {
   position: relative;
   background: linear-gradient(180deg, rgba(8, 12, 10, 0.12), rgba(8, 12, 10, 0.5));
 }
-.app-main > * { animation: page-in .42s cubic-bezier(.22, .8, .25, 1) backwards; }
+/* Sayfa geçişi: kısa, yalnızca opaklık (transform yok) — içerik beklemeden görünsün */
+.app-main > * { animation: page-in .14s ease-out backwards; }
 .ambient-scene {
   position: absolute;
   inset: 0;
@@ -103,9 +104,23 @@ body {
 .interactive-row:hover { background: rgba(184, 242, 82, .055); transform: translateX(2px); }
 
 @keyframes page-in {
-  from { opacity: 0; transform: translateY(7px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
+
+/* Gezinme çubuğu: 150 ms gecikmeyle (hızlı geçişlerde hiç görünmez), sonra yavaşça %90'a uzar */
+@keyframes nav-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(.9); }
+}
+.nav-progress { animation: nav-progress 6s cubic-bezier(.1, .6, .2, 1) .15s both; }
+
+/* Klavye odağı: tüm etkileşimli öğelerde görünür halka (kendi halkası olan alanlar ezmez) */
+a:focus-visible, button:focus-visible, summary:focus-visible, [role="tab"]:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+main:focus-visible { outline: none; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

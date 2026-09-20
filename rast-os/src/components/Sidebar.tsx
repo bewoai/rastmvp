@@ -3,7 +3,8 @@
 import Link, { useLinkStatus } from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { NAV } from "@/lib/nav";
+import { X } from "lucide-react";
+import { NAV, activeNavItem } from "@/lib/nav";
 
 /**
  * Prefetch kapalı olduğundan tıklama ile yeni sayfa arasında ağ beklemesi olur; tıklanan öğede
@@ -22,15 +23,13 @@ function PendingHint() {
   );
 }
 
-export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
+export default function Sidebar({ onNavigate, onClose }: { onNavigate?: () => void; onClose?: () => void }) {
   const pathname = usePathname();
-  const activeHref = NAV.flatMap((group) => group.items)
-    .filter((item) => item.href === "/" ? pathname === "/" : pathname === item.href || pathname.startsWith(`${item.href}/`))
-    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  const activeHref = activeNavItem(pathname)?.href;
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border/80 bg-surface/90 backdrop-blur-xl">
-      <div className="border-b border-border/80 px-5 py-4">
+      <div className="flex items-center justify-between border-b border-border/80 px-5 py-4">
         <Link href="/" prefetch={false} onClick={onNavigate} aria-label="Ana sayfa" className="flex items-center rounded-lg outline-none transition-opacity hover:opacity-85 focus-visible:ring-2 focus-visible:ring-amber/60">
         <Image
           src="/brand/rast-white-tight.svg"
@@ -42,12 +41,17 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
         />
         <span className="sr-only">Rast Creative</span>
         </Link>
+        {onClose && (
+          <button type="button" onClick={onClose} aria-label="Menüyü kapat" className="-mr-2 flex h-10 w-10 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-foreground">
+            <X className="h-5 w-5" aria-hidden />
+          </button>
+        )}
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 py-4 pb-6">
+      <nav aria-label="Ana menü" className="flex-1 overflow-y-auto overscroll-contain px-3 py-3 pb-6">
         {NAV.map((group) => (
-          <div key={group.title} className="mb-6">
-            <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted/80">
+          <div key={group.title} className="mb-4">
+            <p className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-muted">
               {group.title}
             </p>
             <ul className="space-y-0.5">
@@ -61,7 +65,7 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                       prefetch={false}
                       onClick={onNavigate}
                       aria-current={active ? "page" : undefined}
-                      className={`group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm transition-all ${
+                      className={`group flex items-center gap-3 rounded-xl border px-3 py-2.5 text-sm outline-none transition-all focus-visible:ring-2 focus-visible:ring-amber/60 md:py-2 ${
                         active
                           ? "border-amber/20 bg-amber/12 text-foreground shadow-[inset_3px_0_0_var(--amber)]"
                           : "border-transparent text-muted hover:border-border/70 hover:bg-surface-2/70 hover:text-foreground"
@@ -81,7 +85,6 @@ export default function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           </div>
         ))}
       </nav>
-
     </aside>
   );
 }

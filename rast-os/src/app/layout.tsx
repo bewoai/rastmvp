@@ -13,6 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
+  // Sayfa başlıkları rota düzeninde (layout.tsx → metadata) tam metin olarak tanımlanır ("Görevler · Rast OS")
   title: "Rast OS — Ajans Operasyon Sistemi",
   description:
     "Rast Creative ajans işletim sistemi — CRM, proje, içerik, prodüksiyon ve finans yönetimi.",

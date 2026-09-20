@@ -48,7 +48,7 @@ interface StoreState extends RastData {
   load: (collections: Collections[]) => Promise<void>;
   add: <K extends Collections>(key: K, item: RastData[K][number]) => Promise<MutationResult>;
   update: <K extends Collections>(key: K, id: string, patch: Partial<RastData[K][number]>) => Promise<MutationResult>;
-  remove: <K extends Collections>(key: K, id: string) => Promise<void>;
+  remove: <K extends Collections>(key: K, id: string) => Promise<MutationResult>;
   reset: () => void;
   seedToSupabase: () => Promise<{ ok: boolean; error?: string }>;
 }
@@ -172,13 +172,22 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   remove: async (key, id) => {
+    const previous = (get()[key] as unknown as Row[]).find((it) => it.id === id);
     set((s) => ({ [key]: (s[key] as unknown as Row[]).filter((it) => it.id !== id) } as Partial<StoreState>));
     const { supabase } = get();
     if (supabase) {
       const sb = createClient();
       const { error } = await sb.from(key).delete().eq("id", id);
-      if (error) console.error(`[${key}] delete hatası:`, error.message);
+      if (error) {
+        // Silme başarısız: kayıt listeye geri konur (iyimser silmenin geri alınması)
+        if (previous) {
+          set((s) => ({ [key]: [previous, ...(s[key] as unknown as Row[])] } as Partial<StoreState>));
+        }
+        console.error(`[${key}] delete hatası:`, error.message);
+        return { ok: false, error: error.message };
+      }
     }
+    return { ok: true };
   },
 
   reset: () => set({ ...seed }),

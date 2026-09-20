@@ -3,18 +3,43 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import {
-  Wallet, TrendingUp, AlertTriangle, CheckCircle2, Users,
-  Boxes, ArrowRight, Plus, CalendarPlus, Receipt,
+  Wallet, AlertTriangle, CheckCircle2, Users,
+  Boxes, ArrowRight, CalendarPlus, FolderPlus, ListPlus, UserPlus,
 } from "lucide-react";
 import { PageHeader, StatCard, Panel, Badge, EmptyState } from "@/components/ui";
 import { useStore, useHydrated } from "@/lib/store";
 import { useFx, toTRY } from "@/lib/fx";
+import { useToday } from "@/lib/useToday";
+import { useQuickAdd } from "@/lib/quickAdd";
+import { bucketTasks, dateKey, formatDue, sortTasks } from "@/lib/taskLogic";
 import { TRY, dateTR, priority as prioMap, shootStatus } from "@/lib/labels";
+
+/** Veri gelene kadar sayfa iskeleti: başlık + kartlar sabit yükseklikte (layout kayması yok). */
+function DashboardSkeleton({ subtitle }: { subtitle: string }) {
+  return (
+    <div role="status" aria-busy="true" aria-live="polite">
+      <PageHeader title="Dashboard" subtitle={subtitle} />
+      <span className="sr-only">Yükleniyor…</span>
+      <div aria-hidden className="animate-pulse space-y-4">
+        <div className="grid gap-4 lg:grid-cols-[1.45fr_.55fr]">
+          <div className="card h-40" />
+          <div className="card h-40" />
+        </div>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+          {Array.from({ length: 5 }, (_, i) => <div key={i} className="card h-[6.5rem]" />)}
+        </div>
+        <div className="grid gap-4 lg:grid-cols-3">
+          {Array.from({ length: 3 }, (_, i) => <div key={i} className="card h-56" />)}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const hydrated = useHydrated(["jobs", "invoices", "expenses", "clients", "equipment", "shoots", "tasks", "contents"]);
   
-  const jobs = useStore((s) => s.jobs) ?? [];
+  const jobs = useStore((s) => s.jobs);
   const invoices = useStore((s) => s.invoices);
   const expenses = useStore((s) => s.expenses);
   const clients = useStore((s) => s.clients);
@@ -24,6 +49,8 @@ export default function DashboardPage() {
   const contents = useStore((s) => s.contents);
 
   const { usd, eur } = useFx();
+  const today = useToday();
+  const openComposer = useQuickAdd((s) => s.openComposer);
 
   const stats = useMemo(() => {
     if (!hydrated) return null;
@@ -53,12 +80,19 @@ export default function DashboardPage() {
     const activeClients = clients.filter((client) => client.is_active).length;
     const idleEquipment = equipment.filter((item) => item.status === "idle").length;
     
-    const upcomingShoots = [...shoots]
-      .filter((shoot) => shoot.scheduled_at)
-      .sort((a, b) => (a.scheduled_at! < b.scheduled_at! ? -1 : 1))
+    // Yaklaşan = bugün veya sonrası ve bitmemiş/iptal edilmemiş (eskiden geçmiş çekimler de listeleniyordu)
+    const upcomingShoots = shoots
+      .filter((shoot) => {
+        if (!shoot.scheduled_at || shoot.status === "completed" || shoot.status === "cancelled") return false;
+        return dateKey(new Date(shoot.scheduled_at)) >= today;
+      })
+      .sort((a, b) => new Date(a.scheduled_at!).getTime() - new Date(b.scheduled_at!).getTime())
       .slice(0, 4);
-      
-    const openTasks = tasks.filter((task) => task.status !== "done").slice(0, 5);
+
+    // En acil 5 açık görev: gecikenler önce, sonra tarih → öncelik (tek geçiş + küçük sıralama)
+    const openBucket = bucketTasks(tasks, today).all;
+    const overdueTasks = openBucket.filter((t) => t.due_date && t.due_date.slice(0, 10) < today).length;
+    const openTasks = sortTasks("all", openBucket).slice(0, 5);
     
     const awaiting = contents.filter(
       (content) => content.status === "sent_to_client" || content.status === "internal_review",
@@ -70,14 +104,14 @@ export default function DashboardPage() {
 
     return {
       income, expense, net, expected, overdue, activeClients, idleEquipment,
-      upcomingShoots, openTasks, awaiting, incomeWidth, expenseWidth, month
+      upcomingShoots, openTasks, overdueTasks, awaiting, incomeWidth, expenseWidth, month
     };
-  }, [hydrated, jobs, invoices, expenses, clients, equipment, shoots, tasks, contents, usd, eur]);
+  }, [hydrated, jobs, invoices, expenses, clients, equipment, shoots, tasks, contents, usd, eur, today]);
 
   if (!hydrated || !stats) {
     const now = new Date();
     const monthLabel = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(now);
-    return <PageHeader title="Dashboard" subtitle={monthLabel} />;
+    return <DashboardSkeleton subtitle={monthLabel} />;
   }
 
   const panelLink = (href: string) => (
@@ -114,33 +148,34 @@ export default function DashboardPage() {
           </div>
         </Link>
 
-        <div className="card grid grid-cols-2 gap-px overflow-hidden bg-border/70">
+        <div className="card grid grid-cols-2 gap-px overflow-hidden bg-border/70" role="group" aria-label="Hızlı eylemler">
+          {/* Görev: sayfa değiştirmeden Hızlı Ekle açılır. Diğerleri ilgili sayfada "yeni" modalını doğrudan açar (?new=1). */}
+          <button type="button" onClick={openComposer} className="group flex min-h-24 flex-col justify-between bg-surface/95 p-4 text-left outline-none transition-colors hover:bg-surface-2 focus-visible:bg-surface-2">
+            <ListPlus className="h-4 w-4 text-muted transition-colors group-hover:text-amber" aria-hidden />
+            <span className="flex items-end justify-between gap-2 text-sm font-medium text-foreground">Yeni görev <kbd className="rounded border border-border px-1 text-[10px] text-muted">Q</kbd></span>
+          </button>
           {[
-            { href: "/crm/clients", label: "Müşteri ekle", icon: Users },
-            { href: "/projects", label: "Proje aç", icon: Plus },
-            { href: "/content", label: "İçerik ekle", icon: CalendarPlus },
-            { href: "/finance/invoices", label: "Tahsilatlar", icon: Receipt },
+            { href: "/projects?new=1", label: "Yeni proje", icon: FolderPlus },
+            { href: "/content?new=1", label: "Yeni içerik", icon: CalendarPlus },
+            { href: "/crm/clients?new=1", label: "Yeni müşteri", icon: UserPlus },
           ].map(({ href, label, icon: Icon }) => (
             <Link prefetch={false} key={href} href={href} className="group flex min-h-24 flex-col justify-between bg-surface/95 p-4 outline-none transition-colors hover:bg-surface-2 focus-visible:bg-surface-2">
-              <Icon className="h-4 w-4 text-muted transition-colors group-hover:text-amber" />
-              <span className="flex items-end justify-between gap-2 text-sm font-medium text-foreground">{label}<ArrowRight className="h-3.5 w-3.5 text-muted transition-transform group-hover:translate-x-0.5" /></span>
+              <Icon className="h-4 w-4 text-muted transition-colors group-hover:text-amber" aria-hidden />
+              <span className="flex items-end justify-between gap-2 text-sm font-medium text-foreground">{label}<ArrowRight className="h-3.5 w-3.5 text-muted transition-transform group-hover:translate-x-0.5" aria-hidden /></span>
             </Link>
           ))}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard href="/finance/invoices" label="Tahsil edilen" value={TRY(stats.income)} icon={TrendingUp} tone="success" />
-        <StatCard href="/finance/expenses" label="Bu ay gider" value={TRY(stats.expense)} icon={Wallet} tone="warning" />
-        <StatCard href="/finance/invoices" label="Net" value={TRY(stats.net)} icon={TrendingUp} tone="amber" />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <StatCard href="/finance/invoices" label="Beklenen tahsilat" value={TRY(stats.expected)} icon={Wallet} />
-        <StatCard href="/finance/invoices" label="Geciken ödeme" value={TRY(stats.overdue)} icon={AlertTriangle} tone="danger" />
+        <StatCard href="/finance/invoices" label="Geciken ödeme" value={TRY(stats.overdue)} icon={AlertTriangle} tone={stats.overdue > 0 ? "danger" : "default"} />
         <StatCard href="/crm/clients" label="Aktif müşteri" value={String(stats.activeClients)} icon={Users} />
         <StatCard href="/equipment" label="Boştaki ekipman" value={String(stats.idleEquipment)} icon={Boxes} />
         <StatCard href="/content" label="Onay bekleyen" value={String(stats.awaiting.length)} icon={CheckCircle2} tone="amber" />
       </div>
 
-      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+      <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Panel title="Yaklaşan çekimler" action={panelLink("/shoots")}>
           {stats.upcomingShoots.length ? (
             <ul className="space-y-1">
@@ -153,16 +188,16 @@ export default function DashboardPage() {
                 </li>
               ))}
             </ul>
-          ) : <EmptyState title="Yaklaşan çekim yok" />}
+          ) : <EmptyState title="Yaklaşan çekim yok" hint="Bugünden sonrası için planlı çekim bulunmuyor." />}
         </Panel>
 
-        <Panel title="Açık görevler" action={panelLink("/tasks")}>
+        <Panel title={stats.overdueTasks ? `Açık görevler · ${stats.overdueTasks} gecikmiş` : "Açık görevler"} action={panelLink("/tasks")}>
           {stats.openTasks.length ? (
             <ul className="space-y-1">
               {stats.openTasks.map((task) => (
                 <li key={task.id}>
                   <Link prefetch={false} href="/tasks" className="interactive-row flex items-center justify-between gap-3">
-                    <div className="min-w-0"><p className="truncate text-sm text-foreground">{task.title}</p><p className="text-xs text-muted">{task.assignee || "—"} · {dateTR(task.due_date)}</p></div>
+                    <div className="min-w-0"><p className="truncate text-sm text-foreground">{task.title}</p><p className={`text-xs ${task.due_date && task.due_date.slice(0, 10) < today ? "text-danger" : "text-muted"}`}>{task.due_date ? formatDue(task.due_date.slice(0, 10), today) : "Tarihsiz"}</p></div>
                     <Badge tone={prioMap[task.priority as keyof typeof prioMap].tone}>{prioMap[task.priority as keyof typeof prioMap].label}</Badge>
                   </Link>
                 </li>

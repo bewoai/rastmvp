@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { Button } from "@/components/form";
+import { PageLoading, SearchBox, Tabs, Toolbar, useListSearch, usePersistentState } from "@/components/list";
 import TaskRow from "@/components/TaskRow";
 import { useStore, useHydrated } from "@/lib/store";
 import { useQuickAdd } from "@/lib/quickAdd";
@@ -17,6 +18,7 @@ const VIEWS: { id: TaskView; label: string }[] = [
   { id: "all", label: "Tümü" },
   { id: "completed", label: "Tamamlanan" },
 ];
+const VIEW_IDS = VIEWS.map((v) => v.id);
 
 const EMPTY: Record<TaskView, { title: string; hint: string }> = {
   today: { title: "Bugün için görev yok", hint: "Q'ya basıp yeni görev ekleyebilirsin." },
@@ -31,8 +33,10 @@ export default function TasksPage() {
   const projects = useStore((s) => s.projects);
   const openComposer = useQuickAdd((s) => s.openComposer);
   const today = useToday();
-  // "Tümü" varsayılan: tarihsiz dahil her açık görev görünür (başka sayfadan Q ile eklenen de)
-  const [view, setView] = useState<TaskView>("all");
+  // "Tümü" varsayılan: tarihsiz dahil her açık görev görünür (başka sayfadan Q ile eklenen de).
+  // Seçilen görünüm hatırlanır: başka sayfaya gidip dönünce aynı sekmede kalınır.
+  const [view, setView] = usePersistentState<TaskView>("tasks-view", "all", VIEW_IDS);
+  const [query, setQuery] = useState("");
 
   // O(1) proje adı araması
   const projectMap = useMemo(() => {
@@ -43,9 +47,11 @@ export default function TasksPage() {
 
   // Tüm görünümler tek O(N) geçişte; yalnızca aktif görünüm sıralanır/gruplanır.
   const buckets = useMemo(() => bucketTasks(hydrated ? tasks : [], today), [tasks, hydrated, today]);
+  // Arama yalnızca aktif görünümü süzer (sekme sayıları etkilenmez); yazarken TaskRow'lar memo ile korunur.
+  const searched = useListSearch(buckets[view], query, (t) => `${t.title} ${t.project_id ? projectMap.get(t.project_id) ?? "" : ""}`);
   const groups = useMemo(
-    () => groupTasks(view, sortTasks(view, buckets[view]), today),
-    [buckets, view, today],
+    () => groupTasks(view, sortTasks(view, searched), today),
+    [searched, view, today],
   );
 
   // Quick Add, aktif görünümde anında görünsün diye varsayılan son tarihi görünüme göre ayarlar.
@@ -55,7 +61,7 @@ export default function TasksPage() {
     return () => useQuickAdd.getState().setDefaultDue("");
   }, [view, today]);
 
-  if (!hydrated) return <PageHeader title="Görevler" subtitle="Yükleniyor…" />;
+  if (!hydrated) return <PageLoading title="Görevler" rows={8} />;
 
   return (
     <>
@@ -63,7 +69,7 @@ export default function TasksPage() {
         title="Görevler"
         subtitle="Hızlı ekle için Q'ya bas. Başlığa tıklayarak düzenle, daireye tıklayarak tamamla."
         action={
-          <Button className="hidden md:block" onClick={openComposer}>
+          <Button className="max-md:hidden" onClick={openComposer}>
             <span className="flex items-center gap-1.5">
               <Plus className="h-4 w-4" /> Yeni Görev
               <kbd className="ml-1 rounded border border-black/25 px-1 text-[10px] font-semibold leading-4">Q</kbd>
@@ -72,32 +78,25 @@ export default function TasksPage() {
         }
       />
 
-      <div role="tablist" aria-label="Görev görünümleri" className="mb-4 flex gap-1 overflow-x-auto border-b border-border/70">
-        {VIEWS.map((v) => {
-          const active = v.id === view;
-          return (
-            <button
-              key={v.id}
-              role="tab"
-              aria-selected={active}
-              onClick={() => setView(v.id)}
-              className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-sm transition-colors ${
-                active
-                  ? "border-amber text-foreground"
-                  : "border-transparent text-muted hover:text-foreground"
-              }`}
-            >
-              {v.label}
-              <span className="text-xs text-muted">{buckets[v.id].length}</span>
-            </button>
-          );
-        })}
-      </div>
+      <Toolbar>
+        <Tabs
+          label="Görev görünümleri"
+          value={view}
+          onChange={setView}
+          className="w-full sm:w-auto"
+          tabs={VIEWS.map((v) => ({ id: v.id, label: v.label, count: buckets[v.id].length }))}
+        />
+        <SearchBox value={query} onChange={setQuery} placeholder="Görev ara…" label="Görev ara" />
+      </Toolbar>
 
       {groups.length === 0 ? (
-        <EmptyState title={EMPTY[view].title} hint={EMPTY[view].hint} />
+        query ? (
+          <EmptyState title="Eşleşen görev yok" hint="Aramayı değiştir veya başka bir görünüme bak." />
+        ) : (
+          <EmptyState title={EMPTY[view].title} hint={EMPTY[view].hint} action={view !== "completed" ? { label: "Yeni Görev", onClick: openComposer } : undefined} />
+        )
       ) : (
-        <div className="space-y-5 pb-24 md:pb-4">
+        <div role="tabpanel" aria-label="Görev listesi" className="space-y-5 pb-24 md:pb-4">
           {groups.map((g) => (
             <section key={g.id} aria-label={g.label || undefined}>
               {g.label && (

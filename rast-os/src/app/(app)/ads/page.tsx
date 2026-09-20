@@ -168,8 +168,8 @@ export default function AdsPage() {
       />
 
       {pageError && (
-        <div className="mb-4 flex items-center gap-3 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
-          <AlertTriangle className="h-4 w-4 shrink-0" /> {pageError}
+        <div role="alert" className="mb-4 flex items-center gap-3 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+          <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden /> <span className="min-w-0 break-words">{pageError}</span>
         </div>
       )}
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronRight, LoaderCircle, X } from "lucide-react";
 import type { MutationResult } from "@/lib/store";
 import { useToasts } from "@/lib/toast";
@@ -88,7 +89,9 @@ export function Modal({
     };
   }, [open, autoFocusField]);
 
-  if (!open) return null;
+  // Sayfa içeriği z-10 katmanında; modal orada kalırsa sidebar (z-20) modalın üstüne biner ve arka plan
+  // sidebar'ı örtmez. Portal ile body'ye taşınır (modal yalnızca hidrasyondan sonra açılır → SSR sorunu yok).
+  if (!open || typeof document === "undefined") return null;
 
   function trapTab(e: React.KeyboardEvent<HTMLDivElement>) {
     if (e.key !== "Tab") return;
@@ -122,7 +125,7 @@ export function Modal({
     </>
   );
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center md:p-4">
       <div
         aria-hidden
@@ -161,7 +164,8 @@ export function Modal({
           <div className="flex min-h-0 flex-1 flex-col">{body}</div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

@@ -97,7 +97,7 @@ export function EmptyState({
   return (
     <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 bg-background/20 px-4 py-10 text-center">
       <p className="text-sm font-medium text-foreground">{title}</p>
-      {hint && <p className="mt-1 max-w-sm text-xs text-muted">{hint}</p>}
+      {hint && <p className="mt-1 max-w-sm break-words text-xs text-muted">{hint}</p>}
       {cta && (
         <Link
           href={cta.href}

@@ -1,4 +1,4 @@
-# Migration uygulama sırası (0008 → 0014)
+# Migration uygulama sırası (0008 → 0015)
 
 > **Durum:** Bu dosyalardan hiçbiri henüz hiçbir veritabanında çalıştırılmadı.
 > Önce staging / branch veritabanında, sonra canlıda uygulanır. Sıra
@@ -15,7 +15,7 @@
    aşağıdaki kontrolleri orada yap; ancak hepsi geçince canlıda tekrarla.
 3. **Yedek al:** Canlıdan önce veritabanı yedeği / Point-in-Time Recovery
    noktasının olduğunu doğrula.
-4. Postgres sürümünün **15+** olduğunu kontrol et (0013 için gerekli; güncel
+4. Postgres sürümünün **15+** olduğunu kontrol et (0013 ve 0015 için gerekli; güncel
    Supabase projeleri uygun).
 
 ## Sıra
@@ -27,12 +27,13 @@
 5. `0012_activity_logs_triggers.sql` — `log_activity()` trigger'ları ile işlem geçmişi (`activity_logs`).
 6. `0013_content_approvals.sql` — `content_approvals` tablosu + hesapsız hekim onayı için public token RPC'leri (`approval_get` vb.).
 7. `0014_org_targets.sql` — `organizations.mrr_target` / `mrr_target_label` (MRR eşiği; yalnız admin, kolon düzeyinde güncelleme).
+8. `0015_client_reports.sql` — `client_reports` (aylık müşteri raporu notları; sayılar saklanmaz) + `projects.proposal_id` (teklif → proje bağı, teklif başına tek proje).
 
 > 0013 ve 0014 birbirinden bağımsız yazıldı; yine de numara sırasıyla
 > (0013 → 0014) uygulanır.
 
 Uygulama: Supabase Dashboard → SQL Editor → dosyayı yapıştır → Run (veya
-bağlı projede `supabase db push`). 0008–0014 dosyaları idempotent olarak yazıldı; tekrar çalıştırmak
+bağlı projede `supabase db push`). 0008–0015 dosyaları idempotent olarak yazıldı; tekrar çalıştırmak
 güvenlidir.
 
 ## Son kontroller
@@ -55,5 +56,10 @@ atlar), uygulamadan / anon key + kullanıcı JWT'si ile yap.
 - **0014:** Admin olarak Ayarlar'da eşik kaydet → dashboard MRR kartında
   görünür; admin olmayan kullanıcıda kaydetme reddedilir; `organizations.name`
   istemciden değiştirilemez.
+- **0015:** Raporlar → Aylık rapor → müşteri + ay seç → not yaz → Kaydet →
+  `select client_id, period, generated_at from public.client_reports order by updated_at desc limit 5;`
+  Aynı ay ikinci kayıtta yeni satır oluşmaz. Bir teklifi "Kabul edildi" yapıp kaydet →
+  proje (+ aylık kalem varsa taslak fatura) oluşur; "Projeye dönüştür" tekrar basılınca
+  aynı proje açılır: `select name, proposal_id from public.projects where proposal_id is not null;`
 - **Sonra:** Kayıtlar kapalı kalır; yeni kullanıcılar yalnız admin daveti ile
   eklenir. Kayıtları yeniden açmak gerekirse ancak 0008 doğrulandıktan sonra.

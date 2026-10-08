@@ -3,7 +3,10 @@
 import { useStore, uid, nowISO } from "./store";
 import type { MutationResult } from "./store";
 import type { Proposal, ProposalItem } from "./types";
-import { nextProposalNo } from "./proposal-logic";
+import { formatMoney, nextProposalNo } from "./proposal-logic";
+import { conversionBlocker, findLinkedProject, proposalToDraftInvoice, proposalToProject } from "./proposal-convert";
+import { todayKey } from "./taskLogic";
+import { useToasts } from "./toast";
 
 /** Yeni teklifin başlık alanları (id / no / tarih damgaları burada üretilir). */
 export type ProposalFields = Omit<Proposal, "id" | "proposal_no" | "created_at" | "updated_at" | "created_by">;
@@ -145,4 +148,109 @@ export async function saveProposal(
 
   const failed = (await Promise.all(ops)).filter((r) => !r.ok);
   return failed.length ? { ok: false, error: `${failed.length} kalem kaydedilemedi: ${failed[0].error ?? ""}` } : { ok: true };
+}
+
+/* ---------------- Teklif kabulü → proje + taslak fatura ---------------- */
+
+export type ConvertResult = MutationResult & {
+  projectId?: string;
+  projectName?: string;
+  /** Proje daha önce oluşturulmuştu (idempotent: yeni kayıt açılmadı). */
+  existing?: boolean;
+  invoiceId?: string;
+  invoiceAmount?: number;
+  /** Proje oluştu ama fatura taslağı oluşturulamadı / atlandı. */
+  warning?: string;
+};
+
+/** Aynı teklif için eşzamanlı iki dönüştürmeyi (çift tık, kaydet + düğme) engeller. */
+const converting = new Map<string, Promise<ConvertResult>>();
+
+/** Projelerin tekil indeksi (0015 projects_proposal_unique) ya da eksik kolon hatası. */
+const isDuplicateProject = (msg?: string) => /projects_proposal_unique|duplicate key|23505/i.test(msg ?? "");
+const isMissingColumn = (msg?: string) => /proposal_id|schema cache|column .* does not exist/i.test(msg ?? "");
+
+/**
+ * Kabul edilen tekliften proje oluşturur; aylık kalemler varsa bu ayın taslak faturasını ekler
+ * (KDV teklifin oranından, not "Teklif RC-…"). Idempotent: teklife bağlı proje zaten varsa yeni
+ * kayıt açmaz, onu döndürür. Fatura yalnızca proje İLK kez oluşturulurken eklenir.
+ */
+export function convertProposalToProject(proposalId: string): Promise<ConvertResult> {
+  const running = converting.get(proposalId);
+  if (running) return running;
+  const job = doConvert(proposalId).finally(() => converting.delete(proposalId));
+  converting.set(proposalId, job);
+  return job;
+}
+
+async function doConvert(proposalId: string): Promise<ConvertResult> {
+  const store = useStore.getState();
+  // Supabase: projeler / faturalar bu sayfada henüz yüklenmemiş olabilir (yüklüyse no-op).
+  await store.load(["projects", "invoices", "proposal_items"]).catch(() => undefined);
+
+  const s = useStore.getState();
+  const linked = findLinkedProject(s.projects, proposalId);
+  if (linked) return { ok: true, existing: true, projectId: linked.id, projectName: linked.name };
+
+  const proposal = s.proposals.find((p) => p.id === proposalId);
+  if (!proposal) return { ok: false, error: "Teklif bulunamadı." };
+  const blocker = conversionBlocker(proposal);
+  if (blocker) return { ok: false, error: blocker };
+
+  const items = s.proposal_items.filter((i) => i.proposal_id === proposalId);
+  const today = todayKey();
+  const now = nowISO();
+  const project = proposalToProject(proposal, items, { id: uid(), today, now });
+
+  const res = await s.add("projects", project).catch(fail);
+  if (!res.ok) {
+    if (isDuplicateProject(res.error)) {
+      return { ok: false, error: "Bu teklif için başka bir kullanıcı az önce proje oluşturdu. Sayfayı yenileyip Projeler'den açın." };
+    }
+    if (isMissingColumn(res.error)) {
+      return { ok: false, error: `${res.error} (0015_client_reports.sql uygulanmış mı?)` };
+    }
+    return res;
+  }
+
+  const result: ConvertResult = { ok: true, projectId: project.id, projectName: project.name };
+  const invoice = proposalToDraftInvoice(proposal, items, { id: uid(), today, now, projectId: project.id });
+  if (!invoice) {
+    const hasRecurring = items.some((i) => i.is_recurring);
+    if (hasRecurring && proposal.currency !== "TRY") result.warning = "Döviz teklif: taslak fatura oluşturulmadı (faturalar TL).";
+    return result;
+  }
+  const inv = await useStore.getState().add("invoices", invoice).catch(fail);
+  if (inv.ok) {
+    result.invoiceId = invoice.id;
+    result.invoiceAmount = invoice.amount;
+  } else {
+    result.warning = `Taslak fatura eklenemedi: ${inv.error ?? ""}`;
+  }
+  return result;
+}
+
+/** Dönüştürür ve sonucu bildirim olarak gösterir ("Projeyi aç" bağlantısıyla). */
+export async function convertProposalWithToast(proposalId: string): Promise<ConvertResult> {
+  const r = await convertProposalToProject(proposalId);
+  const toasts = useToasts.getState();
+  if (!r.ok || !r.projectId) {
+    toasts.push({ message: `Projeye dönüştürülemedi: ${r.error ?? ""}`, tone: "danger" });
+    return r;
+  }
+  const href = `/projects?ac=${encodeURIComponent(r.projectId)}`;
+  if (r.existing) {
+    toasts.push({ message: `Bu teklifin projesi zaten var: ${r.projectName ?? ""}`, href, hrefLabel: "Projeyi aç" });
+    return r;
+  }
+  const invoiceText = r.invoiceId && r.invoiceAmount !== undefined
+    ? ` · bu ayın taslak faturası eklendi (${formatMoney(r.invoiceAmount)} + KDV)`
+    : "";
+  toasts.push({
+    message: `Proje oluşturuldu: ${r.projectName ?? ""}${invoiceText}${r.warning ? ` — ${r.warning}` : ""}`,
+    tone: r.warning && !r.warning.startsWith("Döviz") ? "danger" : "default",
+    href,
+    hrefLabel: "Projeyi aç",
+  });
+  return r;
 }

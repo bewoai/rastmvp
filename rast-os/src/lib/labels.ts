@@ -165,6 +165,7 @@ export const activityEntity: Record<string, string> = {
   proposals: "Teklif",
   proposal_items: "Teklif kalemi",
   content_approvals: "İçerik onayı", // 0013
+  client_reports: "Aylık rapor", // 0015
 };
 
 export const activityEntityLabel = (entity: string) => activityEntity[entity] ?? entity;
@@ -191,6 +192,7 @@ export const activityField: Record<string, string> = {
   version: "sürüm", token: "onay bağlantısı", note: "not", script_snapshot: "senaryo",
   sent_at: "gönderim", expires_at: "son geçerlilik", decided_at: "karar tarihi",
   decided_by_name: "karar veren", decided_by_ip: "IP",
+  period: "dönem", highlights: "öne çıkanlar", generated_at: "oluşturulma",
 };
 
 /** Değişen alanların Türkçe adları (diff anahtar sırasıyla). */
@@ -216,7 +218,7 @@ export function activityHref(log: Pick<ActivityLog, "entity" | "entity_id" | "ac
   const pages: Record<string, string> = {
     clients: "/crm/clients", projects: "/projects", jobs: "/jobs", tasks: "/tasks",
     invoices: "/finance/invoices", payments: "/finance/invoices", expenses: "/finance/expenses",
-    proposal_items: "/teklifler", content_approvals: "/content",
+    proposal_items: "/teklifler", content_approvals: "/content", client_reports: "/raporlar/aylik",
   };
   return pages[log.entity];
 }

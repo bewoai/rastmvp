@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { PageHeader, Badge, EmptyState } from "@/components/ui";
 import { FormModal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
@@ -21,6 +22,7 @@ const empty: Project = {
 const statusOptions = (Object.keys(projectStatus) as ProjectStatus[]).map((value) => ({ value, ...projectStatus[value] }));
 const ACTIVE: ProjectStatus[] = ["planning", "active", "on_hold", "review"];
 type Scope = "active" | "closed" | "all";
+
 const SCOPES: readonly Scope[] = ["active", "closed", "all"];
 
 /** Form state'i burada yaşar: yazarken sayfa listesi render olmaz; her açılışta temiz başlar. */
@@ -86,7 +88,16 @@ function ProjectModal({ initial, clients, brands, onClose }: {
   );
 }
 
+// useSearchParams statik sayfada Suspense sınırı ister.
 export default function ProjectsPage() {
+  return (
+    <Suspense fallback={<PageLoading title="Projeler" />}>
+      <ProjectsList />
+    </Suspense>
+  );
+}
+
+function ProjectsList() {
   const hydrated = useHydrated(["projects", "clients", "tasks", "brands"]);
   const projects = useStore((s) => s.projects);
   const clients = useStore((s) => s.clients);
@@ -95,6 +106,20 @@ export default function ProjectsPage() {
 
   const wantNew = useNewIntent();
   const [modal, setModal] = useState<{ initial: Project | null } | null>(() => (wantNew ? { initial: null } : null));
+  // `?ac=<proje id>`: tekliften oluşturulan projeye bağlantı (teklif editörü / bildirim) — modalı açar.
+  const openId = useSearchParams().get("ac");
+  const [dismissedId, setDismissedId] = useState<string | null>(null);
+  const linked = openId && openId !== dismissedId ? projects.find((p) => p.id === openId) : undefined;
+  const shown = modal ?? (linked ? { initial: linked } : null);
+  function closeModal() {
+    setModal(null);
+    if (openId) {
+      setDismissedId(openId);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("ac");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+  }
   const [scope, setScope] = usePersistentState<Scope>("projects-scope", "active", SCOPES);
   const [query, setQuery] = useState("");
   const del = useDeleteConfirm();
@@ -203,7 +228,7 @@ export default function ProjectsPage() {
         }
       />
 
-      {modal && <ProjectModal initial={modal.initial} clients={clients} brands={brands} onClose={() => setModal(null)} />}
+      {shown && <ProjectModal key={shown.initial?.id ?? "new"} initial={shown.initial} clients={clients} brands={brands} onClose={closeModal} />}
       {del.dialog}
     </>
   );

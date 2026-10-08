@@ -18,6 +18,8 @@ export const COLLECTIONS: Collections[] = [
   "proposals", "proposal_items",
   // İçerik onayları (0013): token sunucuda üretilir → approvalActions.ts ile eklenir.
   "content_approvals",
+  // Aylık müşteri raporu notları (0015), clients'tan SONRA (FK).
+  "client_reports",
   // Salt okunur: yalnızca DB trigger'ı yazar (0012). add/update/remove ve seedToSupabase dışında.
   "activity_logs",
 ];
@@ -28,7 +30,7 @@ const ACTIVITY_LOG_LIMIT = 500;
 const emptyData: RastData = {
   leads: [], jobs: [], clients: [], brands: [], contacts: [], projects: [],
   tasks: [], contents: [], shoots: [], equipment: [], invoices: [], payments: [], expenses: [],
-  proposals: [], proposal_items: [], content_approvals: [], activity_logs: [],
+  proposals: [], proposal_items: [], content_approvals: [], client_reports: [], activity_logs: [],
 };
 
 export const uid = () =>

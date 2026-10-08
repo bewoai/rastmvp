@@ -1,7 +1,7 @@
 import type {
   LeadStatus, ProjectStatus, TaskStatus, ContentStatus,
   ShootStatus, EquipmentStatus, InvoiceStatus, JobStatus,
-  PaymentStatus, Priority,
+  PaymentStatus, Priority, ProposalStatus,
 } from "./types";
 
 type Tone = "default" | "amber" | "success" | "warning" | "danger" | "muted";
@@ -102,6 +102,14 @@ export const paymentStatus: Record<PaymentStatus, { label: string; tone: Tone }>
   unpaid: { label: "Ödenmedi", tone: "danger" },
   partial: { label: "Kısmi", tone: "warning" },
   paid: { label: "Ödendi", tone: "success" },
+};
+
+export const proposalStatus: Record<ProposalStatus, { label: string; tone: Tone }> = {
+  draft: { label: "Taslak", tone: "muted" },
+  sent: { label: "Gönderildi", tone: "amber" },
+  accepted: { label: "Kabul edildi", tone: "success" },
+  rejected: { label: "Reddedildi", tone: "danger" },
+  expired: { label: "Süresi doldu", tone: "warning" },
 };
 
 export const priority: Record<Priority, { label: string; tone: Tone }> = {

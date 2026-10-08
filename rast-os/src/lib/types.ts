@@ -234,6 +234,38 @@ export interface Job {
   created_at: string;
 }
 
+// Teklif (0011): kapsam → fiyat → markalı PDF. Kalemler ayrı koleksiyonda (proposal_items).
+export type ProposalStatus = "draft" | "sent" | "accepted" | "rejected" | "expired";
+
+export interface Proposal {
+  id: ID;
+  client_id?: ID;
+  title: string;
+  proposal_no: string;     // RC-YYYY-NNN (uygulamada üretilir, org içinde tekil)
+  status: ProposalStatus;
+  currency: Currency;      // varsayılan TRY
+  vat_rate: number;        // yüzde (varsayılan 20)
+  valid_until?: string;
+  notes?: string;          // süreç / takvim
+  terms?: string;          // karşılıklı sorumluluklar + ödeme koşulları
+  created_by?: ID;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface ProposalItem {
+  id: ID;
+  proposal_id: ID;
+  position: number;
+  name: string;
+  description?: string;
+  qty: number;
+  unit: string;            // varsayılan "ay"
+  unit_price: number;      // KDV hariç
+  is_recurring: boolean;   // aylık (true) / tek seferlik (false)
+  created_at: string;
+}
+
 export interface RastData {
   leads: Lead[];
   jobs: Job[];
@@ -248,4 +280,6 @@ export interface RastData {
   invoices: Invoice[];
   payments: Payment[];
   expenses: Expense[];
+  proposals: Proposal[];
+  proposal_items: ProposalItem[];
 }

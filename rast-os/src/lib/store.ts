@@ -14,11 +14,14 @@ export type MutationResult = { ok: boolean; error?: string };
 export const COLLECTIONS: Collections[] = [
   "leads", "jobs", "clients", "brands", "contacts", "projects",
   "tasks", "contents", "shoots", "equipment", "invoices", "payments", "expenses",
+  // proposal_items, proposals'tan SONRA (seedToSupabase sırayla ekler; FK)
+  "proposals", "proposal_items",
 ];
 
 const emptyData: RastData = {
   leads: [], jobs: [], clients: [], brands: [], contacts: [], projects: [],
   tasks: [], contents: [], shoots: [], equipment: [], invoices: [], payments: [], expenses: [],
+  proposals: [], proposal_items: [],
 };
 
 export const uid = () =>

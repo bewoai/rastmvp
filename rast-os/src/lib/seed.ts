@@ -1,4 +1,12 @@
 import type { RastData } from "./types";
+import { findPreset, presetToItems } from "./proposal-presets";
+
+// Demo teklif: Hekim İçerik Sistemi — Standart (25.000 + KDV / ay)
+const demoProposalItems = (() => {
+  const preset = findPreset("hekim:standart");
+  let n = 0;
+  return preset ? presetToItems(preset.pkg, "pr1", () => `pi${++n}`, "2026-10-01") : [];
+})();
 
 // Gerçekçi tohum veri (Rast Creative örnek müşterileri).
 export const seed: RastData = {
@@ -80,4 +88,13 @@ export const seed: RastData = {
     { id: "x3", category: "Ulaşım", vendor: "—", amount: 1800, vat: 0, paid_at: "2026-08-02", is_recurring: false, description: "Çekim ulaşım", created_at: "2026-08-02" },
     { id: "x4", category: "Ekipman", vendor: "Kiralama", amount: 6000, vat: 1200, paid_at: "2026-07-30", is_recurring: false, description: "Ekstra ışık kiralama", created_at: "2026-07-30" },
   ],
+  proposals: [
+    {
+      id: "pr1", client_id: "c2", title: "Hekim İçerik Sistemi — Standart", proposal_no: "RC-2026-001",
+      status: "sent", currency: "TRY", vat_rate: 20, valid_until: "2026-10-31",
+      notes: findPreset("hekim:standart")?.group.notes, terms: findPreset("hekim:standart")?.group.terms,
+      created_at: "2026-10-01", updated_at: "2026-10-01",
+    },
+  ],
+  proposal_items: demoProposalItems,
 };

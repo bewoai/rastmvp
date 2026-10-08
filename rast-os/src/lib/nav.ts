@@ -4,6 +4,7 @@ import {
   LayoutDashboard, Users, Building2, Palette, FolderKanban,
   ListTodo, CalendarDays, Camera, Wallet, Receipt, Boxes,
   FolderOpen, Settings, Contact, TrendingUp, Briefcase, Upload, ShoppingCart, Megaphone,
+  FileSignature,
 } from "lucide-react";
 
 export type NavItem = {
@@ -47,6 +48,7 @@ export const NAV: NavGroup[] = [
   {
     title: "Finans",
     items: [
+      { label: "Teklifler", href: "/teklifler", icon: FileSignature },
       { label: "Gelirler / Faturalar", href: "/finance/invoices", icon: Receipt },
       { label: "Giderler", href: "/finance/expenses", icon: Wallet },
     ],

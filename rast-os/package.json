@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/tasks-logic.test.mjs scripts/finance-logic.test.mjs"
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/tasks-logic.test.mjs scripts/finance-logic.test.mjs scripts/proposal-logic.test.mjs"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

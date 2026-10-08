@@ -125,6 +125,7 @@ export interface Content {
   goal?: string;
   hook?: string;
   script?: string;
+  script_source?: string | null; // 0016: senaryonun kaynağı ("claude-code" = senaryo-uret taslağından içe aktarıldı)
   cta?: string;
   references_url?: string;
   attachments?: ContentAttachment[];

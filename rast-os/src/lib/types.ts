@@ -182,6 +182,18 @@ export interface Invoice {
   created_at: string;
 }
 
+// Tahsilat kaydı: faturaya yapılan her ödeme (paid_at = paranın girdiği gün).
+// Dashboard geliri fatura tarihine değil bu tarihe göre hesaplanır.
+export interface Payment {
+  id: ID;
+  invoice_id?: ID;
+  amount: number;
+  method?: string;
+  paid_at: string;
+  notes?: string;
+  created_at: string;
+}
+
 export type Currency = "TRY" | "USD" | "EUR";
 export type ExpensePaymentStatus = "paid" | "pending";
 
@@ -232,5 +244,6 @@ export interface RastData {
   shoots: Shoot[];
   equipment: Equipment[];
   invoices: Invoice[];
+  payments: Payment[];
   expenses: Expense[];
 }

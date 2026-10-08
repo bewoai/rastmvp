@@ -69,6 +69,11 @@ export const seed: RastData = {
     { id: "i3", client_id: "c3", invoice_no: "2026-079", issue_date: "2026-07-15", due_date: "2026-07-25", amount: 22000, vat: 4400, paid_amount: 0, status: "overdue", created_at: "2026-07-15" },
     { id: "i4", client_id: "c2", invoice_no: "2026-083", issue_date: "2026-08-02", due_date: "2026-08-15", amount: 18000, vat: 3600, paid_amount: 0, status: "issued", created_at: "2026-08-02" },
   ],
+  // Tahsilatlar: faturalardaki paid_amount ile tutarlı (i1 tamamı, i2 yarısı)
+  payments: [
+    { id: "p1", invoice_id: "i1", amount: 42000, method: "Havale", paid_at: "2026-08-04", created_at: "2026-08-04" },
+    { id: "p2", invoice_id: "i2", amount: 30000, method: "Havale", paid_at: "2026-08-10", created_at: "2026-08-10" },
+  ],
   expenses: [
     { id: "x1", category: "Yazılım", vendor: "Adobe", amount: 3200, vat: 640, paid_at: "2026-08-01", is_recurring: true, description: "Creative Cloud", created_at: "2026-08-01" },
     { id: "x2", category: "Freelancer", vendor: "Seslendirme — Onur", amount: 4500, vat: 0, paid_at: "2026-08-02", is_recurring: false, description: "Adatıp video seslendirme", created_at: "2026-08-02" },

@@ -13,12 +13,12 @@ export type MutationResult = { ok: boolean; error?: string };
 
 export const COLLECTIONS: Collections[] = [
   "leads", "jobs", "clients", "brands", "contacts", "projects",
-  "tasks", "contents", "shoots", "equipment", "invoices", "expenses",
+  "tasks", "contents", "shoots", "equipment", "invoices", "payments", "expenses",
 ];
 
 const emptyData: RastData = {
   leads: [], jobs: [], clients: [], brands: [], contacts: [], projects: [],
-  tasks: [], contents: [], shoots: [], equipment: [], invoices: [], expenses: [],
+  tasks: [], contents: [], shoots: [], equipment: [], invoices: [], payments: [], expenses: [],
 };
 
 export const uid = () =>

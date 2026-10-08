@@ -9,6 +9,7 @@ import {
 import { PageHeader, StatCard, Panel, Badge, EmptyState } from "@/components/ui";
 import { useStore, useHydrated } from "@/lib/store";
 import { useFx, toTRY } from "@/lib/fx";
+import { invoiceIncomeInRange, monthBounds } from "@/lib/finance";
 import { useToday } from "@/lib/useToday";
 import { useQuickAdd } from "@/lib/quickAdd";
 import { bucketTasks, dateKey, formatDue, sortTasks } from "@/lib/taskLogic";
@@ -37,10 +38,11 @@ function DashboardSkeleton({ subtitle }: { subtitle: string }) {
 }
 
 export default function DashboardPage() {
-  const hydrated = useHydrated(["jobs", "invoices", "expenses", "clients", "equipment", "shoots", "tasks", "contents"]);
+  const hydrated = useHydrated(["jobs", "invoices", "payments", "expenses", "clients", "equipment", "shoots", "tasks", "contents"]);
   
   const jobs = useStore((s) => s.jobs);
   const invoices = useStore((s) => s.invoices);
+  const payments = useStore((s) => s.payments);
   const expenses = useStore((s) => s.expenses);
   const clients = useStore((s) => s.clients);
   const equipment = useStore((s) => s.equipment);
@@ -60,10 +62,16 @@ export default function DashboardPage() {
     const month = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
     const inCurrentMonth = (date: string | undefined) => Boolean(date?.startsWith(month));
     
+    const [monthStart, monthEnd] = monthBounds(month);
+
+    // Tekil işler: jobs tablosunda ayrı bir tahsilat/ödeme tarihi kolonu yok (yalnızca iş/teslim
+    // tarihi `date`). Bu yüzden iş geliri hâlâ iş tarihine göre sayılır; tahsilat tarihi
+    // gerekirse jobs için de payments benzeri bir kayıt eklenmeli.
     const jobIncome = activeJobs.filter((job) => inCurrentMonth(job.date)).reduce((total, job) => total + job.paid_amount, 0);
     const jobOutstanding = activeJobs.reduce((total, job) => total + (job.price - job.paid_amount), 0);
   
-    const income = invoices.filter((invoice) => inCurrentMonth(invoice.issue_date)).reduce((total, invoice) => total + invoice.paid_amount, 0) + jobIncome;
+    // Fatura geliri: fatura tarihine göre değil, tahsilatın yapıldığı güne (payments.paid_at) göre.
+    const income = invoiceIncomeInRange(invoices, payments, monthStart, monthEnd) + jobIncome;
     const expense = expenses
       .filter((item) => item.payment_status !== "pending" && (item.is_recurring || inCurrentMonth(item.paid_at)))
       .reduce((total, item) => total + toTRY(item.amount + item.vat, item.currency, usd, eur), 0);
@@ -106,7 +114,7 @@ export default function DashboardPage() {
       income, expense, net, expected, overdue, activeClients, idleEquipment,
       upcomingShoots, openTasks, overdueTasks, awaiting, incomeWidth, expenseWidth, month
     };
-  }, [hydrated, jobs, invoices, expenses, clients, equipment, shoots, tasks, contents, usd, eur, today]);
+  }, [hydrated, jobs, invoices, payments, expenses, clients, equipment, shoots, tasks, contents, usd, eur, today]);
 
   if (!hydrated || !stats) {
     const now = new Date();

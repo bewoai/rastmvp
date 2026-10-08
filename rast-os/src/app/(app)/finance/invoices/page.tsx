@@ -13,6 +13,7 @@ import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
 import { useToday } from "@/lib/useToday";
 import { patchRecord } from "@/lib/mutate";
+import { useToasts } from "@/lib/toast";
 import { invoiceStatus, TRY, dateTR } from "@/lib/labels";
 import type { Invoice, InvoiceStatus, Client, Job } from "@/lib/types";
 
@@ -49,7 +50,25 @@ function InvoiceModal({ initial, clients, today, onClose }: { initial: Invoice |
   async function submit() {
     if (!(form.amount > 0)) return { ok: false, error: "Tutar girin." };
     const s = useStore.getState();
-    return editing ? s.update("invoices", form.id, form) : s.add("invoices", { ...form, id: uid(), created_at: nowISO() });
+    const invoiceId = editing ? form.id : uid();
+    const res = editing ? await s.update("invoices", form.id, form) : await s.add("invoices", { ...form, id: invoiceId, created_at: nowISO() });
+    if (!res.ok) return res;
+
+    // Tahsilat tarihi: paid_amount değiştiyse farkı bugünün tarihiyle payments'a yaz
+    // (dashboard geliri payments.paid_at'e göre hesaplanır). Azalma → negatif düzeltme satırı,
+    // böylece ödeme satırlarının toplamı paid_amount ile tutarlı kalır.
+    const delta = (Number(form.paid_amount) || 0) - (Number(initial?.paid_amount) || 0);
+    if (Math.abs(delta) > 0.005) {
+      const pay = await s.add("payments", {
+        id: uid(), invoice_id: invoiceId, amount: delta, paid_at: today, created_at: nowISO(),
+        notes: delta < 0 ? "Düzeltme: tahsil edilen tutar azaltıldı" : undefined,
+      });
+      if (!pay.ok) {
+        // Fatura kaydedildi; formu açık bırakmak tekrar kaydetmede çift fatura riski doğurur.
+        useToasts.getState().push({ message: `Fatura kaydedildi ama tahsilat kaydı eklenemedi: ${pay.error ?? ""}`, tone: "danger" });
+      }
+    }
+    return res;
   }
 
   return (

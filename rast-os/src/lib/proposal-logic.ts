@@ -74,8 +74,8 @@ const NO_RE = /^RC-(\d{4})-(\d+)$/;
 
 /**
  * Sıradaki teklif numarası: RC-<yıl>-<NNN>. Aynı organizasyon + yıl içindeki en büyük sıra + 1
- * (boşluklar doldurulmaz; silinen teklifin numarası tekrar kullanılmaz ki gönderilmiş PDF'lerle
- * karışmasın). `orgId` verilirse yalnızca o organizasyonun kayıtları sayılır (Supabase'de RLS zaten
+ * (aradaki boşluklar doldurulmaz; elle girilmiş biçim dışı numaralar yok sayılır; 999'dan sonra
+ * 4 haneye geçer). `orgId` verilirse yalnızca o organizasyonun kayıtları sayılır (Supabase'de RLS zaten
  * yalnızca kendi org'unu döndürür; demo/çok-org testleri için).
  */
 export function nextProposalNo(

@@ -1,8 +1,9 @@
 # Migration 0014 — Organizasyon hedefleri (MRR eşiği)
 
-> **Status: NOT applied anywhere.** Written only. Apply on a staging / branch
-> database first. (Numbered 0014 to avoid colliding with the parallel
-> `0013_content_approvals.sql`; the two are independent.)
+> **Status: NOT applied anywhere.** Written only. Apply after
+> `0013_content_approvals.sql`, on a staging / branch database first.
+> (Numbered 0014 to avoid colliding with the parallel 0013; the two are
+> independent, but apply in numeric order — see `APPLY-ORDER.md`.)
 
 ## What changes
 

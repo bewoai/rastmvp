@@ -35,6 +35,23 @@ jobs:
       - run: npm test
       - run: npm run build
 
+  db-check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rast-os
+    # Migration zinciri (0001–0018 + 0008–0018 ikinci geçiş) bellek içi PGlite'ta;
+    # hiçbir Supabase / uzak veritabanına bağlanmaz.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: rast-os/package-lock.json
+      - run: npm ci
+      - run: npm run db:check
+
   e2e:
     runs-on: ubuntu-latest
     defaults:

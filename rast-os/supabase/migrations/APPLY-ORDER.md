@@ -1,4 +1,4 @@
-# Migration uygulama sırası (0008 → 0015)
+# Migration uygulama sırası (0008 → 0015, 0017)
 
 > **Durum:** Bu dosyalardan hiçbiri henüz hiçbir veritabanında çalıştırılmadı.
 > Önce staging / branch veritabanında, sonra canlıda uygulanır. Sıra
@@ -28,6 +28,7 @@
 6. `0013_content_approvals.sql` — `content_approvals` tablosu + hesapsız hekim onayı için public token RPC'leri (`approval_get` vb.).
 7. `0014_org_targets.sql` — `organizations.mrr_target` / `mrr_target_label` (MRR eşiği; yalnız admin, kolon düzeyinde güncelleme).
 8. `0015_client_reports.sql` — `client_reports` (aylık müşteri raporu notları; sayılar saklanmaz) + `projects.proposal_id` (teklif → proje bağı, teklif başına tek proje).
+9. `0017_lead_intake_rpc.sql` — web sitesi formu → CRM lead + "Lead'i 24 saat içinde ara" görevi (`lead_intake` RPC, `lead_intake_settings`, `tasks.lead_id`). Sır + org id kurulumu için README-0017 (0016 numarası kullanılmadı).
 
 > 0013 ve 0014 birbirinden bağımsız yazıldı; yine de numara sırasıyla
 > (0013 → 0014) uygulanır.
@@ -61,5 +62,6 @@ atlar), uygulamadan / anon key + kullanıcı JWT'si ile yap.
   Aynı ay ikinci kayıtta yeni satır oluşmaz. Bir teklifi "Kabul edildi" yapıp kaydet →
   proje (+ aylık kalem varsa taslak fatura) oluşur; "Projeye dönüştür" tekrar basılınca
   aynı proje açılır: `select name, proposal_id from public.projects where proposal_id is not null;`
+- **0017:** README-0017'deki `curl` ile `/api/leads`'e test gönderimi → CRM'de lead + yarına görev; aynı komut tekrarında `duplicate: true`.
 - **Sonra:** Kayıtlar kapalı kalır; yeni kullanıcılar yalnız admin daveti ile
   eklenir. Kayıtları yeniden açmak gerekirse ancak 0008 doğrulandıktan sonra.

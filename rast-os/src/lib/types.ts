@@ -37,7 +37,10 @@ export interface Lead {
   phone?: string;
   email?: string;
   instagram?: string;
+  website?: string;
   source?: string;
+  source_package?: string | null;               // 0017: web formundaki paket (ör. "standart")
+  source_utm?: Record<string, string> | null;   // 0017: utm_* parametreleri
   interested_in?: string;
   est_budget?: number;
   notes?: string;
@@ -103,6 +106,7 @@ export interface Project {
 export interface Task {
   id: ID;
   project_id?: ID;
+  lead_id?: ID | null;     // 0017: lead girişinden doğan arama görevi
   title: string;
   assignee?: string;
   due_date?: string;

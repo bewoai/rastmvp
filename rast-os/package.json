@@ -7,8 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/tasks-logic.test.mjs scripts/finance-logic.test.mjs scripts/proposal-logic.test.mjs scripts/activity-logic.test.mjs scripts/approval-logic.test.mjs scripts/mrr-logic.test.mjs scripts/report-logic.test.mjs scripts/proposal-convert.test.mjs scripts/writing-draft.test.mjs scripts/lead-logic.test.mjs scripts/portal-logic.test.mjs scripts/growth-logic.test.mjs",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/tasks-logic.test.mjs scripts/finance-logic.test.mjs scripts/proposal-logic.test.mjs scripts/activity-logic.test.mjs scripts/approval-logic.test.mjs scripts/mrr-logic.test.mjs scripts/report-logic.test.mjs scripts/proposal-convert.test.mjs scripts/writing-draft.test.mjs scripts/lead-logic.test.mjs scripts/portal-logic.test.mjs scripts/growth-logic.test.mjs scripts/ads-check.test.mjs",
     "db:check": "node scripts/db-check.mjs",
+    "ads:check": "node scripts/ads-check.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {

@@ -26,6 +26,19 @@ const platformNames: Record<AdsPlatform, string> = {
   meta: "Meta Ads",
 };
 
+const setupSteps: Record<AdsPlatform, string[]> = {
+  google: [
+    "Google Ads → Araçlar → API Merkezi'nden geliştirici token'ı alın (Basic Access onayı birkaç gün sürebilir).",
+    "Google Cloud'da OAuth istemcisi (Desktop app) oluşturup scripts/google-ads-oauth.mjs ile refresh token üretin.",
+    "GOOGLE_ADS_* değişkenlerini (token, client id/secret, refresh token, login customer id) Vercel ortam değişkenlerine ve .env.local dosyasına yazın.",
+  ],
+  meta: [
+    "Business Settings → Users → System users altında \"Rast OS\" sistem kullanıcısı oluşturup reklam hesaplarını atayın.",
+    "ads_read, read_insights izinleriyle süresiz token üretin.",
+    "Token'ı META_ADS_ACCESS_TOKEN olarak Vercel ortam değişkenlerine ve .env.local dosyasına yazın.",
+  ],
+};
+
 function inputDate(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -240,13 +253,25 @@ export default function AdsPage() {
         </div>
       </section>
 
-      {!accountsLoading && !currentStatus?.configured ? (
+      {!accountsLoading && accountsData && !currentStatus?.configured ? (
         <div className="card px-5 py-12">
-          <EmptyState title={`${platformNames[platform]} bağlantısı bekleniyor`} hint="Bağlantı bilgileri güvenli şekilde tanımlandığında hesaplar ve raporlar burada otomatik görünecek." />
+          <EmptyState
+            title={`${platformNames[platform]} bağlantısı henüz kurulmadı`}
+            hint={`${currentStatus?.missingCount ? `${currentStatus.missingCount} ayar eksik. ` : ""}Kurulum yaklaşık 15 dakika sürer; bağlantı kurulunca hesaplar ve raporlar burada otomatik görünür.`}
+          />
+          <ol className="mx-auto mt-5 max-w-md list-decimal space-y-1.5 pl-5 text-left text-xs text-muted">
+            {setupSteps[platform].map((step) => <li key={step}>{step}</li>)}
+            <li>
+              Ayrıntılı rehber: depodaki <code className="rounded bg-surface-2 px-1 py-0.5 text-foreground">docs/ads-baglanti.md</code>. Kontrol için <code className="rounded bg-surface-2 px-1 py-0.5 text-foreground">npm run ads:check</code> çalıştırın.
+            </li>
+          </ol>
         </div>
       ) : !accountsLoading && currentStatus?.configured && !platformAccounts.length ? (
         <div className="card px-5 py-12">
-          <EmptyState title="Kullanılabilir reklam hesabı bulunamadı" hint={accountsData?.errors[platform] || "Bu bağlantının erişebildiği aktif bir reklam hesabı yok."} />
+          <EmptyState
+            title="Kullanılabilir reklam hesabı bulunamadı"
+            hint={accountsData?.errors[platform] || "Bu bağlantının erişebildiği aktif bir reklam hesabı yok. Hesap durumu aktif değilse (ör. ödenmemiş bakiye) listelenmez; kontrol için npm run ads:check çalıştırın."}
+          />
         </div>
       ) : reportError ? (
         <div className="card px-5 py-12">

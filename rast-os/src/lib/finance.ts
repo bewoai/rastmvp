@@ -61,13 +61,44 @@ export function toTRY(amount: number, currency: Currency | undefined, usd: numbe
   return amount;
 }
 
-/** Giderin KDV dahil TL karşılığı. */
+const num = (v: unknown) => (v === null || v === undefined || v === "" ? undefined : Number.isFinite(Number(v)) ? Number(v) : undefined);
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+/**
+ * Giderin KDV dahil TL karşılığı.
+ * Giriş anında sabitlenmiş TL tutarı (amount_try, 0009) varsa onu kullanır; KDV aynı kurla
+ * (fx_rate, yoksa güncel kur) çevrilir. Eski kayıtlarda (amount_try yok) güncel kurla çevirir.
+ */
 export function expenseTotalTRY(
-  x: Pick<Expense, "amount" | "vat" | "currency">,
+  x: Pick<Expense, "amount" | "vat" | "currency" | "fx_rate" | "amount_try">,
   usd: number,
   eur: number,
 ): number {
-  return toTRY((Number(x.amount) || 0) + (Number(x.vat) || 0), x.currency, usd, eur);
+  const vat = Number(x.vat) || 0;
+  const amountTry = num(x.amount_try);
+  if (amountTry !== undefined && x.currency && x.currency !== "TRY") {
+    const rate = num(x.fx_rate);
+    return amountTry + (rate !== undefined ? vat * rate : toTRY(vat, x.currency, usd, eur));
+  }
+  return toTRY((Number(x.amount) || 0) + vat, x.currency, usd, eur);
+}
+
+/**
+ * Kayıt anında saklanacak kur alanları (0009). TRY → ikisi de null.
+ * Düzenlemede para birimi değişmediyse ve kayıtlı kur varsa o kur korunur (tarihsel değer);
+ * yoksa güncel kur (Ayarlar → tarayıcı) kullanılır.
+ */
+export function fxSnapshot(
+  amount: number,
+  currency: Currency | undefined,
+  usd: number,
+  eur: number,
+  previous?: Pick<Expense, "currency" | "fx_rate"> | null,
+): { fx_rate: number | null; amount_try: number | null } {
+  if (!currency || currency === "TRY") return { fx_rate: null, amount_try: null };
+  const kept = previous && previous.currency === currency ? num(previous.fx_rate) : undefined;
+  const rate = kept !== undefined && kept > 0 ? kept : currency === "USD" ? usd : eur;
+  return { fx_rate: rate, amount_try: round2((Number(amount) || 0) * rate) };
 }
 
 // ---------------------------------------------------------------------------

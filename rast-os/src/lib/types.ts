@@ -204,6 +204,8 @@ export interface Expense {
   amount: number;
   vat: number;
   currency?: Currency;   // varsayılan TRY; USD/EUR ise kurla TL'ye çevrilir
+  fx_rate?: number | null;    // 0009: giriş anındaki kur (USD/EUR); TRY'de null
+  amount_try?: number | null; // 0009: amount * fx_rate (KDV hariç), giriş anında sabit
   paid_at?: string;
   method?: string;
   payment_status?: ExpensePaymentStatus;

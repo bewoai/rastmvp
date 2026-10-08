@@ -1,7 +1,7 @@
 // Çalıştırma: npm test  (Node'un yerleşik test runner'ı + type stripping)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { expandRecurring, expenseTotalTRY, invoiceIncomeInRange, monthBounds, toTRY } from "../src/lib/finance.ts";
+import { expandRecurring, expenseTotalTRY, fxSnapshot, invoiceIncomeInRange, monthBounds, toTRY } from "../src/lib/finance.ts";
 
 const OCT = monthBounds("2026-10");
 
@@ -109,4 +109,28 @@ test("FX conversion: TRY passthrough, USD/EUR at given rate, VAT included", () =
   const sub = exp({ id: "s", is_recurring: true, paid_at: "2026-01-01", amount: 20, currency: "EUR" });
   const [occ] = expandRecurring([sub], ...OCT);
   assert.equal(expenseTotalTRY(occ, 40, 45), 900);
+});
+
+test("historical FX: amount_try (entry-time) wins over the current rate", () => {
+  // Girişte kur 40 idi; bugün 50. Tarihsel tutar sabit kalmalı.
+  const x = { amount: 10, vat: 2, currency: "USD", fx_rate: 40, amount_try: 400 };
+  assert.equal(expenseTotalTRY(x, 50, 60), 480);
+  // amount_try var ama fx_rate yok (elle backfill): KDV güncel kurla
+  assert.equal(expenseTotalTRY({ amount: 10, vat: 2, currency: "USD", amount_try: 400 }, 50, 60), 500);
+  // Eski kayıt (kolonlar boş/null): güncel kur
+  assert.equal(expenseTotalTRY({ amount: 10, vat: 2, currency: "USD", fx_rate: null, amount_try: null }, 50, 60), 600);
+  // DB numeric string olarak gelse de çalışır
+  assert.equal(expenseTotalTRY({ amount: 10, vat: 0, currency: "EUR", fx_rate: "45.5", amount_try: "455.00" }, 50, 60), 455);
+});
+
+test("fxSnapshot stores entry-time rate; keeps stored rate on edit; clears for TRY", () => {
+  assert.deepEqual(fxSnapshot(100, "TRY", 40, 45), { fx_rate: null, amount_try: null });
+  assert.deepEqual(fxSnapshot(100, "USD", 40, 45), { fx_rate: 40, amount_try: 4000 });
+  assert.deepEqual(fxSnapshot(12.345, "EUR", 40, 45.1), { fx_rate: 45.1, amount_try: 556.76 });
+  // Düzenleme: aynı para birimi + kayıtlı kur → kur korunur, tutar yeniden hesaplanır
+  assert.deepEqual(fxSnapshot(200, "USD", 50, 60, { currency: "USD", fx_rate: 40 }), { fx_rate: 40, amount_try: 8000 });
+  // Para birimi değişti → güncel kur
+  assert.deepEqual(fxSnapshot(200, "EUR", 50, 60, { currency: "USD", fx_rate: 40 }), { fx_rate: 60, amount_try: 12000 });
+  // Eski kayıt (kur yok) → güncel kur
+  assert.deepEqual(fxSnapshot(200, "USD", 50, 60, { currency: "USD", fx_rate: null }), { fx_rate: 50, amount_try: 10000 });
 });

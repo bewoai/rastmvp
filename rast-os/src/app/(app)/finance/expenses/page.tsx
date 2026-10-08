@@ -14,7 +14,7 @@ import { useToday } from "@/lib/useToday";
 import { patchRecord } from "@/lib/mutate";
 import { TRY, dateTR } from "@/lib/labels";
 import { useFx, toTRY, money, CURRENCIES } from "@/lib/fx";
-import { expandRecurring, expenseTotalTRY, monthBounds } from "@/lib/finance";
+import { expandRecurring, expenseTotalTRY, fxSnapshot, monthBounds } from "@/lib/finance";
 import type { ExpenseRow } from "@/lib/finance";
 import type { Expense, Currency, ExpensePaymentStatus } from "@/lib/types";
 
@@ -40,7 +40,23 @@ function ExpenseModal({ initial, today, usd, eur, onClose }: { initial: Expense 
   async function submit() {
     if (!(form.amount > 0)) return { ok: false, error: "Tutar girin." };
     const s = useStore.getState();
-    return editing ? s.update("expenses", form.id, form) : s.add("expenses", { ...form, id: uid(), created_at: nowISO() });
+    // Tarihsel kur (0009): USD/EUR giderde giriş anındaki kur ve TL karşılığı saklanır.
+    // TRY gider ve önceden kur alanı yoksa kolonlara hiç dokunma (0009 öncesi DB ile de uyumlu).
+    const snap = fxSnapshot(form.amount, cur, usd, eur, initial);
+    const touchesFx = snap.fx_rate !== null || form.fx_rate != null || form.amount_try != null;
+    const withFx: Expense = touchesFx ? { ...form, ...snap } : form;
+    const save = (data: Expense) =>
+      editing ? s.update("expenses", form.id, data) : s.add("expenses", { ...data, id: uid(), created_at: nowISO() });
+    const res = await save(withFx);
+    // 0009 henüz uygulanmamışsa PostgREST bilinmeyen kolon hatası verir: eski davranışla kaydet.
+    if (!res.ok && /fx_rate|amount_try/.test(res.error ?? "")) {
+      console.warn("[expenses] fx_rate/amount_try kolonları yok (migration 0009 uygulanmamış); kur saklanmadan kaydediliyor.");
+      const legacy: Expense = { ...withFx };
+      delete legacy.fx_rate;
+      delete legacy.amount_try;
+      return save(legacy);
+    }
+    return res;
   }
 
   return (

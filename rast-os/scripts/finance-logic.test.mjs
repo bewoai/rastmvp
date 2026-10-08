@@ -1,7 +1,7 @@
 // Çalıştırma: npm test  (Node'un yerleşik test runner'ı + type stripping)
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { expandRecurring, expenseTotalTRY, fxSnapshot, invoiceIncomeInRange, monthBounds, toTRY } from "../src/lib/finance.ts";
+import { expandRecurring, expenseTotalTRY, fxSnapshot, invoiceIncomeInRange, monthBounds, periodBounds, toTRY } from "../src/lib/finance.ts";
 
 const OCT = monthBounds("2026-10");
 
@@ -38,6 +38,25 @@ test("payments of deleted invoices are ignored; corrections net out", () => {
     { amount: 50, paid_at: "2026-10-15" }, // faturasız tahsilat
   ];
   assert.equal(invoiceIncomeInRange(invoices, payments, ...OCT), 750);
+});
+
+test("invoices page summary: periodBounds + invoiceIncomeInRange (payment date, same as dashboard)", () => {
+  assert.deepEqual(periodBounds("month", "2026-10"), ["2026-10-01", "2026-10-31"]);
+  const [allStart, allEnd] = periodBounds("all", "2026-10");
+  // Eylülde kesilen, Ekimde tahsil edilen fatura: Ekim özetinde sayılır, Eylülde sayılmaz
+  const invoices = [
+    { id: "sep", issue_date: "2026-09-28", paid_amount: 1200 },
+    { id: "oct", issue_date: "2026-10-02", paid_amount: 400 }, // eski kayıt: ödeme satırı yok
+  ];
+  const payments = [
+    { invoice_id: "sep", amount: 1000, paid_at: "2026-10-01" },
+    { invoice_id: "sep", amount: 200, paid_at: "2026-11-03" },
+  ];
+  assert.equal(invoiceIncomeInRange(invoices, payments, ...periodBounds("month", "2026-09")), 0);
+  assert.equal(invoiceIncomeInRange(invoices, payments, ...periodBounds("month", "2026-10")), 1000 + 400);
+  assert.equal(invoiceIncomeInRange(invoices, payments, ...periodBounds("month", "2026-11")), 200);
+  // Tüm dönem: her tahsilat bir kez (ödeme satırları + eşleşmeyen eski paid_amount)
+  assert.equal(invoiceIncomeInRange(invoices, payments, allStart, allEnd), 1600);
 });
 
 const exp = (over) => ({

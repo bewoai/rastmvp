@@ -15,6 +15,7 @@ import { useToday } from "@/lib/useToday";
 import { patchRecord } from "@/lib/mutate";
 import { useToasts } from "@/lib/toast";
 import { invoiceStatus, TRY, dateTR } from "@/lib/labels";
+import { invoiceIncomeInRange, periodBounds } from "@/lib/finance";
 import type { Invoice, InvoiceStatus, Client, Job } from "@/lib/types";
 
 const empty: Invoice = {
@@ -113,8 +114,9 @@ function InvoiceModal({ initial, clients, today, onClose }: { initial: Invoice |
 }
 
 export default function InvoicesPage() {
-  const hydrated = useHydrated(["invoices", "clients", "jobs"]);
+  const hydrated = useHydrated(["invoices", "payments", "clients", "jobs"]);
   const invoices = useStore((s) => s.invoices);
+  const payments = useStore((s) => s.payments);
   const clients = useStore((s) => s.clients);
   const jobs = useStore((s) => s.jobs);
   const today = useToday();
@@ -133,13 +135,20 @@ export default function InvoicesPage() {
     return map;
   }, [clients]);
 
-  const { rows, collected, revenue } = useMemo(() => {
+  const { rows, collected, revenue, outstanding } = useMemo(() => {
     const inPeriod = (date: string | undefined) => periodView === "all" || Boolean(date?.startsWith(selectedMonth));
     const visibleInvoices = incomeView === "one_off" ? [] : invoices.filter((invoice) => inPeriod(invoice.issue_date));
     const visibleJobs = incomeView === "recurring" ? [] : jobs.filter((job) => job.status !== "cancelled" && inPeriod(job.date));
 
-    const collected = visibleInvoices.reduce((sum, i) => sum + i.paid_amount, 0) + visibleJobs.reduce((sum, j) => sum + j.paid_amount, 0);
+    // Tahsil edilen: dashboard ile aynı kural — fatura tahsilatı fatura tarihine değil ödeme
+    // tarihine (payments.paid_at) göre; ödeme satırı olmayan eski paid_amount fatura tarihine düşer.
+    // Tekil işlerin ayrı tahsilat tarihi yok: iş tarihine göre (dashboard ile aynı).
+    const [start, end] = periodBounds(periodView, selectedMonth);
+    const invoiceCollected = incomeView === "one_off" ? 0 : invoiceIncomeInRange(invoices, payments, start, end);
+    const collected = invoiceCollected + visibleJobs.reduce((sum, j) => sum + j.paid_amount, 0);
     const revenue = visibleInvoices.reduce((sum, i) => sum + i.amount + i.vat, 0) + visibleJobs.reduce((sum, j) => sum + j.price, 0);
+    // Bekleyen: dönemde kesilen faturaların / işlerin kalanı (kayıt tarihine göre, tablodaki "Kalan" ile aynı).
+    const outstanding = visibleInvoices.reduce((sum, i) => sum + i.amount + i.vat - i.paid_amount, 0) + visibleJobs.reduce((sum, j) => sum + j.price - j.paid_amount, 0);
 
     const rows: Row[] = [
       ...visibleInvoices.map((invoice): Row => ({
@@ -153,8 +162,8 @@ export default function InvoicesPage() {
       })),
     ].sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")));
 
-    return { rows, collected, revenue };
-  }, [invoices, jobs, periodView, incomeView, selectedMonth, clientMap]);
+    return { rows, collected, revenue, outstanding };
+  }, [invoices, payments, jobs, periodView, incomeView, selectedMonth, clientMap]);
 
   const visible = useListSearch(rows, query, (r) => `${r.record} ${r.client}`);
 
@@ -212,8 +221,8 @@ export default function InvoicesPage() {
       <StatStrip
         items={[
           { label: "Toplam gelir", value: TRY(revenue), tone: "amber" },
-          { label: "Tahsil edilen", value: TRY(collected), tone: "success" },
-          { label: "Bekleyen tahsilat", value: TRY(revenue - collected), tone: "warning" },
+          { label: "Tahsil edilen", value: TRY(collected), tone: "success", hint: "Ödeme tarihine göre" },
+          { label: "Bekleyen tahsilat", value: TRY(outstanding), tone: "warning" },
           { label: "Kayıt sayısı", value: String(rows.length) },
         ]}
       />

@@ -11,6 +11,14 @@ export function monthBounds(month: string): [string, string] {
   return [`${y}-${mm}-01`, `${y}-${mm}-${String(last).padStart(2, "0")}`];
 }
 
+/**
+ * Liste sayfalarının dönem filtresi → kapsayıcı tarih aralığı.
+ * "month": seçili ayın ilk/son günü · "all": tüm zamanlar (her tarih anahtarını kapsar).
+ */
+export function periodBounds(mode: "month" | "all", month: string): [string, string] {
+  return mode === "all" ? ["0000-01-01", "9999-12-31"] : monthBounds(month);
+}
+
 const dayKey = (d: string | undefined) => (d ? d.slice(0, 10) : "");
 const inRange = (d: string | undefined, start: string, end: string) => {
   const k = dayKey(d);

@@ -14,6 +14,8 @@ import { useToday } from "@/lib/useToday";
 import { patchRecord } from "@/lib/mutate";
 import { TRY, dateTR } from "@/lib/labels";
 import { useFx, toTRY, money, CURRENCIES } from "@/lib/fx";
+import { expandRecurring, expenseTotalTRY, monthBounds } from "@/lib/finance";
+import type { ExpenseRow } from "@/lib/finance";
 import type { Expense, Currency, ExpensePaymentStatus } from "@/lib/types";
 
 const empty: Expense = {
@@ -68,7 +70,8 @@ function ExpenseModal({ initial, today, usd, eur, onClose }: { initial: Expense 
             <option value="paid">Ödendi</option><option value="pending">Bekliyor</option>
           </Select>
         </Field>
-        <Field label="Ödeme / vade tarihi"><Input type="date" {...f.text("paid_at")} /></Field>
+        {/* Tekrarlayan giderde bu tarih tekrarın başlangıcıdır (her ay aynı gün; öncesindeki aylarda sayılmaz). */}
+        <Field label={form.is_recurring ? "İlk ödeme (başlangıç) tarihi" : "Ödeme / vade tarihi"}><Input type="date" {...f.text("paid_at")} /></Field>
         {cur !== "TRY" && (
           <p className="self-end text-xs text-muted">
             TL karşılığı ≈ {TRY(toTRY((form.amount || 0) + (form.vat || 0), cur, usd, eur))} (kur: ${usd} / €{eur}, Ayarlar&apos;dan değişir)
@@ -105,8 +108,12 @@ export default function ExpensesPage() {
   const del = useDeleteConfirm();
 
   const stats = useMemo(() => {
-    const inTRY = (x: Expense) => toTRY(x.amount + x.vat, x.currency, usd, eur);
-    const period = expenses.filter((x) => periodView === "all" || x.is_recurring || Boolean(x.paid_at?.startsWith(selectedMonth)));
+    const inTRY = (x: Expense) => expenseTotalTRY(x, usd, eur);
+    // Seçili ay: tekrarlayan giderler şablondur; yalnızca başlangıç tarihinden sonraki (ve taksit
+    // sayısı dolmamış) aylarda birer oluşum olarak görünür. Tüm dönem: kayıtların kendisi (şablon bir kez).
+    const period: ExpenseRow[] = periodView === "all"
+      ? expenses.map((x) => ({ ...x, source_id: x.id, is_occurrence: false }))
+      : expandRecurring(expenses, ...monthBounds(selectedMonth));
     let total = 0, recurring = 0, pending = 0, pendingCount = 0, recurringCount = 0;
     for (const x of period) {
       if (x.payment_status === "pending") { pending += inTRY(x); pendingCount++; }
@@ -123,7 +130,10 @@ export default function ExpensesPage() {
   }, [stats.period, scope]);
   const visible = useListSearch(scoped, query, (x) => `${x.category ?? ""} ${x.vendor ?? ""} ${x.description ?? ""}`);
 
-  const columns = useMemo<Column<Expense>[]>(() => [
+  // Oluşum satırları DB'de yok: düzenleme/silme/ödendi işaretleme kaynak (şablon) kayda yapılır.
+  const sourceOf = (x: ExpenseRow): Expense => expenses.find((e) => e.id === x.source_id) ?? x;
+
+  const columns = useMemo<Column<ExpenseRow>[]>(() => [
     {
       key: "what", header: "Gider", tone: "primary", mobile: "title", sort: (x) => x.category,
       cell: (x) => (
@@ -134,13 +144,13 @@ export default function ExpensesPage() {
       ),
     },
     {
-      key: "amount", header: "Tutar (+KDV)", tone: "strong", sort: (x) => toTRY(x.amount + x.vat, x.currency, usd, eur),
+      key: "amount", header: "Tutar (+KDV)", tone: "strong", sort: (x) => expenseTotalTRY(x, usd, eur),
       cell: (x) => {
         const cur = x.currency ?? "TRY";
         return (
           <>
             <span>{money(x.amount + x.vat, cur)}</span>
-            {cur !== "TRY" && <span className="block text-xs text-muted">≈ {TRY(toTRY(x.amount + x.vat, cur, usd, eur))}</span>}
+            {cur !== "TRY" && <span className="block text-xs text-muted">≈ {TRY(expenseTotalTRY(x, usd, eur))}</span>}
           </>
         );
       },
@@ -161,7 +171,15 @@ export default function ExpensesPage() {
           // Tek tıkla ödendi: bekleyen taksit/ödeme akışının en sık işlemi
           <button
             type="button"
-            onClick={() => patchRecord("expenses", x.id, { payment_status: "paid", paid_at: x.paid_at || today }, "Ödeme güncellenemedi")}
+            onClick={() =>
+              patchRecord(
+                "expenses",
+                x.source_id,
+                // Şablonun tarihi tekrarın başlangıcıdır; oluşumdan işaretlerken tarih değiştirilmez.
+                x.is_occurrence ? { payment_status: "paid" } : { payment_status: "paid", paid_at: x.paid_at || today },
+                "Ödeme güncellenemedi",
+              )
+            }
             aria-label={`Ödendi olarak işaretle: ${x.vendor || x.category || "gider"}`}
             title="Ödendi olarak işaretle"
             className="inline-flex items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
@@ -216,10 +234,14 @@ export default function ExpensesPage() {
         columns={columns}
         rows={visible}
         rowKey={(x) => x.id}
-        onOpen={(x) => setModal({ initial: x })}
+        onOpen={(x) => setModal({ initial: sourceOf(x) })}
         openLabel={(x) => `Düzenle: ${x.category || x.vendor || "gider"}`}
         actions={(x) => (
-          <RowActions label={x.vendor || x.category || "gider"} onEdit={() => setModal({ initial: x })} onDelete={() => del.ask({ key: "expenses", id: x.id, label: x.vendor || x.category || "Gider" })} />
+          <RowActions
+            label={x.vendor || x.category || "gider"}
+            onEdit={() => setModal({ initial: sourceOf(x) })}
+            onDelete={() => del.ask({ key: "expenses", id: x.source_id, label: `${x.vendor || x.category || "Gider"}${x.is_recurring ? " (tüm tekrarlar)" : ""}` })}
+          />
         )}
         empty={
           <EmptyState

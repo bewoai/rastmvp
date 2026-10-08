@@ -27,12 +27,8 @@ export const useFx = create<FxState>()(
   ),
 );
 
-/** Verilen tutarı (para birimiyle) TL'ye çevirir. */
-export function toTRY(amount: number, currency: Currency | undefined, usd: number, eur: number): number {
-  if (currency === "USD") return amount * usd;
-  if (currency === "EUR") return amount * eur;
-  return amount;
-}
+// Çevrim mantığı saf modülde (testli): src/lib/finance.ts
+export { toTRY } from "./finance";
 
 export const CURRENCIES: Currency[] = ["TRY", "USD", "EUR"];
 export const currencySymbol: Record<Currency, string> = { TRY: "₺", USD: "$", EUR: "€" };

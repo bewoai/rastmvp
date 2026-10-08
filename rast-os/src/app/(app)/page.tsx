@@ -8,8 +8,8 @@ import {
 } from "lucide-react";
 import { PageHeader, StatCard, Panel, Badge, EmptyState } from "@/components/ui";
 import { useStore, useHydrated } from "@/lib/store";
-import { useFx, toTRY } from "@/lib/fx";
-import { invoiceIncomeInRange, monthBounds } from "@/lib/finance";
+import { useFx } from "@/lib/fx";
+import { expandRecurring, expenseTotalTRY, invoiceIncomeInRange, monthBounds } from "@/lib/finance";
 import { useToday } from "@/lib/useToday";
 import { useQuickAdd } from "@/lib/quickAdd";
 import { bucketTasks, dateKey, formatDue, sortTasks } from "@/lib/taskLogic";
@@ -72,9 +72,10 @@ export default function DashboardPage() {
   
     // Fatura geliri: fatura tarihine göre değil, tahsilatın yapıldığı güne (payments.paid_at) göre.
     const income = invoiceIncomeInRange(invoices, payments, monthStart, monthEnd) + jobIncome;
-    const expense = expenses
-      .filter((item) => item.payment_status !== "pending" && (item.is_recurring || inCurrentMonth(item.paid_at)))
-      .reduce((total, item) => total + toTRY(item.amount + item.vat, item.currency, usd, eur), 0);
+    // Tekrarlayan giderler şablondur: yalnızca bu aya düşen oluşumları sayılır (başlangıç/taksit sonu dikkate alınır).
+    const expense = expandRecurring(expenses, monthStart, monthEnd)
+      .filter((item) => item.payment_status !== "pending")
+      .reduce((total, item) => total + expenseTotalTRY(item, usd, eur), 0);
     const net = income - expense;
     
     const expected = invoices

@@ -35,7 +35,10 @@ export async function updateSession(request: NextRequest) {
   const isPublic =
     path.startsWith("/login") ||
     path.startsWith("/auth") ||
-    path.startsWith("/portal-login");
+    path.startsWith("/portal-login") ||
+    // Herkese açık içerik onay sayfası (/onay/<token>): hekim hesapsız açar; veriye yalnızca
+    // token'la anon RPC (approval_get / approval_decide) üzerinden erişilir.
+    path.startsWith("/onay/");
 
   const redirectToLogin = () => {
     const redirectUrl = request.nextUrl.clone();

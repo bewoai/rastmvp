@@ -7,7 +7,7 @@ import type { Lead } from "@/lib/types";
 
 const empty: Lead = {
   id: "", company_name: "", contact_person: "", phone: "", email: "",
-  source: "", interested_in: "", est_budget: undefined, status: "new",
+  source: "", instagram: "", website: "", interested_in: "", est_budget: undefined, status: "new",
   next_followup_at: "", notes: "", created_at: "",
 };
 
@@ -48,9 +48,11 @@ export default function LeadModal({ initial, onClose }: { initial: Lead | null; 
           <Field label="Kaynak">
             <Select {...f.text("source")}>
               <option value="">Seçin</option>
-              {["Referans", "Instagram", "Web sitesi", "Reklam", "LinkedIn", "Organik"].map((s) => <option key={s}>{s}</option>)}
+              {["Referans", "Instagram", "Web sitesi", "Hekim sistemi", "Reklam", "LinkedIn", "Organik"].map((s) => <option key={s}>{s}</option>)}
             </Select>
           </Field>
+          <Field label="Instagram"><Input {...f.text("instagram")} placeholder="@hesap" /></Field>
+          <Field label="Web sitesi"><Input {...f.text("website")} placeholder="ornek.com" /></Field>
           <Field label="Tahmini bütçe (₺)"><Input type="number" inputMode="decimal" min="0" {...f.num("est_budget")} /></Field>
           <Field label="İlgilendiği hizmet"><Input {...f.text("interested_in")} /></Field>
           <div className="sm:col-span-2"><Field label="Notlar"><Textarea {...f.text("notes")} /></Field></div>

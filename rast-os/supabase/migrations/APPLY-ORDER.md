@@ -1,4 +1,4 @@
-# Migration uygulama sırası (0008 → 0017)
+# Migration uygulama sırası (0008 → 0019)
 
 > **Durum:** Bu dosyalardan hiçbiri henüz hiçbir veritabanında çalıştırılmadı.
 > Önce staging / branch veritabanında, sonra canlıda uygulanır. Sıra
@@ -30,12 +30,13 @@
 8. `0015_client_reports.sql` — `client_reports` (aylık müşteri raporu notları; sayılar saklanmaz) + `projects.proposal_id` (teklif → proje bağı, teklif başına tek proje).
 9. `0016_script_source.sql` — `contents.script_source` (senaryonun kaynağı; "Senaryo içe aktar" `claude-code` yazar).
 10. `0017_lead_intake_rpc.sql` — web sitesi formu → CRM lead + "Lead'i 24 saat içinde ara" görevi (`lead_intake` RPC, `lead_intake_settings`, `tasks.lead_id`). Sır + org id kurulumu için README-0017.
+11. `0019_growth_engine.sql` — Müşteri Bulma: `prospects`, `outreach_sequences`, `outreach_messages`, `suppression_list`, `outreach_settings` + `outreach_unsubscribe` / `outreach_cron_claim` / `outreach_cron_result` RPC'leri. 0011, 0012 ve 0017'den sonra. CRON_SECRET hash'i + ret anahtarı kurulumu için README-0019. (0018 başka dalda olabilir; 0019 ondan bağımsız.)
 
 > 0013 ve 0014 birbirinden bağımsız yazıldı; yine de numara sırasıyla
 > (0013 → 0014) uygulanır.
 
 Uygulama: Supabase Dashboard → SQL Editor → dosyayı yapıştır → Run (veya
-bağlı projede `supabase db push`). 0008–0017 dosyaları idempotent olarak yazıldı; tekrar çalıştırmak
+bağlı projede `supabase db push`). 0008–0019 dosyaları idempotent olarak yazıldı; tekrar çalıştırmak
 güvenlidir.
 
 ## Son kontroller
@@ -66,5 +67,6 @@ atlar), uygulamadan / anon key + kullanıcı JWT'si ile yap.
 - **0016:** İçerik → "Brief" durumundaki içerik → Senaryo içe aktar → vault örneğini yapıştır → Alanlara aktar → Kaydet →
   `select status, script_source from public.contents order by updated_at desc limit 5;` → `script_ready` / `claude-code`.
 - **0017:** README-0017'deki `curl` ile `/api/leads`'e test gönderimi → CRM'de lead + yarına görev; aynı komut tekrarında `duplicate: true`.
+- **0019:** README-0019'daki son kontroller: keşif tekrarında aday çoğalmaz; onaylanmamış mesaj gönderilmez; `curl -H "Authorization: Bearer $CRON_SECRET" …/api/growth/cron`; ret bağlantısı → `suppression_list`.
 - **Sonra:** Kayıtlar kapalı kalır; yeni kullanıcılar yalnız admin daveti ile
   eklenir. Kayıtları yeniden açmak gerekirse ancak 0008 doğrulandıktan sonra.

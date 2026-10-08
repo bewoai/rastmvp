@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createHmac } from "node:crypto";
 import {
-  CONTACT_COOLDOWN_DAYS, DAILY_LIST_SIZE, DEFAULT_SEQUENCES, MANUAL_SCRIPTS, SECTORS, allowedFieldSource, approvalPatch,
+  CONTACT_COOLDOWN_DAYS, cronEmailDecision, DAILY_LIST_SIZE, DEFAULT_SEQUENCES, MANUAL_SCRIPTS, SECTORS, allowedFieldSource, approvalPatch,
   clinicCsvToProspects, contactStats, emailSendingEnabled, emailsSentToday, firstStepDraft, instagramLink, isSuppressed,
   isWithinSendWindow, manualContactRecord, nextSendSlot, nextStepDraft, normalizeInstagram, parseCsv, parseDailyCap,
   planSendBatch, prospectToLeadDraft, prospectView, remainingCap, renderTemplate, scoreProspect, sectorKeyOf,
@@ -139,6 +139,15 @@ test("approvalPatch: bayrak kapalıyken planlama YOK; açıkken gelecek plan kor
   assert.equal(approvalPatch({ scheduled_for: "2026-10-20T08:00:00Z" }, { emailEnabled: true, now: NOW }).scheduled_for, "2026-10-20T08:00:00.000Z");
   assert.equal(approvalPatch({ scheduled_for: ago(1) }, { emailEnabled: true, now: NOW }).scheduled_for, new Date(NOW).toISOString());
   assert.equal(approvalPatch({ scheduled_for: null }, { emailEnabled: true, now: Date.parse("2026-10-10T08:00:00Z") }).scheduled_for, "2026-10-12T07:00:00.000Z");
+});
+
+test("cronEmailDecision: bayrak kapalıysa SMTP ve pencereden bağımsız olarak 'disabled' (gönderim yok)", () => {
+  const sat = Date.parse("2026-10-10T08:00:00Z");
+  assert.equal(cronEmailDecision({ env: {}, mailerKind: "smtp", now: NOW }), "disabled");
+  assert.equal(cronEmailDecision({ env: { OUTREACH_EMAIL_ENABLED: "false" }, mailerKind: "smtp", now: NOW }), "disabled");
+  assert.equal(cronEmailDecision({ env: { OUTREACH_EMAIL_ENABLED: "true" }, mailerKind: "noop", now: NOW }), "no-smtp");
+  assert.equal(cronEmailDecision({ env: { OUTREACH_EMAIL_ENABLED: "true" }, mailerKind: "smtp", now: sat }), "outside-window");
+  assert.equal(cronEmailDecision({ env: { OUTREACH_EMAIL_ENABLED: "true" }, mailerKind: "smtp", now: NOW }), "send");
 });
 
 /* ---------------- Günlük limit + gönderim seçimi ---------------- */

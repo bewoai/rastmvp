@@ -266,6 +266,17 @@ export function emailSendingEnabled(env: Env): boolean {
   return v === "true" || v === "1";
 }
 
+/**
+ * Cron'un e-posta kararı (route bunu uygular): bayrak kapalıysa "disabled" → hiçbir RPC çağrılmaz, hiçbir şey
+ * gönderilmez; SMTP yoksa "no-smtp"; pencere dışıysa "outside-window"; aksi halde "send".
+ */
+export function cronEmailDecision(opts: { env: Env; mailerKind: "smtp" | "noop"; now: Date | number }): "disabled" | "no-smtp" | "outside-window" | "send" {
+  if (!emailSendingEnabled(opts.env)) return "disabled";
+  if (opts.mailerKind !== "smtp") return "no-smtp";
+  if (!isWithinSendWindow(opts.now)) return "outside-window";
+  return "send";
+}
+
 export const DEFAULT_DAILY_CAP = 20;
 export const MAX_DAILY_CAP = 200;
 

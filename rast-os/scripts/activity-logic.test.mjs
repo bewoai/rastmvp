@@ -6,7 +6,7 @@ import {
   activityEntity, activityFields, activityHref, activityRecord, activityValue,
 } from "../src/lib/labels.ts";
 
-test("every table with an activity-log trigger (0012, 0013, 0015, 0018) has a Turkish module label", () => {
+test("every table with an activity-log trigger (0012, 0013, 0015, 0018, 0019) has a Turkish module label", () => {
   const sql = readFileSync(new URL("../supabase/migrations/0012_activity_logs_triggers.sql", import.meta.url), "utf8");
   const block = sql.match(/foreach t in array array\[([\s\S]*?)\]/);
   assert.ok(block, "trigger table list not found in 0012");
@@ -23,6 +23,13 @@ test("every table with an activity-log trigger (0012, 0013, 0015, 0018) has a Tu
   assert.ok(tables.includes("content_approvals"), "0013 activity trigger not found");
   assert.ok(tables.includes("client_reports"), "0015 activity trigger not found");
   assert.ok(tables.includes("client_portal_tokens"), "0018 activity trigger not found");
+  // 0019 (Müşteri Bulma): foreach döngüsüyle bağlanan tablolar (prospects BİLEREK hariç: lat/lng ≤30 gün).
+  const sql19 = readFileSync(new URL("../supabase/migrations/0019_growth_engine.sql", import.meta.url), "utf8");
+  const block19 = sql19.match(/-- ---------- 13\) İşlem geçmişi[\s\S]*?foreach t in array array\[([\s\S]*?)\]/);
+  assert.ok(block19, "0019 activity trigger list not found");
+  const t19 = [...block19[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  assert.ok(!t19.includes("prospects"), "prospects activity_logs'a bağlanmamalı");
+  tables.push(...t19);
   assert.deepEqual(tables.sort(), Object.keys(activityEntity).sort());
 });
 

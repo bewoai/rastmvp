@@ -89,3 +89,23 @@ export function useDeleteConfirm() {
 
   return { ask, dialog };
 }
+
+/**
+ * Genel onay: `const c = useConfirm();` → `if (await c.ask({ title, message, confirmLabel })) …` ve JSX'te `{c.dialog}`.
+ * Silme dışı ama geri dönüşü zor işlemler için (ör. adayı ret listesine almak).
+ */
+export function useConfirm() {
+  const [req, setReq] = useState<{ title: string; message: React.ReactNode; confirmLabel?: string; resolve: (ok: boolean) => void } | null>(null);
+  const ask = useCallback(
+    (o: { title: string; message: React.ReactNode; confirmLabel?: string }) => new Promise<boolean>((resolve) => setReq({ ...o, resolve })),
+    [],
+  );
+  const close = (ok: boolean) => {
+    req?.resolve(ok);
+    setReq(null);
+  };
+  const dialog = req ? (
+    <ConfirmDialog title={req.title} message={req.message} confirmLabel={req.confirmLabel ?? "Onayla"} onConfirm={() => close(true)} onCancel={() => close(false)} />
+  ) : null;
+  return { ask, dialog };
+}

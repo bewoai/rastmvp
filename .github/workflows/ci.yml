@@ -40,7 +40,7 @@ jobs:
     defaults:
       run:
         working-directory: rast-os
-    # Migration zinciri (0001–0018 + 0008–0018 ikinci geçiş) bellek içi PGlite'ta;
+    # Migration zinciri (0001–0019 + 0008–0019 ikinci geçiş) bellek içi PGlite'ta;
     # hiçbir Supabase / uzak veritabanına bağlanmaz.
     steps:
       - uses: actions/checkout@v4

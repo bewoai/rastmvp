@@ -57,6 +57,8 @@ supabase/migrations/                # tam şema, RLS ve sürüm migration'ları
 - **Web formu → CRM:** `POST /api/leads` (Web3Forms webhook'u) lead'i ekler/tekilleştirir ve "Lead'i 24 saat içinde ara: <ad>" görevi açar. Kurulum (migration 0017, `LEAD_WEBHOOK_SECRET`, `LEAD_INTAKE_ORG_ID`, Web3Forms webhook'u PRO plan ister): `supabase/migrations/README-0017.md`.
 - **CRM → Potansiyel Müşteriler:** "Kaynak" sütunu + filtre (Hekim / Site / Manuel); son 48 saatte gelen ve arama görevi tamamlanmamış lead'lerde "Aranmadı · yeni" rozeti.
 
+- **Müşteri Bulma** (`/musteri-bulma`, günlük ekran `/musteri-bulma/bugun`): Google Places ile aday keşfi (veri saklanmaz, canlı), site zenginleştirme, açıklamalı puan, günlük 10 kişilik manuel temas listesi (telefon / WhatsApp / Instagram bağlantıları — otomatik gönderim yok), yanıt → CRM lead + arama görevi, ret listesi. E-posta dizileri hazır ama `OUTREACH_EMAIL_ENABLED` olmadan kapalı (İYS). Ayrıntı: `docs/musteri-bulma.md`, kurulum: `supabase/migrations/README-0019.md`. Hedef klinik CSV'si modülde **Keşfet → Hedef klinik listesini aktar (18)** ile doğrudan kalifiye aday olarak da alınabilir.
+
 ### Hedef klinik listesini içe aktarma
 
 `scripts/data/` altında Sakarya / Kocaeli hedef klinik listesi (`hedef-klinik-listesi.md`, 2026-10-08 taraması) hazır:

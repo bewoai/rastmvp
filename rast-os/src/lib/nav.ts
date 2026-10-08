@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Building2, Palette, FolderKanban,
   ListTodo, CalendarDays, Camera, Wallet, Receipt, Boxes,
   FolderOpen, Settings, Contact, TrendingUp, Briefcase, Upload, ShoppingCart, Megaphone,
-  FileSignature, FileChartColumn,
+  FileSignature, FileChartColumn, Radar,
 } from "lucide-react";
 
 export type NavItem = {
@@ -30,6 +30,7 @@ export const NAV: NavGroup[] = [
     items: [
       { label: "Satış Pipeline", href: "/crm/pipeline", icon: TrendingUp },
       { label: "Potansiyel Müşteriler", href: "/crm/leads", icon: Users },
+      { label: "Müşteri Bulma", href: "/musteri-bulma", icon: Radar },
       { label: "Müşteriler", href: "/crm/clients", icon: Building2 },
       { label: "Markalar", href: "/crm/brands", icon: Palette },
       { label: "İletişim Kişileri", href: "/crm/contacts", icon: Contact },

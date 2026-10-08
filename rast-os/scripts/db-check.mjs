@@ -10,9 +10,9 @@
 // anon/authenticated/service_role rolleri, "extensions" şemasında pgcrypto,
 // Supabase'in public şeması varsayılan yetkileri) ve sonra:
 //
-//   1) supabase/migrations/0001…0018'i numara sırasıyla, her dosyayı kendi
+//   1) supabase/migrations/0001…0019'u numara sırasıyla, her dosyayı kendi
 //      transaction'ında uygular; ilk hatada durur ve hatalı ifadeyi yazar.
-//   2) Idempotency: 0008…0018'i İKİNCİ kez uygular.
+//   2) Idempotency: 0008…0019'u İKİNCİ kez uygular.
 //   3) Yapısal kontroller (tablo / kolon / fonksiyon / trigger / yetki).
 //   4) Davranış kontrolleri: SET ROLE anon|authenticated + request.jwt.claims
 //      ile (PostgREST'in yaptığı gibi) RLS, guard trigger'lar ve RPC'ler.
@@ -28,7 +28,7 @@ import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createHash } from "node:crypto";
+import { createHash, createHmac } from "node:crypto";
 
 const started = Date.now();
 const MIGRATIONS_DIR =
@@ -277,6 +277,7 @@ async function structuralChecks() {
   for (const t of [
     "proposals", "proposal_items", "activity_logs", "content_approvals", "organization_invites",
     "lead_intake_settings", "client_reports", "client_portal_tokens",
+    "prospects", "outreach_sequences", "outreach_messages", "suppression_list", "outreach_settings",
   ]) {
     await check(G, `tablo public.${t}`, async () => (await val("select to_regclass($1) is not null", [`public.${t}`])) || "yok");
   }
@@ -285,7 +286,7 @@ async function structuralChecks() {
     ["expenses", "fx_rate"], ["expenses", "amount_try"], ["contents", "script_source"],
     ["projects", "proposal_id"], ["organizations", "mrr_target"], ["organizations", "mrr_target_label"],
     ["activity_logs", "actor_name"], ["activity_logs", "record_label"], ["leads", "source_package"],
-    ["leads", "source_utm"], ["tasks", "lead_id"],
+    ["leads", "source_utm"], ["tasks", "lead_id"], ["prospects", "field_sources"], ["prospects", "places_cached_at"],
   ]) {
     await check(G, `kolon ${t}.${c}`, async () =>
       (await val(
@@ -300,6 +301,9 @@ async function structuralChecks() {
     "portal_touch(text)", "portal_report_get(text,text)", "portal_active_token(text)", "log_activity()",
     "handle_new_user()", "apply_invite_to_existing_user()", "current_org_id()", "current_role_name()",
     "set_updated_at()", "content_approvals_guard()", "client_portal_tokens_guard()",
+    "outreach_is_suppressed(uuid,text,text)", "outreach_messages_guard()", "outreach_messages_touch_prospect()",
+    "outreach_unsub_token(uuid,text)", "outreach_unsubscribe(text)", "outreach_cron_claim(text,integer,integer)",
+    "outreach_cron_result(text,uuid,text,text,text,jsonb)", "outreach_places_purge(text)",
   ];
   for (const f of fns) {
     await check(G, `fonksiyon ${f}`, async () => (await val("select to_regprocedure($1) is not null", [`public.${f}`])) || "yok");
@@ -309,12 +313,13 @@ async function structuralChecks() {
   const logged = [
     "clients", "projects", "jobs", "tasks", "invoices", "payments", "expenses", "proposals", "proposal_items",
     "content_approvals", "client_reports", "client_portal_tokens",
+    "outreach_sequences", "outreach_messages", "suppression_list", // 0019 — prospects BİLEREK yok (lat/lng ≤30 gün)
   ];
   const trig = (await db.query(
     `select c.relname from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_proc p on p.oid = t.tgfoid
       where not t.tgisinternal and p.proname = 'log_activity'`,
   )).rows.map((r) => r.relname).sort();
-  await check(G, "log_activity trigger'ları (12 tablo)", () => eq(trig, [...logged].sort(), "trigger bağlı tablolar"));
+  await check(G, "log_activity trigger'ları (15 tablo, prospects hariç)", () => eq(trig, [...logged].sort(), "trigger bağlı tablolar"));
 
   await check(G, "auth.users trigger'ları (oluşturma + e-posta onayı)", async () => {
     const r = (await db.query(
@@ -322,6 +327,17 @@ async function structuralChecks() {
     )).rows.map((x) => x.tgname);
     return eq(r, ["on_auth_user_created", "on_auth_user_email_confirmed"], "trigger'lar");
   });
+
+  // 0019: Places içeriği saklanmaz (Google Maps Platform Şartları 3.2.3(a)) — kısıtlar yerinde.
+  for (const c of ["prospects_places_provenance", "prospects_name_required", "prospects_latlng_dated"]) {
+    await check(G, `kısıt prospects.${c}`, async () =>
+      (await val("select exists(select 1 from pg_constraint where conname = $1 and conrelid = 'public.prospects'::regclass)", [c])) || "yok");
+  }
+  await check(G, "outreach_settings: RLS açık, politika yok", async () =>
+    eq(await one(
+      `select c.relrowsecurity as rls, (select count(*)::int from pg_policy p where p.polrelid = c.oid) as policies
+         from pg_class c where c.oid = 'public.outreach_settings'::regclass`,
+    ), { rls: true, policies: 0 }));
 
   await check(G, "public'te RLS kapalı tablo yok", async () => {
     const r = (await db.query(
@@ -339,6 +355,11 @@ async function structuralChecks() {
     ["anon", "lead_intake_settings", "select"], ["authenticated", "lead_intake_settings", "select"],
     ["authenticated", "activity_logs", "insert"], ["authenticated", "activity_logs", "update"],
     ["authenticated", "activity_logs", "delete"], ["authenticated", "organization_invites", "update"],
+    // 0019
+    ["anon", "outreach_settings", "select"], ["anon", "outreach_settings", "insert"], ["anon", "outreach_settings", "update"],
+    ["authenticated", "outreach_settings", "select"], ["authenticated", "outreach_settings", "insert"],
+    ["authenticated", "outreach_settings", "update"], ["anon", "prospects", "select"], ["anon", "outreach_messages", "select"],
+    ["anon", "suppression_list", "select"], ["anon", "suppression_list", "insert"], ["authenticated", "suppression_list", "update"],
   ]) {
     await check(G, `${role} ${priv} ${table} = false`, async () => eq(await tablePriv(role, table, priv), false));
   }
@@ -357,12 +378,16 @@ async function structuralChecks() {
   const ANON_RPC = [
     "approval_get(text)", "approval_decide(text,text,text,text,text[])", "lead_intake(uuid,jsonb,text)",
     "portal_get(text)", "portal_touch(text)", "portal_report_get(text,text)",
+    // 0019: ret bağlantısı + cron (sır / HMAC token ile; sunucu route'ları anon istemciyle çağırır)
+    "outreach_unsubscribe(text)", "outreach_cron_claim(text,integer,integer)",
+    "outreach_cron_result(text,uuid,text,text,text,jsonb)", "outreach_places_purge(text)",
   ];
   for (const f of ANON_RPC) await check(G, `anon execute ${f} = true`, async () => eq(await fnPriv("anon", f), true));
   for (const f of [
     "import_rows(jsonb)", "approval_new_token()", "approval_default_checklist()", "portal_active_token(text)",
     "log_activity()", "handle_new_user()", "apply_invite_to_existing_user()", "set_updated_at()",
     "content_approvals_guard()", "client_portal_tokens_guard()", "current_org_id()", "current_role_name()",
+    "outreach_unsub_token(uuid,text)", "outreach_messages_guard()", "outreach_messages_touch_prospect()",
   ]) {
     await check(G, `anon execute ${f} = false`, async () => eq(await fnPriv("anon", f), false));
   }
@@ -370,6 +395,10 @@ async function structuralChecks() {
     ["current_org_id()", true], ["current_role_name()", true], ["import_rows(jsonb)", true],
     ["approval_new_token()", true], ["handle_new_user()", false], ["log_activity()", false],
     ["portal_active_token(text)", false], ["apply_invite_to_existing_user()", false],
+    // 0019: anon RPC'leri authenticated'a kapalı (0018 portal deseni); HMAC yardımcısı kimseye açık değil.
+    ["outreach_unsubscribe(text)", false], ["outreach_cron_claim(text,integer,integer)", false],
+    ["outreach_cron_result(text,uuid,text,text,text,jsonb)", false], ["outreach_places_purge(text)", false],
+    ["outreach_unsub_token(uuid,text)", false],
   ]) {
     await check(G, `authenticated execute ${f} = ${want}`, async () => eq(await fnPriv("authenticated", f), want));
   }
@@ -385,7 +414,7 @@ async function structuralChecks() {
     )).rows.map((x) => x.f.replace(/^public\./, ""));
     return eq(r.sort(), [...ANON_RPC].sort(), "anon definer listesi");
   });
-  // authenticated: portal_* yalnız anon'a açık; RLS yardımcıları açık kalmalı.
+  // authenticated: portal_* ve outreach_* RPC'leri yalnız anon'a açık; RLS yardımcıları açık kalmalı.
   await check(G, "authenticated'a açık SECURITY DEFINER fonksiyonlar beklenen listede", async () => {
     const r = (await db.query(
       `select replace(p.oid::regprocedure::text, ' ', '') as f from pg_proc p join pg_namespace n on n.oid = p.pronamespace
@@ -708,6 +737,126 @@ async function behaviouralChecks() {
     const b = await as("authenticated", U.B, () => expectError(() => db.query("select * from lead_intake_settings"), "42501"));
     return a === true && b === true ? true : `${a} / ${b}`;
   });
+
+  // --- 0019: Müşteri Bulma ---
+  const GR = "0019";
+  const ins = (row) =>
+    as("authenticated", U.B, () => val(
+      `insert into prospects (organization_id, source, external_id, name, phone, website, email, field_sources, lat, lng, places_cached_at)
+       values ($1, $2, $3, $4, $5, $6, $7, coalesce($8::jsonb, '{}'::jsonb), $9, $10, $11) returning id`,
+      [ORG1, row.source, row.external_id ?? null, row.name ?? null, row.phone ?? null, row.website ?? null, row.email ?? null,
+        row.field_sources ? JSON.stringify(row.field_sources) : null, row.lat ?? null, row.lng ?? null, row.places_cached_at ?? null],
+    ));
+  await check(GR, "Places adayı: yalnız place_id saklanabilir", async () => ((await ins({ source: "places", external_id: "ChIJ-test-1" })) ? true : "eklenmedi"));
+  await check(GR, "Places adayı: Places'ten ad kopyalanamaz (23514)", () =>
+    expectError(() => ins({ source: "places", external_id: "ChIJ-test-2", name: "Places Adı" }), "23514"));
+  await check(GR, "Places adayı: elle girilen ad (field_sources.name=manual) saklanır", async () =>
+    ((await ins({ source: "places", external_id: "ChIJ-test-3", name: "Elle Ad", field_sources: { name: "manual" } })) ? true : "eklenmedi"));
+  await check(GR, "Places adayı: site yalnız elle (website kökenli site 23514)", () =>
+    expectError(() => ins({ source: "places", external_id: "ChIJ-test-4", website: "https://ornek.com", field_sources: { website: "website" } }), "23514"));
+  await check(GR, "Places adayı: Places kökenli telefon reddedilir (23514)", () =>
+    expectError(() => ins({ source: "places", external_id: "ChIJ-test-5", phone: "02121112233", field_sources: { phone: "places" } }), "23514"));
+  await check(GR, "lat/lng places_cached_at olmadan saklanamaz (23514)", () =>
+    expectError(() => ins({ source: "places", external_id: "ChIJ-test-6", lat: 41, lng: 29 }), "23514"));
+  await check(GR, "CSV / manuel adayda ad zorunlu (23514)", () =>
+    expectError(() => ins({ source: "csv", external_id: "csv:ornek.com" }), "23514"));
+  await check(GR, "aynı org'da place_id tekil (23505)", () =>
+    expectError(() => ins({ source: "places", external_id: "ChIJ-test-1" }), "23505"));
+  await check(GR, "anon/authenticated outreach_settings okuyamaz (42501)", async () => {
+    const a = await as("anon", null, () => expectError(() => db.query("select * from outreach_settings"), "42501"));
+    const b = await as("authenticated", U.B, () => expectError(() => db.query("select * from outreach_settings"), "42501"));
+    return a === true && b === true ? true : `${a} / ${b}`;
+  });
+
+  const cronSecret = "cron-".repeat(8);
+  const unsubKey = createHash("sha256").update("ret-anahtari-db-check").digest("hex");
+  await db.query("insert into outreach_settings (organization_id, cron_token_hash, unsub_key_hash) values ($1, $2, $3)", [
+    ORG1, createHash("sha256").update(cronSecret).digest("hex"), unsubKey,
+  ]);
+  const unsubToken = (id) => `${id}.${createHmac("sha256", unsubKey).update(id).digest("hex")}`;
+  const newMsg = (email, status, scheduledFor = null) =>
+    as("authenticated", U.B, async () => {
+      const pid = await val(
+        `insert into prospects (organization_id, source, name, email, field_sources) values ($1, 'manuel', $2, $3, '{"email":"manual"}') returning id`,
+        [ORG1, `Dr. ${email}`, email],
+      );
+      const mid = await val(
+        "insert into outreach_messages (organization_id, prospect_id, to_email, subject, body, status, scheduled_for) values ($1, $2, $3, 'Merhaba {{isim}}', 'Gövde', $4, $5) returning id",
+        [ORG1, pid, email, status, scheduledFor],
+      );
+      return { pid, mid };
+    });
+
+  const R = await newMsg("ret@klinik-ornek.com", "draft");
+  await check(GR, "outreach_unsubscribe (anon) yanlış token → invalid", () =>
+    as("anon", null, async () => eq(await val("select outreach_unsubscribe($1)", [`${R.mid}.${"0".repeat(64)}`]), { ok: false, error: "invalid" })));
+  await check(GR, "outreach_unsubscribe (anon) → ret listesi + mesaj iptal + aday suppressed", async () => {
+    const r = await as("anon", null, () => val("select outreach_unsubscribe($1)", [unsubToken(R.mid)]));
+    const s = await one(
+      `select (select reason from suppression_list where organization_id = $1 and kind = 'email' and value = 'ret@klinik-ornek.com') as reason,
+              (select status from outreach_messages where id = $2) as msg,
+              (select status from prospects where id = $3) as prospect`,
+      [ORG1, R.mid, R.pid],
+    );
+    return eq([r, s], [{ ok: true }, { reason: "unsubscribe", msg: "cancelled", prospect: "suppressed" }]);
+  });
+  await check(GR, "outreach_unsubscribe tekrar → ok, tek ret kaydı (idempotent)", async () => {
+    const r = await as("anon", null, () => val("select outreach_unsubscribe($1)", [unsubToken(R.mid)]));
+    const n = Number(await val("select count(*) from suppression_list where value = 'ret@klinik-ornek.com'"));
+    return eq([r, n], [{ ok: true }, 1]);
+  });
+  await check(GR, "authenticated outreach_unsubscribe çağıramaz (42501)", () =>
+    as("authenticated", U.B, () => expectError(() => db.query("select outreach_unsubscribe($1)", [unsubToken(R.mid)]), "42501")));
+  await check(GR, "ret listesindeki adrese onay reddedilir (23514)", () =>
+    expectError(() => newMsg("ret@klinik-ornek.com", "approved"), "23514"));
+
+  // Cron: aynı gün tekrar çalışma kotayı aşmaz, aynı mesaj iki kez talep edilmez (günlük cron idempotentliği).
+  const past = new Date(Date.now() - 60_000).toISOString();
+  const M1 = await newMsg("a@klinik-bir.com", "approved", past);
+  const M2 = await newMsg("b@klinik-iki.com", "approved", past);
+  const claim = (tok, cap) =>
+    as("anon", null, () => val("select outreach_cron_claim($1, $2, 25)", [tok, cap]));
+  await check(GR, "outreach_cron_claim yanlış sır → 42501", () => expectError(() => claim("x".repeat(40), 5), "42501"));
+  let claimed;
+  await check(GR, "outreach_cron_claim kota=1 → 1 mesaj 'scheduled', ret token'ı ile", async () => {
+    const r = await claim(cronSecret, 1);
+    claimed = r?.messages?.[0];
+    const st = claimed ? await val("select status from outreach_messages where id = $1", [claimed.id]) : null;
+    return eq([r?.messages?.length, st, claimed?.unsub_token === unsubToken(claimed?.id ?? "")], [1, "scheduled", true]);
+  });
+  await check(GR, "aynı gün ikinci claim (kota=1) → 0 mesaj", async () => eq((await claim(cronSecret, 1))?.messages?.length, 0));
+  await check(GR, "outreach_cron_result sent → tekrarı not_claimed", async () => {
+    const res = () => as("anon", null, () =>
+      val("select outreach_cron_result($1, $2, 'sent', 'smtp-1', null, null)", [cronSecret, claimed.id]));
+    const a = await res();
+    const b = await res();
+    const st = await one("select status, sent_at is not null as sent from outreach_messages where id = $1", [claimed.id]);
+    return eq([a?.ok, b?.error, st], [true, "not_claimed", { status: "sent", sent: true }]);
+  });
+  await check(GR, "gönderim sonrası claim (kota=1) → 0; kota=2 → kalan 1", async () => {
+    const a = (await claim(cronSecret, 1))?.messages?.length;
+    const b = (await claim(cronSecret, 2))?.messages?.map((m) => m.id);
+    const other = claimed.id === M1.mid ? M2.mid : M1.mid;
+    return eq([a, b], [0, [other]]);
+  });
+  const D = await newMsg("taslak@klinik-uc.com", "draft");
+  await check(GR, "istemci taslağı 'sent' / 'scheduled' yapamaz (42501)", () =>
+    as("authenticated", U.B, async () => {
+      const x = await expectError(() => db.query("update outreach_messages set status = 'sent' where id = $1", [D.mid]), "42501");
+      const y = await expectError(() => db.query("update outreach_messages set status = 'scheduled' where id = $1", [D.mid]), "42501");
+      return x === true && y === true ? true : x + ' / ' + y;
+    }));
+  await check(GR, "outreach_places_purge: 30 günü geçen lat/lng silinir", async () => {
+    const pid = await val(
+      "insert into prospects (organization_id, source, external_id, lat, lng, places_cached_at) values ($1, 'places', 'ChIJ-eski', 41, 29, now() - interval '31 days') returning id",
+      [ORG1],
+    );
+    const n = await as("anon", null, () => val("select outreach_places_purge($1)", [cronSecret]));
+    const p = await one("select lat, lng, places_cached_at from prospects where id = $1", [pid]);
+    return eq([n, p], [1, { lat: null, lng: null, places_cached_at: null }]);
+  });
+  await check(GR, "outreach_places_purge yanlış sır → 42501", () =>
+    as("anon", null, () => expectError(() => db.query("select outreach_places_purge($1)", ["y".repeat(40)]), "42501")));
 
   // --- 0010: import_rows ---
   const IM = "import_rows";

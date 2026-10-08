@@ -167,6 +167,9 @@ export const activityEntity: Record<string, string> = {
   content_approvals: "İçerik onayı", // 0013
   client_reports: "Aylık rapor", // 0015
   client_portal_tokens: "Müşteri portalı", // 0018
+  outreach_sequences: "Erişim dizisi", // 0019
+  outreach_messages: "Temas / mesaj", // 0019
+  suppression_list: "Ret listesi", // 0019
 };
 
 export const activityEntityLabel = (entity: string) => activityEntity[entity] ?? entity;

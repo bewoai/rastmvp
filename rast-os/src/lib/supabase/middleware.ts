@@ -44,7 +44,11 @@ export async function updateSession(request: NextRequest) {
     path.startsWith("/portal/") ||
     // Web sitesi lead webhook'u (POST /api/leads): oturum yok; yetki x-rast-lead-secret başlığıyla
     // route içinde sabit-zamanlı karşılaştırılır (LEAD_WEBHOOK_SECRET). Yalnızca bu tam yol açık.
-    path === "/api/leads";
+    path === "/api/leads" ||
+    // Müşteri Bulma (0019): e-postadaki tek tıkla ret bağlantısı (HMAC token, DB'de doğrulanır) ve Vercel Cron
+    // (Authorization: Bearer CRON_SECRET, route içinde sabit-zamanlı karşılaştırılır). Yalnızca bu tam yollar açık.
+    path === "/api/growth/unsubscribe" ||
+    path === "/api/growth/cron";
 
   const redirectToLogin = () => {
     const redirectUrl = request.nextUrl.clone();

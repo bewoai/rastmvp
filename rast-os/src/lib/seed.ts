@@ -1,6 +1,7 @@
 import type { RastData } from "./types";
 import { findPreset, presetToItems } from "./proposal-presets";
 import { APPROVAL_CHECKLIST, expiresAtFrom } from "./approval-logic";
+import { growthDemoSeed } from "./growth/demo-seed";
 
 // Demo içerik onayları: tarihler sayfanın açıldığı ana göre (bekleyen talep demo'da hiç "süresi dolmuş" olmasın).
 const DAY = 86_400_000;
@@ -61,6 +62,8 @@ const demoAcceptedItems: RastData["proposal_items"] = [
 
 // Gerçekçi tohum veri (Rast Creative örnek müşterileri).
 export const seed: RastData = {
+  // Müşteri Bulma (0019): 16 aday (sahte Places kimlikleri), 1 dizi, 2 taslak, 2 manuel temas, 1 ret kaydı.
+  ...growthDemoSeed(demoNow),
   jobs: [
     { id: "j1", customer_name: "Selin & Emre (Düğün)", contact: "0533 100 00 01", service: "Düğün çekimi + edit", job_type: "Çekim", date: "2026-08-16", price: 28000, cost: 6000, paid_amount: 14000, status: "confirmed", payment_status: "partial", notes: "Kapora alındı, kalan çekim günü.", created_at: "2026-07-20" },
     { id: "j2", customer_name: "Elit Emlak", contact: "info@elitemlak.com", service: "Tek tanıtım videosu", job_type: "Video", date: "2026-08-09", price: 15000, cost: 3000, paid_amount: 15000, status: "delivered", payment_status: "paid", created_at: "2026-07-28" },

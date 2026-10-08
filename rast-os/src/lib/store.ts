@@ -24,7 +24,12 @@ export const COLLECTIONS: Collections[] = [
   "client_portal_tokens",
   // Salt okunur: yalnızca DB trigger'ı yazar (0012). add/update/remove ve seedToSupabase dışında.
   "activity_logs",
+  // Müşteri Bulma (0019): prospects ve outreach_sequences, outreach_messages'tan ÖNCE (FK).
+  "prospects", "outreach_sequences", "outreach_messages", "suppression_list",
 ];
+
+/** seedToSupabase'in atladığı koleksiyonlar (demo Müşteri Bulma verisi sahte Places kimlikleri içerir). */
+const SEED_SKIP = new Set<Collections>(["activity_logs", "content_approvals", "client_portal_tokens", "prospects", "outreach_sequences", "outreach_messages", "suppression_list"]);
 
 /** Tek seferde çekilecek en fazla işlem geçmişi satırı (en yeniler). */
 const ACTIVITY_LOG_LIMIT = 500;
@@ -33,6 +38,7 @@ const emptyData: RastData = {
   leads: [], jobs: [], clients: [], brands: [], contacts: [], projects: [],
   tasks: [], contents: [], shoots: [], equipment: [], invoices: [], payments: [], expenses: [],
   proposals: [], proposal_items: [], content_approvals: [], client_reports: [], client_portal_tokens: [], activity_logs: [],
+  prospects: [], outreach_sequences: [], outreach_messages: [], suppression_list: [],
 };
 
 export const uid = () =>
@@ -63,6 +69,8 @@ interface StoreState extends RastData {
   add: <K extends WritableCollection>(key: K, item: RastData[K][number]) => Promise<MutationResult>;
   update: <K extends WritableCollection>(key: K, id: string, patch: Partial<RastData[K][number]>) => Promise<MutationResult>;
   remove: <K extends WritableCollection>(key: K, id: string) => Promise<MutationResult>;
+  /** Sunucudan dönen satırları (ör. /api/growth/discover upsert'i) yerel listeye id'ye göre birleştirir; DB'ye yazmaz. */
+  mergeLocal: <K extends WritableCollection>(key: K, rows: RastData[K][number][]) => void;
   reset: () => void;
   seedToSupabase: () => Promise<{ ok: boolean; error?: string }>;
 }
@@ -208,6 +216,17 @@ export const useStore = create<StoreState>()((set, get) => ({
     return { ok: true };
   },
 
+  mergeLocal: (key, rows) => {
+    set((s) => {
+      const incoming = rows as unknown as Row[];
+      const byId = new Map(incoming.map((r) => [r.id, r]));
+      const kept = (s[key] as unknown as Row[]).map((r) => (byId.has(r.id) ? { ...r, ...byId.get(r.id)! } : r));
+      const existing = new Set(kept.map((r) => r.id));
+      const added = incoming.filter((r) => !existing.has(r.id));
+      return { [key]: [...added, ...kept] } as Partial<StoreState>;
+    });
+  },
+
   reset: () => set({ ...seed }),
 
   // Örnek veriyi (seed) Supabase'e yükler — canlı DB boşken denemek için
@@ -216,9 +235,9 @@ export const useStore = create<StoreState>()((set, get) => ({
     if (!isSupabaseConfigured || !orgId) return { ok: false, error: "Supabase/oturum yok" };
     const sb = createClient();
     for (const c of COLLECTIONS) {
-      if (c === "activity_logs") continue; // istemci yazamaz (RLS); loglar trigger'la oluşur
-      if (c === "content_approvals") continue; // karar verilmiş kayıt istemciden yazılamaz (0013 guard)
-      if (c === "client_portal_tokens") continue; // örnek bağlantılar canlıya taşınmaz (token sunucuda üretilir, 0018)
+      // activity_logs: istemci yazamaz (RLS); content_approvals: karar verilmiş kayıt yazılamaz (0013 guard);
+      // client_portal_tokens: örnek bağlantılar canlıya taşınmaz (0018); Müşteri Bulma: demo verisi sahte Places kimlikleri içerir.
+      if (SEED_SKIP.has(c)) continue;
       const rows = (seed[c] as unknown as Row[]).map((r) => clean({ ...r, organization_id: orgId }));
       if (rows.length) {
         const { error } = await sb.from(c).insert(rows);

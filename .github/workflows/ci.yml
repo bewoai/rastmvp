@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  rast-os:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rast-os
+    # Boş Supabase env: uygulama demo modunda derlenir, hiçbir veritabanına bağlanmaz.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ""
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
+      NEXT_PUBLIC_REQUIRE_AUTH: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          # npm test, .ts dosyalarını Node'un yerleşik type stripping'i ile çalıştırır (Node 22.18+).
+          node-version: 22
+          cache: npm
+          cache-dependency-path: rast-os/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+      - run: npm test
+      - run: npm run build

@@ -196,7 +196,7 @@ const INSAAT_TERMS = `## Rast Creative'in sorumlulukları
 
 const HEKIM_EK_NOTES = `Ek hizmetler yalnızca açılış tarihini izleyen ilk bir ay içinde (açılış duyurusu) veya özel izin bulunan durumlarda sunulur.
 1. Uygunluk kontrolü — açılış tarihi / izin belgesi doğrulanır.
-2. Tek seferlik kampanya planı ve içerik onaya sunulur.
+2. Tek seferlik tanıtım planı ve içerik onaya sunulur.
 3. Yayın ve kapanış özeti.`;
 
 const HEKIM_EK_TERMS = `## Rast Creative'in sorumlulukları

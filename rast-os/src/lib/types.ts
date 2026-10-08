@@ -355,6 +355,109 @@ export interface ClientReport {
   updated_at?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Müşteri Bulma (0019)
+// ---------------------------------------------------------------------------
+// VERİ KAYNAĞI: Places'ten gelen adayda ad / adres / telefon / site / puan SAKLANMAZ (Google Maps Platform
+// Şartları 3.2.3(a)); yalnızca external_id (place_id) ve ≤30 gün lat/lng. Bu alanlar canlı çekilir
+// (PlaceDetails). field_sources her saklanan alanın kökenini tutar. Ayrıntı: supabase/migrations/README-0019.md
+
+export type ProspectSource = "places" | "csv" | "manuel";
+export type ProspectStatus = "new" | "qualified" | "queued" | "contacted" | "replied" | "converted" | "suppressed";
+/** Saklanan bir alanın kökeni: işletmenin kendi sitesi, elle giriş veya CSV (elle araştırılmış liste). */
+export type FieldSource = "website" | "manual" | "csv";
+
+/** Puan dökümü kalemi. `detail` yalnızca bant etiketi içerir (Places metni / ham değer yok). */
+export interface ScoreItem {
+  key: string;
+  label: string;
+  points: number;
+  max: number;
+  detail: string;
+}
+
+export interface Prospect {
+  id: ID;
+  source: ProspectSource;
+  external_id?: string | null;   // Places place_id (CSV için "csv:<alan-adı>")
+  name?: string | null;          // Places adayında yalnızca elle girildiyse
+  sector?: string | null;
+  city?: string | null;
+  district?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  email?: string | null;
+  instagram?: string | null;
+  field_sources?: Partial<Record<"name" | "address" | "phone" | "website" | "email" | "instagram", FieldSource>>;
+  lat?: number | null;
+  lng?: number | null;
+  places_cached_at?: string | null;
+  score: number;
+  score_breakdown: ScoreItem[];
+  status: ProspectStatus;
+  lead_id?: ID | null;
+  notes?: string | null;
+  next_action_at?: string | null;     // YYYY-MM-DD
+  last_contacted_at?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface SequenceStep {
+  day: number;
+  subject: string;
+  body: string;
+}
+
+export interface OutreachSequence {
+  id: ID;
+  name: string;
+  sector?: string | null;
+  channel: "email";
+  steps: SequenceStep[];
+  active: boolean;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type OutreachChannel = "email" | "phone" | "whatsapp" | "instagram";
+export type OutreachStatus = "draft" | "approved" | "scheduled" | "sent" | "bounced" | "replied" | "cancelled";
+
+export interface OutreachMessage {
+  id: ID;
+  prospect_id: ID;
+  sequence_id?: ID | null;
+  step_no: number;
+  channel: OutreachChannel;
+  manual: boolean;               // kişinin kendi yaptığı temasın kaydı (telefon / WhatsApp / Instagram)
+  to_email?: string | null;
+  subject: string;               // ŞABLON ({{isim}} vb. gösterimde doldurulur)
+  body: string;
+  status: OutreachStatus;
+  scheduled_for?: string | null;
+  sent_at?: string | null;
+  provider_message_id?: string | null;
+  error?: string | null;
+  approved_by?: ID | null;
+  approved_at?: string | null;
+  replied_at?: string | null;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type SuppressionKind = "email" | "domain" | "phone";
+export type SuppressionReason = "unsubscribe" | "bounce" | "manual" | "complaint";
+
+export interface SuppressionEntry {
+  id: ID;
+  kind: SuppressionKind;
+  value: string;
+  reason: SuppressionReason;
+  note?: string | null;
+  created_at: string;
+}
+
 export interface RastData {
   leads: Lead[];
   jobs: Job[];
@@ -374,6 +477,11 @@ export interface RastData {
   content_approvals: ContentApproval[];
   client_reports: ClientReport[];
   activity_logs: ActivityLog[];
+  // Müşteri Bulma (0019)
+  prospects: Prospect[];
+  outreach_sequences: OutreachSequence[];
+  outreach_messages: OutreachMessage[];
+  suppression_list: SuppressionEntry[];
 }
 
 /** Uygulamanın yazabildiği koleksiyonlar (activity_logs salt okunur — trigger yazar). */

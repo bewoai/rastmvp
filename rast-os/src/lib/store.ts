@@ -237,8 +237,13 @@ export function useHydrated(requiredCollections?: Collections[]) {
     }
   }, []);
 
+  // Çağıranlar her render'da yeni dizi geçebilir; içerik (reqStr) değişmedikçe aynı referansı koru.
+  // Boş dizi ile undefined aynı sonucu verir (aşağıda ikisi de "hazır" sayılır).
   const reqStr = requiredCollections?.join(",") || "";
-  const reqCols = useMemo(() => requiredCollections, [reqStr]);
+  const reqCols = useMemo(
+    () => (reqStr ? (reqStr.split(",") as Collections[]) : undefined),
+    [reqStr],
+  );
 
   useEffect(() => {
     if (loaded && isSupabase && reqCols) {

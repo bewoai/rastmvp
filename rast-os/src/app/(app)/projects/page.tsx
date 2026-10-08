@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { PageHeader, Badge, EmptyState } from "@/components/ui";
 import { FormModal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
@@ -22,14 +23,6 @@ const statusOptions = (Object.keys(projectStatus) as ProjectStatus[]).map((value
 const ACTIVE: ProjectStatus[] = ["planning", "active", "on_hold", "review"];
 type Scope = "active" | "closed" | "all";
 
-/** `?ac=<proje id>`: tekliften oluşturulan projeye bağlantı (teklif editörü / bildirim) — modalı açar. */
-function readOpenParam(): string | null {
-  try {
-    return new URLSearchParams(window.location.search).get("ac");
-  } catch {
-    return null;
-  }
-}
 const SCOPES: readonly Scope[] = ["active", "closed", "all"];
 
 /** Form state'i burada yaşar: yazarken sayfa listesi render olmaz; her açılışta temiz başlar. */
@@ -95,7 +88,16 @@ function ProjectModal({ initial, clients, brands, onClose }: {
   );
 }
 
+// useSearchParams statik sayfada Suspense sınırı ister.
 export default function ProjectsPage() {
+  return (
+    <Suspense fallback={<PageLoading title="Projeler" />}>
+      <ProjectsList />
+    </Suspense>
+  );
+}
+
+function ProjectsList() {
   const hydrated = useHydrated(["projects", "clients", "tasks", "brands"]);
   const projects = useStore((s) => s.projects);
   const clients = useStore((s) => s.clients);
@@ -104,13 +106,15 @@ export default function ProjectsPage() {
 
   const wantNew = useNewIntent();
   const [modal, setModal] = useState<{ initial: Project | null } | null>(() => (wantNew ? { initial: null } : null));
-  const [openId, setOpenId] = useState(readOpenParam);
-  const linked = openId ? projects.find((p) => p.id === openId) : undefined;
+  // `?ac=<proje id>`: tekliften oluşturulan projeye bağlantı (teklif editörü / bildirim) — modalı açar.
+  const openId = useSearchParams().get("ac");
+  const [dismissedId, setDismissedId] = useState<string | null>(null);
+  const linked = openId && openId !== dismissedId ? projects.find((p) => p.id === openId) : undefined;
   const shown = modal ?? (linked ? { initial: linked } : null);
   function closeModal() {
     setModal(null);
     if (openId) {
-      setOpenId(null);
+      setDismissedId(openId);
       const url = new URL(window.location.href);
       url.searchParams.delete("ac");
       window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);

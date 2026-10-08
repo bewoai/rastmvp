@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronLeft, ChevronRight, FileText, Printer, Save } from "lucide-react";
 import { PageHeader, EmptyState, Badge, StatStrip } from "@/components/ui";
 import { Field, Select, Textarea, Button } from "@/components/form";
@@ -21,30 +21,33 @@ import type { Client, ClientReport } from "@/lib/types";
 const bucketLabel = (b: ApprovalBucket) => (b === "none" ? "Onaya gönderilmedi" : approvalStatus[b].label);
 const bucketTone = (b: ApprovalBucket) => (b === "none" ? "muted" : approvalStatus[b].tone);
 
-/** Seçim adres çubuğunda tutulur (?musteri=…&ay=YYYY-MM): bağlantı paylaşılabilir, yenilemede kaybolmaz. */
-function readQuery(): { client: string; month: string } {
-  try {
-    const q = new URLSearchParams(window.location.search);
-    return { client: q.get("musteri") ?? "", month: q.get("ay") ?? "" };
-  } catch {
-    return { client: "", month: "" };
-  }
-}
-
 const reportHref = (clientId: string, month: string) =>
   `/raporlar/aylik?musteri=${encodeURIComponent(clientId)}&ay=${month}`;
 const printHref = (clientId: string, month: string) =>
   `/raporlar/aylik/${encodeURIComponent(clientId)}/${month}/yazdir`;
 
+// useSearchParams statik sayfada Suspense sınırı ister.
 export default function MonthlyReportPage() {
+  return (
+    <Suspense fallback={<PageLoading title="Aylık müşteri raporu" />}>
+      <MonthlyReportView />
+    </Suspense>
+  );
+}
+
+function MonthlyReportView() {
   const hydrated = useHydrated(["clients", "contents", "shoots", "content_approvals", "client_reports"]);
   const clients = useStore((s) => s.clients);
   const reports = useStore((s) => s.client_reports);
   const today = useToday();
 
-  const [query] = useState(readQuery);
-  const [clientId, setClientId] = useState(query.client);
-  const [month, setMonth] = useState(isValidMonth(query.month) ? query.month : defaultReportMonth(today));
+  // Seçim adres çubuğunda tutulur (?musteri=…&ay=YYYY-MM): bağlantı paylaşılabilir, yenilemede kaybolmaz.
+  const params = useSearchParams();
+  const [clientId, setClientId] = useState(() => params.get("musteri") ?? "");
+  const [month, setMonth] = useState(() => {
+    const m = params.get("ay");
+    return isValidMonth(m) ? m : defaultReportMonth(today);
+  });
 
   const sortedClients = useMemo(
     () => [...clients].sort((a, b) => Number(b.is_active) - Number(a.is_active) || a.name.localeCompare(b.name, "tr")),

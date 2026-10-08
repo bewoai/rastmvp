@@ -36,6 +36,8 @@ const REPORT_CSS = `
 .rc-note + .rc-note { margin-top: 3mm; }
 .rc-note h3 { margin-top: 0 !important; }
 .rc-fine { font-size: 8pt; color: var(--rc-muted); }
+/* Dar ekranda (önizleme) geniş tablolar sayfayı taşırmasın; yazdırmada etkisiz. */
+@media screen and (max-width: 900px) { .rc-doc { overflow-x: auto; } }
 `;
 
 const toneClass = (tone: string) =>

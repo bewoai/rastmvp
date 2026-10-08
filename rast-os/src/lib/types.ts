@@ -282,6 +282,53 @@ export interface ActivityLog {
   created_at: string;
 }
 
+// İçerik onayı (0013): hekim / müşteri yayından önce gizli bağlantıyla onaylar.
+export type ApprovalStatus = "pending" | "approved" | "changes_requested" | "expired";
+export type ApprovalDecision = Extract<ApprovalStatus, "approved" | "changes_requested">;
+
+export interface ApprovalChecklistItem {
+  key: string;
+  label: string;
+  basis?: string;   // yönetmelik dayanağı (ör. "5/d")
+  checked: boolean;
+}
+
+export interface ContentApproval {
+  id: ID;
+  content_id?: ID | null;        // içerik silinirse null (kayıt kanıt olarak kalır)
+  version: number;               // içerik başına 1, 2, 3…
+  token: string;                 // 64 hex — gizli bağlantı (/onay/<token>)
+  title: string;                 // gönderim anındaki içerik başlığı
+  checklist: ApprovalChecklistItem[];
+  script_snapshot?: string | null;
+  note?: string | null;          // onaylayanın notu / değişiklik talebi
+  status: ApprovalStatus;
+  sent_at: string;
+  decided_at?: string | null;
+  decided_by_name?: string | null;
+  decided_by_ip?: string | null;
+  expires_at: string;
+  created_by?: ID | null;
+  created_at: string;
+}
+
+/** approval_get RPC'nin döndürdüğü asgari (public) görünüm. */
+export interface PublicApproval {
+  title: string;
+  version: number;
+  status: ApprovalStatus;        // etkin durum (süresi dolan / yenisi gönderilen bekleyen → expired)
+  script_snapshot: string | null;
+  checklist: ApprovalChecklistItem[];
+  note: string | null;
+  sent_at: string;
+  expires_at: string;
+  decided_at: string | null;
+  decided_by_name: string | null;
+  client_name: string | null;
+  brand_name: string | null;
+  agency_name: string | null;
+}
+
 export interface RastData {
   leads: Lead[];
   jobs: Job[];
@@ -298,6 +345,7 @@ export interface RastData {
   expenses: Expense[];
   proposals: Proposal[];
   proposal_items: ProposalItem[];
+  content_approvals: ContentApproval[];
   activity_logs: ActivityLog[];
 }
 

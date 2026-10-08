@@ -16,6 +16,8 @@ export const COLLECTIONS: Collections[] = [
   "tasks", "contents", "shoots", "equipment", "invoices", "payments", "expenses",
   // proposal_items, proposals'tan SONRA (seedToSupabase sırayla ekler; FK)
   "proposals", "proposal_items",
+  // İçerik onayları (0013): token sunucuda üretilir → approvalActions.ts ile eklenir.
+  "content_approvals",
   // Salt okunur: yalnızca DB trigger'ı yazar (0012). add/update/remove ve seedToSupabase dışında.
   "activity_logs",
 ];
@@ -26,7 +28,7 @@ const ACTIVITY_LOG_LIMIT = 500;
 const emptyData: RastData = {
   leads: [], jobs: [], clients: [], brands: [], contacts: [], projects: [],
   tasks: [], contents: [], shoots: [], equipment: [], invoices: [], payments: [], expenses: [],
-  proposals: [], proposal_items: [], activity_logs: [],
+  proposals: [], proposal_items: [], content_approvals: [], activity_logs: [],
 };
 
 export const uid = () =>
@@ -211,6 +213,7 @@ export const useStore = create<StoreState>()((set, get) => ({
     const sb = createClient();
     for (const c of COLLECTIONS) {
       if (c === "activity_logs") continue; // istemci yazamaz (RLS); loglar trigger'la oluşur
+      if (c === "content_approvals") continue; // karar verilmiş kayıt istemciden yazılamaz (0013 guard)
       const rows = (seed[c] as unknown as Row[]).map((r) => clean({ ...r, organization_id: orgId }));
       if (rows.length) {
         const { error } = await sb.from(c).insert(rows);

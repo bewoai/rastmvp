@@ -1,5 +1,25 @@
 import type { RastData } from "./types";
 import { findPreset, presetToItems } from "./proposal-presets";
+import { APPROVAL_CHECKLIST, expiresAtFrom } from "./approval-logic";
+
+// Demo içerik onayları: tarihler sayfanın açıldığı ana göre (bekleyen talep demo'da hiç "süresi dolmuş" olmasın).
+const DAY = 86_400_000;
+const demoNow = Date.now();
+const daysAgo = (d: number) => new Date(demoNow - d * DAY).toISOString();
+/** Demo onay bağlantıları: /onay/<token> (Supabase yokken sunucu seed'den okur). */
+export const DEMO_APPROVAL_TOKENS = {
+  pending: "7c1e9a4b2d6f80135ae9c47d2b18f6a0c3d5e7f91b2a4c6d8e0f13579bdf2468",
+  approved: "e4b7a91c3f5d2086b9e1a7c4d3f60852a1c9e7b5d3f1a2c4e6b8d0f2a4c6e8b0",
+} as const;
+
+const SCRIPT_KARDIYOLOJI = `[0-3 sn] Hook: "Merdiven çıkarken nefesiniz mi daralıyor?"
+[3-20 sn] Uzm. Dr. anlatır: Efor sırasında nefes darlığı ve göğüste baskı hissi kalple ilgili olabilir; tek başına tanı koymaz, değerlendirme gerekir.
+[20-35 sn] Hangi durumlarda bir kardiyoloji uzmanına başvurmak gerektiğini genel bilgi olarak sıralar.
+[35-40 sn] Kapanış: "Şikâyetleriniz varsa bir hekime danışın." (randevu çağrısı yok)`;
+
+const SCRIPT_GLOBAL = `[0-5 sn] Hastane girişi, genel mekan görüntüleri (hasta yüzü yok).
+[5-30 sn] Uluslararası hasta birimi sorumlusu, tercüman ve transfer süreçlerini genel olarak anlatır.
+[30-45 sn] Kapanış: kurum adı ve web sitesi (fiyat, kampanya, garanti ifadesi yok).`;
 
 // Demo teklif: Hekim İçerik Sistemi — Standart (25.000 + KDV / ay)
 const demoProposalItems = (() => {
@@ -54,9 +74,9 @@ export const seed: RastData = {
   contents: [
     { id: "co1", client_id: "c1", brand_id: "b1", title: "Yatak odası ilhamı — Reels", platform: "Instagram", content_type: "reels", status: "editing", planned_date: "2026-08-04", created_at: "2026-08-01" },
     { id: "co2", client_id: "c1", brand_id: "b1", title: "Ürün kombin — Carousel", platform: "Instagram", content_type: "post", status: "sent_to_client", planned_date: "2026-08-05", created_at: "2026-08-01" },
-    { id: "co3", client_id: "c2", brand_id: "b2", title: "Doktor tanıtımı — Kardiyoloji", platform: "Instagram", content_type: "reels", status: "internal_review", planned_date: "2026-08-06", created_at: "2026-07-30" },
+    { id: "co3", client_id: "c2", brand_id: "b2", title: "Doktor tanıtımı — Kardiyoloji", platform: "Instagram", content_type: "reels", status: "sent_to_client", planned_date: "2026-08-06", hook: "Merdiven çıkarken nefesiniz mi daralıyor?", script: SCRIPT_KARDIYOLOJI, created_at: "2026-07-30" },
     { id: "co4", client_id: "c3", brand_id: "b4", title: "Yeni ruj lansmanı", platform: "TikTok", content_type: "reels", status: "idea", planned_date: "2026-08-10", created_at: "2026-07-28" },
-    { id: "co5", client_id: "c2", brand_id: "b3", title: "Global hasta deneyimi", platform: "YouTube", content_type: "video", status: "script_ready", planned_date: "2026-08-12", created_at: "2026-07-29" },
+    { id: "co5", client_id: "c2", brand_id: "b3", title: "Global hasta deneyimi", platform: "YouTube", content_type: "video", status: "approved", planned_date: "2026-08-12", script: SCRIPT_GLOBAL, created_at: "2026-07-29" },
   ],
   shoots: [
     { id: "s1", client_id: "c1", brand_id: "b1", title: "Aytaş Home — Ürün Çekimi", shoot_type: "Ürün", scheduled_at: "2026-08-05T10:00", location: "Rast Stüdyo", status: "confirmed", created_at: "2026-07-28" },
@@ -97,6 +117,23 @@ export const seed: RastData = {
     },
   ],
   proposal_items: demoProposalItems,
+  // İçerik onayları (0013): biri hekim onayı bekliyor, biri onaylandı.
+  content_approvals: [
+    {
+      id: "ca2", content_id: "co3", version: 1, token: DEMO_APPROVAL_TOKENS.pending,
+      title: "Doktor tanıtımı — Kardiyoloji", script_snapshot: SCRIPT_KARDIYOLOJI,
+      checklist: APPROVAL_CHECKLIST.map((i) => ({ ...i, checked: false })),
+      status: "pending", sent_at: daysAgo(1), expires_at: expiresAtFrom(daysAgo(1)), created_at: daysAgo(1),
+    },
+    {
+      id: "ca1", content_id: "co5", version: 1, token: DEMO_APPROVAL_TOKENS.approved,
+      title: "Global hasta deneyimi", script_snapshot: SCRIPT_GLOBAL,
+      checklist: APPROVAL_CHECKLIST.map((i) => ({ ...i, checked: true })),
+      note: "Uygundur.", status: "approved",
+      sent_at: daysAgo(5), expires_at: expiresAtFrom(daysAgo(5)), created_at: daysAgo(5),
+      decided_at: daysAgo(4), decided_by_name: "Dr. Kemal Sarı",
+    },
+  ],
   // İşlem geçmişi örnekleri (canlıda 0012 trigger'ı yazar). En yeni önce.
   activity_logs: [
     { id: "al10", actor_name: "Berat", entity: "invoices", entity_id: "i2", record_label: "2026-082", action: "update", diff: { paid_amount: { old: 0, new: 30000 }, status: { old: "issued", new: "partial" } }, created_at: "2026-10-07T16:42:00+03:00" },

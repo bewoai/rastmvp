@@ -1,7 +1,7 @@
 import type {
   LeadStatus, ProjectStatus, TaskStatus, ContentStatus,
   ShootStatus, EquipmentStatus, InvoiceStatus, JobStatus,
-  PaymentStatus, Priority, ProposalStatus, ActivityAction, ActivityLog,
+  PaymentStatus, Priority, ProposalStatus, ActivityAction, ActivityLog, ApprovalStatus,
 } from "./types";
 
 type Tone = "default" | "amber" | "success" | "warning" | "danger" | "muted";
@@ -112,6 +112,14 @@ export const proposalStatus: Record<ProposalStatus, { label: string; tone: Tone 
   expired: { label: "Süresi doldu", tone: "warning" },
 };
 
+/** İçerik onayı (0013). `short`: içerik listesindeki küçük rozet. */
+export const approvalStatus: Record<ApprovalStatus, { label: string; short: string; tone: Tone }> = {
+  pending: { label: "Onay bekliyor", short: "Onay bekliyor", tone: "amber" },
+  approved: { label: "Onaylandı", short: "Onaylı", tone: "success" },
+  changes_requested: { label: "Değişiklik istendi", short: "Değişiklik", tone: "danger" },
+  expired: { label: "Süresi doldu / geri çekildi", short: "Onay süresi doldu", tone: "muted" },
+};
+
 export const priority: Record<Priority, { label: string; tone: Tone }> = {
   low: { label: "Düşük", tone: "muted" },
   medium: { label: "Orta", tone: "default" },
@@ -156,6 +164,7 @@ export const activityEntity: Record<string, string> = {
   expenses: "Gider",
   proposals: "Teklif",
   proposal_items: "Teklif kalemi",
+  content_approvals: "İçerik onayı", // 0013
 };
 
 export const activityEntityLabel = (entity: string) => activityEntity[entity] ?? entity;
@@ -179,6 +188,9 @@ export const activityField: Record<string, string> = {
   qty: "miktar", unit: "birim", unit_price: "birim fiyat", position: "sıra",
   est_hours: "tahmini saat", actual_hours: "gerçek saat", checklist: "kontrol listesi",
   drive_url: "Drive linki", receipt_url: "fiş", created_by: "oluşturan",
+  version: "sürüm", token: "onay bağlantısı", note: "not", script_snapshot: "senaryo",
+  sent_at: "gönderim", expires_at: "son geçerlilik", decided_at: "karar tarihi",
+  decided_by_name: "karar veren", decided_by_ip: "IP",
 };
 
 /** Değişen alanların Türkçe adları (diff anahtar sırasıyla). */
@@ -204,7 +216,7 @@ export function activityHref(log: Pick<ActivityLog, "entity" | "entity_id" | "ac
   const pages: Record<string, string> = {
     clients: "/crm/clients", projects: "/projects", jobs: "/jobs", tasks: "/tasks",
     invoices: "/finance/invoices", payments: "/finance/invoices", expenses: "/finance/expenses",
-    proposal_items: "/teklifler",
+    proposal_items: "/teklifler", content_approvals: "/content",
   };
   return pages[log.entity];
 }
@@ -216,11 +228,14 @@ const activityEnums: Record<string, Record<string, { label: string }>> = {
   "jobs.status": jobStatus,
   "jobs.payment_status": paymentStatus,
   "proposals.status": proposalStatus,
+  "content_approvals.status": approvalStatus,
 };
 
 /** Diff değerini okunur metne çevirir (durumlar Türkçe etiketiyle, uzun metin kısaltılır). */
 export function activityValue(entity: string, key: string, value: unknown): string {
   if (value === null || value === undefined || value === "") return "—";
+  // Onay bağlantısı gizlidir: işlem geçmişinde gösterilmez.
+  if (key === "token" || key === "decided_by_ip") return "••••";
   if (typeof value === "boolean") return value ? "Evet" : "Hayır";
   const text = typeof value === "object" ? JSON.stringify(value) : String(value);
   const enumMap = activityEnums[`${entity}.${key}`] ?? (key === "priority" ? priority : undefined);

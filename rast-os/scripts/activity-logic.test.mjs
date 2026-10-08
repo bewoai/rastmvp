@@ -6,12 +6,19 @@ import {
   activityEntity, activityFields, activityHref, activityRecord, activityValue,
 } from "../src/lib/labels.ts";
 
-test("every table with a 0012 trigger has a Turkish module label", () => {
+test("every table with an activity-log trigger (0012, 0013) has a Turkish module label", () => {
   const sql = readFileSync(new URL("../supabase/migrations/0012_activity_logs_triggers.sql", import.meta.url), "utf8");
   const block = sql.match(/foreach t in array array\[([\s\S]*?)\]/);
   assert.ok(block, "trigger table list not found in 0012");
-  const tables = [...block[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort();
-  assert.deepEqual(tables, Object.keys(activityEntity).sort());
+  const tables = [...block[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  // 0013 kendi tablosuna log_activity trigger'ını ayrıca bağlar.
+  const sql13 = readFileSync(new URL("../supabase/migrations/0013_content_approvals.sql", import.meta.url), "utf8");
+  for (const m of sql13.matchAll(/create trigger ([a-z_]+)_activity_log\s+after insert or update or delete on public\.([a-z_]+)/g)) {
+    assert.equal(m[1], m[2]);
+    tables.push(m[2]);
+  }
+  assert.ok(tables.includes("content_approvals"), "0013 activity trigger not found");
+  assert.deepEqual(tables.sort(), Object.keys(activityEntity).sort());
 });
 
 test("activityRecord: record_label, payment amount, short id fallback", () => {

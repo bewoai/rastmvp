@@ -283,7 +283,9 @@ begin
   return v_out;
 end $$;
 
-revoke all on function public.portal_get(text) from public;
+-- Supabase'in varsayılan yetkileri yeni fonksiyonu authenticated'a da açar;
+-- "yalnız anon" niyeti için authenticated'dan da açıkça geri alınır (db-check).
+revoke all on function public.portal_get(text) from public, authenticated;
 grant execute on function public.portal_get(text) to anon;
 
 -- ---------- Public RPC: portal_touch ----------
@@ -308,7 +310,7 @@ begin
      and (last_seen_at is null or last_seen_at < now() - interval '5 minutes');
 end $$;
 
-revoke all on function public.portal_touch(text) from public;
+revoke all on function public.portal_touch(text) from public, authenticated;
 grant execute on function public.portal_touch(text) to anon;
 
 -- ---------- Public RPC: portal_report_get ----------
@@ -434,7 +436,7 @@ begin
   return v_out;
 end $$;
 
-revoke all on function public.portal_report_get(text, text) from public;
+revoke all on function public.portal_report_get(text, text) from public, authenticated;
 grant execute on function public.portal_report_get(text, text) to anon;
 
 -- ---------- İşlem geçmişi (0012) ----------

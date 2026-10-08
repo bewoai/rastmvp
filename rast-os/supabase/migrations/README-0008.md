@@ -48,7 +48,21 @@
      They can still read their own profile row. The app already shows
      "Hesabınız bir organizasyona bağlı değil" on writes.
 
-3. Existing data is **not** modified. Profiles already attached to an
+3. **RLS helpers not callable by anon** (Supabase security advisor finding)
+   - `current_org_id()` / `current_role_name()` are SECURITY DEFINER and were
+     executable by `PUBLIC`/`anon`/`authenticated` (exposed as `/rpc`).
+     EXECUTE is revoked from `PUBLIC` and `anon`; `authenticated` and
+     `service_role` keep it — the org RLS policies (and the 0006
+     `storage.objects` policies) are evaluated as the calling role and need it.
+   - Side effect (intended): an anon request touching an org table now fails
+     with 42501 instead of returning `[]`. The app's anon paths only call the
+     public SECURITY DEFINER RPCs (`approval_*`, `portal_*`, `lead_intake`).
+   - `handle_new_user()` / `apply_invite_to_existing_user()` were already
+     revoked from `PUBLIC, anon, authenticated` (trigger functions do not need
+     EXECUTE for the inserting role).
+   - Verified offline with `npm run db:check` (PGlite).
+
+4. Existing data is **not** modified. Profiles already attached to an
    organization (including everyone auto-attached by 0007) keep access.
 
 ## How to apply

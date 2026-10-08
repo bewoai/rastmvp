@@ -6,6 +6,8 @@
 -- 2) Sign-up no longer auto-attaches every new auth user to the first
 --    organization. Organization membership is granted only through an
 --    explicit invite (public.organization_invites) created by an org admin.
+-- 3) The SECURITY DEFINER helpers current_org_id() / current_role_name() and
+--    the trigger functions are no longer executable by anon.
 --
 -- Idempotent: safe to run more than once.
 -- NOTE: NOT applied to any environment yet — see README-0008.md.
@@ -204,6 +206,27 @@ drop trigger if exists on_org_invite_created on public.organization_invites;
 create trigger on_org_invite_created
   after insert on public.organization_invites
   for each row execute function public.apply_invite_to_existing_user();
+
+-- ---------------------------------------------------------------------
+-- 3) RLS helper functions: not callable by anon
+-- ---------------------------------------------------------------------
+-- current_org_id() / current_role_name() (0001) are SECURITY DEFINER and, via
+-- Supabase's default privileges, executable by PUBLIC, anon and
+-- authenticated — so PostgREST exposes them as /rpc endpoints (security
+-- advisor finding). They only return the CALLER's own org / role, but anon
+-- has no org and never needs them.
+-- `authenticated` MUST keep EXECUTE: the org policies (`organization_id =
+-- current_org_id()`) are evaluated as the invoking role, and storage.objects
+-- policies (0006) too. service_role bypasses RLS but keeps it for SQL use.
+-- Side effect (intended): an anon request that touches an org table now fails
+-- with 42501 "permission denied for function current_org_id" instead of
+-- returning an empty list. The app's anon paths use only the public
+-- SECURITY DEFINER RPCs (approval_*, portal_*, lead_intake), which run as the
+-- function owner and are unaffected.
+revoke execute on function public.current_org_id() from public, anon;
+revoke execute on function public.current_role_name() from public, anon;
+grant execute on function public.current_org_id() to authenticated, service_role;
+grant execute on function public.current_role_name() to authenticated, service_role;
 
 -- Existing data is intentionally left untouched: profiles already attached
 -- to an organization (including those backfilled by 0007) keep their

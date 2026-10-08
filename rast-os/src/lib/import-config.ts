@@ -1,4 +1,4 @@
-import type { RastData } from "./types";
+import type { WritableCollection } from "./types";
 
 export type FieldType = "text" | "number" | "date" | "bool";
 
@@ -14,7 +14,7 @@ export interface ImportField {
 }
 
 export interface ImportTarget {
-  key: keyof RastData;
+  key: WritableCollection;
   label: string;
   fields: ImportField[];
   /** Kayıt oluştururken eklenecek sabit varsayılanlar */

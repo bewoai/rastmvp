@@ -3,9 +3,9 @@
 import { useStore } from "./store";
 import type { MutationResult } from "./store";
 import { useToasts } from "./toast";
-import type { RastData } from "./types";
+import type { RastData, WritableCollection } from "./types";
 
-type Collections = keyof RastData;
+type Collections = WritableCollection;
 
 /**
  * Satır içi (inline) alan güncellemesi: store.update iyimser yazar ve hata olursa eski değere döner;

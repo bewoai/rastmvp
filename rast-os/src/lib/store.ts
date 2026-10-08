@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { useEffect, useMemo } from "react";
-import type { RastData } from "./types";
+import type { RastData, WritableCollection } from "./types";
 import { seed } from "./seed";
 import { isAuthRequired, isSupabaseConfigured } from "./env";
 import { createClient } from "./supabase/client";
@@ -16,12 +16,17 @@ export const COLLECTIONS: Collections[] = [
   "tasks", "contents", "shoots", "equipment", "invoices", "payments", "expenses",
   // proposal_items, proposals'tan SONRA (seedToSupabase sırayla ekler; FK)
   "proposals", "proposal_items",
+  // Salt okunur: yalnızca DB trigger'ı yazar (0012). add/update/remove ve seedToSupabase dışında.
+  "activity_logs",
 ];
+
+/** Tek seferde çekilecek en fazla işlem geçmişi satırı (en yeniler). */
+const ACTIVITY_LOG_LIMIT = 500;
 
 const emptyData: RastData = {
   leads: [], jobs: [], clients: [], brands: [], contacts: [], projects: [],
   tasks: [], contents: [], shoots: [], equipment: [], invoices: [], payments: [], expenses: [],
-  proposals: [], proposal_items: [],
+  proposals: [], proposal_items: [], activity_logs: [],
 };
 
 export const uid = () =>
@@ -49,9 +54,9 @@ interface StoreState extends RastData {
   loadedCollections: Record<Collections, boolean>;
   init: () => Promise<void>;
   load: (collections: Collections[]) => Promise<void>;
-  add: <K extends Collections>(key: K, item: RastData[K][number]) => Promise<MutationResult>;
-  update: <K extends Collections>(key: K, id: string, patch: Partial<RastData[K][number]>) => Promise<MutationResult>;
-  remove: <K extends Collections>(key: K, id: string) => Promise<MutationResult>;
+  add: <K extends WritableCollection>(key: K, item: RastData[K][number]) => Promise<MutationResult>;
+  update: <K extends WritableCollection>(key: K, id: string, patch: Partial<RastData[K][number]>) => Promise<MutationResult>;
+  remove: <K extends WritableCollection>(key: K, id: string) => Promise<MutationResult>;
   reset: () => void;
   seedToSupabase: () => Promise<{ ok: boolean; error?: string }>;
 }
@@ -108,7 +113,8 @@ export const useStore = create<StoreState>()((set, get) => ({
     await Promise.all(
       collections.map(async (c) => {
         if (s.loadedCollections[c]) return; // Zaten yüklüyse geç
-        const { data } = await sb.from(c).select("*").order("created_at", { ascending: false });
+        const query = sb.from(c).select("*").order("created_at", { ascending: false });
+        const { data } = await (c === "activity_logs" ? query.limit(ACTIVITY_LOG_LIMIT) : query);
         fetched[c] = (data ?? []) as Row[];
       }),
     );
@@ -204,6 +210,7 @@ export const useStore = create<StoreState>()((set, get) => ({
     if (!isSupabaseConfigured || !orgId) return { ok: false, error: "Supabase/oturum yok" };
     const sb = createClient();
     for (const c of COLLECTIONS) {
+      if (c === "activity_logs") continue; // istemci yazamaz (RLS); loglar trigger'la oluşur
       const rows = (seed[c] as unknown as Row[]).map((r) => clean({ ...r, organization_id: orgId }));
       if (rows.length) {
         const { error } = await sb.from(c).insert(rows);

@@ -1,7 +1,7 @@
 import type {
   LeadStatus, ProjectStatus, TaskStatus, ContentStatus,
   ShootStatus, EquipmentStatus, InvoiceStatus, JobStatus,
-  PaymentStatus, Priority, ProposalStatus,
+  PaymentStatus, Priority, ProposalStatus, ActivityAction, ActivityLog,
 } from "./types";
 
 type Tone = "default" | "amber" | "success" | "warning" | "danger" | "muted";
@@ -128,3 +128,102 @@ export const TRY = (n: number | undefined) =>
 
 export const dateTR = (s?: string) =>
   s ? new Date(s).toLocaleDateString("tr-TR", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+
+/** Tarih + saat (işlem geçmişi): "07 Eki 2026 16:42". */
+export const dateTimeTR = (s?: string) =>
+  s
+    ? new Date(s).toLocaleString("tr-TR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })
+    : "—";
+
+// ---------------------------------------------------------------------------
+// İşlem geçmişi (activity_logs, 0012)
+// ---------------------------------------------------------------------------
+
+export const activityAction: Record<ActivityAction, { label: string; verb: string; tone: Tone }> = {
+  insert: { label: "Ekleme", verb: "ekledi", tone: "success" },
+  update: { label: "Güncelleme", verb: "güncelledi", tone: "amber" },
+  delete: { label: "Silme", verb: "sildi", tone: "danger" },
+};
+
+/** Trigger'ın izlediği tablolar → modül adı (0012 ile aynı liste). */
+export const activityEntity: Record<string, string> = {
+  clients: "Müşteri",
+  projects: "Proje",
+  jobs: "Tekil iş",
+  tasks: "Görev",
+  invoices: "Fatura",
+  payments: "Tahsilat",
+  expenses: "Gider",
+  proposals: "Teklif",
+  proposal_items: "Teklif kalemi",
+};
+
+export const activityEntityLabel = (entity: string) => activityEntity[entity] ?? entity;
+
+/** Kolon adı → Türkçe alan adı (bilinmeyen kolon olduğu gibi gösterilir). */
+export const activityField: Record<string, string> = {
+  name: "ad", title: "başlık", customer_name: "müşteri adı", company_name: "firma",
+  status: "durum", payment_status: "ödeme durumu", priority: "öncelik",
+  amount: "tutar", vat: "KDV", vat_rate: "KDV oranı", paid_amount: "tahsil edilen",
+  price: "ücret", cost: "maliyet", budget: "bütçe", est_cost: "tahmini maliyet",
+  monthly_fee: "aylık ücret", currency: "para birimi", fx_rate: "kur", amount_try: "TL tutarı",
+  issue_date: "fatura tarihi", due_date: "vade / teslim", paid_at: "ödeme tarihi", date: "tarih",
+  start_date: "başlangıç", end_date: "bitiş", valid_until: "geçerlilik",
+  contract_start: "sözleşme başlangıcı", contract_end: "sözleşme bitişi", payment_day: "ödeme günü",
+  invoice_no: "fatura no", proposal_no: "teklif no", method: "ödeme yöntemi",
+  category: "kategori", vendor: "tedarikçi", description: "açıklama", notes: "notlar", terms: "koşullar",
+  client_id: "müşteri", project_id: "proje", brand_id: "marka", invoice_id: "fatura",
+  proposal_id: "teklif", content_id: "içerik", assignee_id: "sorumlu", owner_id: "sorumlu",
+  service: "hizmet", job_type: "iş türü", contact: "iletişim", type: "tür", tax_id: "vergi no",
+  is_active: "aktif", is_recurring: "tekrarlayan", installment_number: "taksit no", installment_total: "taksit sayısı",
+  qty: "miktar", unit: "birim", unit_price: "birim fiyat", position: "sıra",
+  est_hours: "tahmini saat", actual_hours: "gerçek saat", checklist: "kontrol listesi",
+  drive_url: "Drive linki", receipt_url: "fiş", created_by: "oluşturan",
+};
+
+/** Değişen alanların Türkçe adları (diff anahtar sırasıyla). */
+export function activityFields(log: Pick<ActivityLog, "diff">): string[] {
+  return Object.keys(log.diff ?? {}).map((k) => activityField[k] ?? k);
+}
+
+/** Kaydın görünen adı: trigger'ın yazdığı record_label → tahsilatta tutar → kısa id. */
+export function activityRecord(log: Pick<ActivityLog, "record_label" | "entity" | "entity_id" | "diff">): string {
+  if (log.record_label) return log.record_label;
+  const amount = log.diff?.amount;
+  const value = amount ? (amount.new ?? amount.old) : undefined;
+  if (log.entity === "payments" && value !== undefined && value !== null && Number.isFinite(Number(value))) {
+    return TRY(Number(value));
+  }
+  return log.entity_id ? `#${log.entity_id.slice(0, 8)}` : "—";
+}
+
+/** Kaydın açıldığı sayfa (silinen kayıtta yok). */
+export function activityHref(log: Pick<ActivityLog, "entity" | "entity_id" | "action">): string | undefined {
+  if (log.action === "delete") return undefined;
+  if (log.entity === "proposals" && log.entity_id) return `/teklifler/${log.entity_id}`;
+  const pages: Record<string, string> = {
+    clients: "/crm/clients", projects: "/projects", jobs: "/jobs", tasks: "/tasks",
+    invoices: "/finance/invoices", payments: "/finance/invoices", expenses: "/finance/expenses",
+    proposal_items: "/teklifler",
+  };
+  return pages[log.entity];
+}
+
+const activityEnums: Record<string, Record<string, { label: string }>> = {
+  "invoices.status": invoiceStatus,
+  "tasks.status": taskStatus,
+  "projects.status": projectStatus,
+  "jobs.status": jobStatus,
+  "jobs.payment_status": paymentStatus,
+  "proposals.status": proposalStatus,
+};
+
+/** Diff değerini okunur metne çevirir (durumlar Türkçe etiketiyle, uzun metin kısaltılır). */
+export function activityValue(entity: string, key: string, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "boolean") return value ? "Evet" : "Hayır";
+  const text = typeof value === "object" ? JSON.stringify(value) : String(value);
+  const enumMap = activityEnums[`${entity}.${key}`] ?? (key === "priority" ? priority : undefined);
+  if (enumMap?.[text]) return enumMap[text].label;
+  return text.length > 40 ? `${text.slice(0, 39)}…` : text;
+}

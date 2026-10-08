@@ -266,6 +266,22 @@ export interface ProposalItem {
   created_at: string;
 }
 
+// İşlem geçmişi (0012): yalnızca DB trigger'ı yazar, uygulama salt okur.
+export type ActivityAction = "insert" | "update" | "delete";
+export type ActivityDiff = Record<string, { old?: unknown; new?: unknown }>;
+
+export interface ActivityLog {
+  id: ID;
+  actor_id?: ID | null;
+  actor_name?: string | null;   // işlem anındaki profil adı
+  entity: string;               // tablo adı (clients, invoices, …)
+  entity_id?: ID | null;
+  record_label?: string | null; // kaydın görünen adı (silinse de okunur)
+  action: ActivityAction;
+  diff?: ActivityDiff | null;   // { kolon: { old, new } } — yalnızca değişen alanlar
+  created_at: string;
+}
+
 export interface RastData {
   leads: Lead[];
   jobs: Job[];
@@ -282,4 +298,8 @@ export interface RastData {
   expenses: Expense[];
   proposals: Proposal[];
   proposal_items: ProposalItem[];
+  activity_logs: ActivityLog[];
 }
+
+/** Uygulamanın yazabildiği koleksiyonlar (activity_logs salt okunur — trigger yazar). */
+export type WritableCollection = Exclude<keyof RastData, "activity_logs">;

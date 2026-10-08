@@ -1,5 +1,5 @@
 import { norm } from "./import-config";
-import type { RastData } from "./types";
+import type { WritableCollection } from "./types";
 
 export type FinanceCell = string | number | boolean | null | undefined;
 export type FinanceRow = FinanceCell[];
@@ -10,7 +10,7 @@ export interface FinanceWorkbookRows {
 }
 
 export interface FinanceImportRecord {
-  key: keyof RastData;
+  key: WritableCollection;
   data: Record<string, unknown>;
 }
 

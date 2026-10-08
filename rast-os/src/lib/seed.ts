@@ -97,4 +97,17 @@ export const seed: RastData = {
     },
   ],
   proposal_items: demoProposalItems,
+  // İşlem geçmişi örnekleri (canlıda 0012 trigger'ı yazar). En yeni önce.
+  activity_logs: [
+    { id: "al10", actor_name: "Berat", entity: "invoices", entity_id: "i2", record_label: "2026-082", action: "update", diff: { paid_amount: { old: 0, new: 30000 }, status: { old: "issued", new: "partial" } }, created_at: "2026-10-07T16:42:00+03:00" },
+    { id: "al9", actor_name: "Berat", entity: "payments", entity_id: "p2", action: "insert", diff: { invoice_id: { old: null, new: "i2" }, amount: { old: null, new: 30000 }, method: { old: null, new: "Havale" }, paid_at: { old: null, new: "2026-08-10" } }, created_at: "2026-10-07T16:42:00+03:00" },
+    { id: "al8", actor_name: "Ece", entity: "tasks", entity_id: "t3", record_label: "Dr. röportaj kurgusu", action: "update", diff: { status: { old: "in_progress", new: "internal_review" } }, created_at: "2026-10-07T11:05:00+03:00" },
+    { id: "al7", actor_name: "Berat", entity: "proposals", entity_id: "pr1", record_label: "Hekim İçerik Sistemi — Standart", action: "update", diff: { status: { old: "draft", new: "sent" } }, created_at: "2026-10-06T18:20:00+03:00" },
+    { id: "al6", actor_name: "Ece", entity: "expenses", entity_id: "x2", record_label: "Adatıp video seslendirme", action: "insert", diff: { category: { old: null, new: "Freelancer" }, vendor: { old: null, new: "Seslendirme — Onur" }, amount: { old: null, new: 4500 } }, created_at: "2026-10-06T10:12:00+03:00" },
+    { id: "al5", actor_name: "Berat", entity: "jobs", entity_id: "j1", record_label: "Selin & Emre (Düğün)", action: "update", diff: { paid_amount: { old: 0, new: 14000 }, payment_status: { old: "unpaid", new: "partial" } }, created_at: "2026-10-05T15:30:00+03:00" },
+    { id: "al4", actor_name: "Ece", entity: "expenses", entity_id: "x9", record_label: "Eski ekipman kirası", action: "delete", diff: { category: { old: "Ekipman", new: null }, amount: { old: 2500, new: null } }, created_at: "2026-10-04T09:48:00+03:00" },
+    { id: "al3", actor_name: "Berat", entity: "projects", entity_id: "p3", record_label: "Mira — Yaz Kampanyası", action: "update", diff: { status: { old: "on_hold", new: "planning" }, end_date: { old: "2026-08-31", new: "2026-09-05" } }, created_at: "2026-10-03T14:02:00+03:00" },
+    { id: "al2", actor_name: "Berat", entity: "proposals", entity_id: "pr1", record_label: "Hekim İçerik Sistemi — Standart", action: "insert", diff: { title: { old: null, new: "Hekim İçerik Sistemi — Standart" }, proposal_no: { old: null, new: "RC-2026-001" }, status: { old: null, new: "draft" } }, created_at: "2026-10-01T12:15:00+03:00" },
+    { id: "al1", actor_name: "Berat", entity: "clients", entity_id: "c3", record_label: "Mira Kozmetik", action: "update", diff: { monthly_fee: { old: 20000, new: 22000 } }, created_at: "2026-10-01T09:30:00+03:00" },
+  ],
 };

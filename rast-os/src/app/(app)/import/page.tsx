@@ -9,7 +9,7 @@ import { useFx } from "@/lib/fx";
 import { IMPORT_TARGETS, coerce, norm, type ImportTarget } from "@/lib/import-config";
 import { isRastFinanceWorkbook, parseRastFinanceWorkbook } from "@/lib/rast-finance-import";
 import { createClient } from "@/lib/supabase/client";
-import type { RastData } from "@/lib/types";
+import type { RastData, WritableCollection } from "@/lib/types";
 
 type Cell = string | number | boolean;
 type RawRow = Cell[];
@@ -24,7 +24,7 @@ const SUMMARY_RE = /^(toplam|genel toplam|total|özet|ara toplam|net)\b/i;
  */
 const USE_RPC_IMPORT = true;
 
-type Table = keyof RastData;
+type Table = WritableCollection;
 /** Kuru çalıştırma (dry-run) planındaki tek işlem. `row`: önizleme için kaydın kendisi. */
 type PlanOp =
   | { op: "delete"; table: Table; id: string; row: Row }

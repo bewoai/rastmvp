@@ -3,7 +3,7 @@
 import { useCallback, useState } from "react";
 import { Modal, Button } from "./form";
 import { useStore } from "@/lib/store";
-import type { RastData } from "@/lib/types";
+import type { WritableCollection } from "@/lib/types";
 import { useToasts } from "@/lib/toast";
 
 export function ConfirmDialog({
@@ -40,7 +40,7 @@ export function ConfirmDialog({
 }
 
 export interface DeleteTarget {
-  key: keyof RastData;
+  key: WritableCollection;
   id: string;
   /** Kaydın görünen adı (onay metninde ve toast'ta). */
   label: string;

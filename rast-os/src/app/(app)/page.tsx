@@ -7,6 +7,7 @@ import {
   Boxes, ArrowRight, CalendarPlus, FolderPlus, ListPlus, UserPlus,
 } from "lucide-react";
 import { PageHeader, StatCard, Panel, Badge, EmptyState } from "@/components/ui";
+import ActivityFeed from "@/components/ActivityFeed";
 import { useStore, useHydrated } from "@/lib/store";
 import { useFx } from "@/lib/fx";
 import { expandRecurring, expenseTotalTRY, invoiceIncomeInRange, monthBounds } from "@/lib/finance";
@@ -38,7 +39,7 @@ function DashboardSkeleton({ subtitle }: { subtitle: string }) {
 }
 
 export default function DashboardPage() {
-  const hydrated = useHydrated(["jobs", "invoices", "payments", "expenses", "clients", "equipment", "shoots", "tasks", "contents"]);
+  const hydrated = useHydrated(["jobs", "invoices", "payments", "expenses", "clients", "equipment", "shoots", "tasks", "contents", "activity_logs"]);
   
   const jobs = useStore((s) => s.jobs);
   const invoices = useStore((s) => s.invoices);
@@ -49,6 +50,7 @@ export default function DashboardPage() {
   const shoots = useStore((s) => s.shoots);
   const tasks = useStore((s) => s.tasks);
   const contents = useStore((s) => s.contents);
+  const activityLogs = useStore((s) => s.activity_logs);
 
   const { usd, eur } = useFx();
   const today = useToday();
@@ -228,6 +230,12 @@ export default function DashboardPage() {
               ))}
             </ul>
           ) : <EmptyState title="Onay bekleyen içerik yok" />}
+        </Panel>
+      </div>
+
+      <div className="mt-4">
+        <Panel title="Son işlemler" action={panelLink("/settings/islem-gecmisi")}>
+          <ActivityFeed logs={activityLogs} limit={15} />
         </Panel>
       </div>
     </div>

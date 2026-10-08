@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { ArrowRight } from "lucide-react";
 import { PageHeader, Panel, Badge } from "@/components/ui";
 import { Button, Field, Input } from "@/components/form";
 import { useStore, useHydrated } from "@/lib/store";
@@ -97,6 +99,20 @@ export default function SettingsPage() {
             <RateInput label="EUR/TRY" value={eur} onCommit={(n) => setRate("eur", n)} />
           </div>
           {updated && <p className="mt-2 text-xs text-muted">Son güncelleme: {updated}</p>}
+        </Panel>
+
+        <Panel title="İşlem Geçmişi">
+          <p className="text-sm text-muted">
+            Müşteri, proje, iş, görev, fatura, tahsilat, gider ve tekliflerdeki her ekleme,
+            güncelleme ve silme kim tarafından, ne zaman yapıldığıyla birlikte otomatik kaydedilir.
+          </p>
+          <Link
+            prefetch={false}
+            href="/settings/islem-gecmisi"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg text-sm font-medium text-amber outline-none hover:text-amber-hi focus-visible:ring-2 focus-visible:ring-amber/60"
+          >
+            İşlem geçmişini aç <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
         </Panel>
 
         <Panel title="Sistem">

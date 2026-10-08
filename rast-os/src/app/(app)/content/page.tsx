@@ -5,7 +5,8 @@ import {
   ArrowRight, CalendarDays, Download, Eye, FileText, Lightbulb, LoaderCircle,
   Paperclip, Plus, Trash2, Upload,
 } from "lucide-react";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { PageHeader, EmptyState, Badge } from "@/components/ui";
+import { ContentApprovalPanel } from "@/components/ContentApprovalPanel";
 import { FormModal, Modal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
 import { FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Tabs, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
 import { useDeleteConfirm } from "@/components/confirm";
@@ -14,7 +15,8 @@ import type { MutationResult } from "@/lib/store";
 import { useToday } from "@/lib/useToday";
 import { patchRecord } from "@/lib/mutate";
 import { useToasts } from "@/lib/toast";
-import { contentStatus } from "@/lib/labels";
+import { approvalStatus, contentStatus } from "@/lib/labels";
+import { effectiveStatus, latestByContent } from "@/lib/approval-logic";
 import { createClient } from "@/lib/supabase/client";
 import type { Brand, Content, ContentAttachment, ContentStatus } from "@/lib/types";
 
@@ -251,39 +253,44 @@ function ContentModal({ initial, mode, brands, onRead, onClose }: {
           </MoreFields>
         </div>
 
-        <div className="self-start rounded-xl border border-border bg-surface-2/40 p-4">
-          <div className="flex items-center gap-2"><Paperclip className="h-4 w-4 text-amber" aria-hidden /><h3 className="text-sm font-semibold text-foreground">Brief ve kaynak dosyaları</h3></div>
-          <p className="mt-1 text-xs text-muted">PDF, Excel, CSV veya TXT yükleyin. Sistem içindeki metni ve tabloyu okuyarak bu kayıtta saklar.</p>
-          <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border px-4 py-6 text-center focus-within:border-amber/60 hover:border-amber/50 hover:bg-amber/5">
-            <Upload className="h-6 w-6 text-amber" aria-hidden />
-            <span className="mt-2 text-sm font-medium text-foreground">Dosya seç</span>
-            <span className="mt-1 text-xs text-muted">PDF / XLSX / XLS / CSV / TXT · en fazla 20 MB</span>
-            <input type="file" multiple accept={acceptedFiles} className="sr-only" onChange={(event) => { extractFiles(event.target.files); event.currentTarget.value = ""; }} />
-          </label>
-
-          <div className="mt-4 space-y-2">
-            {(form.attachments ?? []).map((attachment) => (
-              <div key={attachment.id} className="rounded-lg border border-border bg-background p-3">
-                <div className="flex items-start gap-2">
-                  <FileText className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden />
-                  <div className="min-w-0 flex-1"><p className="truncate text-xs font-medium text-foreground">{attachment.name}</p><p className="text-[11px] text-muted">{readableSize(attachment.size)}{attachment.page_count ? ` · ${attachment.page_count} sayfa` : ""}{attachment.sheet_names?.length ? ` · ${attachment.sheet_names.length} çalışma sayfası` : ""}</p></div>
-                  <button onClick={() => onRead(attachment)} type="button" title="İçeriği oku" aria-label={`İçeriği oku: ${attachment.name}`} className="p-1 text-muted hover:text-foreground"><Eye className="h-4 w-4" aria-hidden /></button>
-                  <button onClick={() => removeExistingAttachment(attachment)} type="button" title="Kaldır" aria-label={`Kaldır: ${attachment.name}`} className="p-1 text-muted hover:text-danger"><Trash2 className="h-4 w-4" aria-hidden /></button>
+        <div className="space-y-4 self-start">
+          {editing && mode === "content" && initial && (
+            <ContentApprovalPanel content={initial} draftScript={form.script} draftTitle={form.title} />
+          )}
+          <div className="rounded-xl border border-border bg-surface-2/40 p-4">
+            <div className="flex items-center gap-2"><Paperclip className="h-4 w-4 text-amber" aria-hidden /><h3 className="text-sm font-semibold text-foreground">Brief ve kaynak dosyaları</h3></div>
+            <p className="mt-1 text-xs text-muted">PDF, Excel, CSV veya TXT yükleyin. Sistem içindeki metni ve tabloyu okuyarak bu kayıtta saklar.</p>
+            <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border px-4 py-6 text-center focus-within:border-amber/60 hover:border-amber/50 hover:bg-amber/5">
+              <Upload className="h-6 w-6 text-amber" aria-hidden />
+              <span className="mt-2 text-sm font-medium text-foreground">Dosya seç</span>
+              <span className="mt-1 text-xs text-muted">PDF / XLSX / XLS / CSV / TXT · en fazla 20 MB</span>
+              <input type="file" multiple accept={acceptedFiles} className="sr-only" onChange={(event) => { extractFiles(event.target.files); event.currentTarget.value = ""; }} />
+            </label>
+  
+            <div className="mt-4 space-y-2">
+              {(form.attachments ?? []).map((attachment) => (
+                <div key={attachment.id} className="rounded-lg border border-border bg-background p-3">
+                  <div className="flex items-start gap-2">
+                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden />
+                    <div className="min-w-0 flex-1"><p className="truncate text-xs font-medium text-foreground">{attachment.name}</p><p className="text-[11px] text-muted">{readableSize(attachment.size)}{attachment.page_count ? ` · ${attachment.page_count} sayfa` : ""}{attachment.sheet_names?.length ? ` · ${attachment.sheet_names.length} çalışma sayfası` : ""}</p></div>
+                    <button onClick={() => onRead(attachment)} type="button" title="İçeriği oku" aria-label={`İçeriği oku: ${attachment.name}`} className="p-1 text-muted hover:text-foreground"><Eye className="h-4 w-4" aria-hidden /></button>
+                    <button onClick={() => removeExistingAttachment(attachment)} type="button" title="Kaldır" aria-label={`Kaldır: ${attachment.name}`} className="p-1 text-muted hover:text-danger"><Trash2 className="h-4 w-4" aria-hidden /></button>
+                  </div>
                 </div>
-              </div>
-            ))}
-            {pendingFiles.map((pending) => (
-              <div key={pending.id} className="rounded-lg border border-border bg-background p-3">
-                <div className="flex items-start gap-2">
-                  {pending.loading ? <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-amber" aria-hidden /> : <FileText className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden />}
-                  <div className="min-w-0 flex-1"><p className="truncate text-xs font-medium text-foreground">{pending.file.name}</p><p className={`text-[11px] ${pending.error ? "text-danger" : "text-muted"}`}>{pending.loading ? "Dosya okunuyor…" : pending.error || `${readableSize(pending.file.size)} · Okundu`}</p></div>
-                  {pending.attachment && <button onClick={() => onRead(pending.attachment!)} type="button" title="İçeriği oku" aria-label={`İçeriği oku: ${pending.file.name}`} className="p-1 text-muted hover:text-foreground"><Eye className="h-4 w-4" aria-hidden /></button>}
-                  <button onClick={() => setPendingFiles((current) => current.filter((item) => item.id !== pending.id))} type="button" title="Kaldır" aria-label={`Kaldır: ${pending.file.name}`} className="p-1 text-muted hover:text-danger"><Trash2 className="h-4 w-4" aria-hidden /></button>
+              ))}
+              {pendingFiles.map((pending) => (
+                <div key={pending.id} className="rounded-lg border border-border bg-background p-3">
+                  <div className="flex items-start gap-2">
+                    {pending.loading ? <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-amber" aria-hidden /> : <FileText className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden />}
+                    <div className="min-w-0 flex-1"><p className="truncate text-xs font-medium text-foreground">{pending.file.name}</p><p className={`text-[11px] ${pending.error ? "text-danger" : "text-muted"}`}>{pending.loading ? "Dosya okunuyor…" : pending.error || `${readableSize(pending.file.size)} · Okundu`}</p></div>
+                    {pending.attachment && <button onClick={() => onRead(pending.attachment!)} type="button" title="İçeriği oku" aria-label={`İçeriği oku: ${pending.file.name}`} className="p-1 text-muted hover:text-foreground"><Eye className="h-4 w-4" aria-hidden /></button>}
+                    <button onClick={() => setPendingFiles((current) => current.filter((item) => item.id !== pending.id))} type="button" title="Kaldır" aria-label={`Kaldır: ${pending.file.name}`} className="p-1 text-muted hover:text-danger"><Trash2 className="h-4 w-4" aria-hidden /></button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+            {fileError && <p role="alert" className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{fileError}</p>}
           </div>
-          {fileError && <p role="alert" className="mt-3 rounded-lg bg-danger/10 px-3 py-2 text-xs text-danger">{fileError}</p>}
         </div>
       </div>
     </FormModal>
@@ -291,10 +298,14 @@ function ContentModal({ initial, mode, brands, onRead, onClose }: {
 }
 
 export default function ContentPage() {
-  const hydrated = useHydrated(["contents", "clients", "brands"]);
+  const hydrated = useHydrated(["contents", "clients", "brands", "content_approvals"]);
   const contents = useStore((s) => s.contents);
   const brands = useStore((s) => s.brands);
+  const approvals = useStore((s) => s.content_approvals);
   const today = useToday();
+  // Onay rozetlerinin "şimdi"si (sayfa açılışında sabit; süre dolumu gün ölçeğinde)
+  const [approvalNow] = useState(() => nowISO());
+  const latestApproval = useMemo(() => latestByContent(approvals), [approvals]);
 
   const wantNew = useNewIntent();
   const [view, setView] = usePersistentState<ContentView>("content-view", "calendar", VIEWS);
@@ -403,6 +414,8 @@ export default function ContentPage() {
               </h2>
               <ul className="card divide-y divide-border/50 overflow-hidden">
                 {g.items.map((item) => {
+                  const appr = latestApproval.get(item.id);
+                  const apprStatus = appr ? effectiveStatus(appr, approvalNow) : undefined;
                   const late = Boolean(item.planned_date) && item.planned_date!.slice(0, 10) < today && !["published", "scheduled", "archived", "approved"].includes(item.status);
                   return (
                     <li key={item.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5 hover:bg-surface-2/40">
@@ -416,6 +429,11 @@ export default function ContentPage() {
                         {item.hook && <p className="mt-0.5 line-clamp-1 text-xs text-muted"><span className="text-foreground/80">Hook:</span> {item.hook}</p>}
                         <AttachmentChips attachments={item.attachments} onRead={setReading} />
                       </div>
+                      {appr && apprStatus && (
+                        <span title={`İçerik onayı v${appr.version}: ${approvalStatus[apprStatus].label}`}>
+                          <Badge tone={approvalStatus[apprStatus].tone}>{approvalStatus[apprStatus].short}</Badge>
+                        </span>
+                      )}
                       <StatusSelect value={item.status} options={calendarStatusOptions} label={`Durum: ${item.title}`} onChange={(status) => patchRecord("contents", item.id, { status }, "Durum güncellenemedi")} />
                       <RowActions label={item.title} onEdit={() => openEdit(item)} onDelete={() => del.ask({ key: "contents", id: item.id, label: item.title })} />
                     </li>

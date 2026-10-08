@@ -5,6 +5,12 @@
 // içindedir (bkz. koşul metinleri: "Strateji, raporlama ve kreatif üretim … dahildir").
 // Yeni paket eklerken de bu kalemleri ayrı satır/fiyat olarak eklemeyin.
 //
+// MEVZUAT KURALI (sahibin kararı, bağlayıcı): Türkiye'de hekimler için ücretli reklam / tanıtım
+// SÜREKLİ AYLIK HİZMET olarak sunulamaz; yalnızca ruhsat sonrası ilk 30 günlük AÇILIŞ DUYURUSU
+// için veya özel izin bulunan durumlarda yapılabilir. Bu yüzden hekim paketlerinde "Meta ve Google
+// reklam yönetimi" tekrarlayan (aylık) kalem OLARAK YER ALMAZ. Reklam yalnızca "Ek hizmetler (hekim)"
+// altında, tek seferlik ve isteğe bağlı kalem olarak teklif edilir.
+//
 // Not: Yalnızca `import type` — saf modül (testlerden doğrudan içe aktarılabilir).
 import type { ProposalItem } from "./types";
 
@@ -39,6 +45,7 @@ const oneOff = (name: string, unit: string, unit_price: number, description?: st
 /* ------------------------------------------------------------------ */
 /* Hekim İçerik Sistemi — 3 kademe (aylık, KDV hariç)                  */
 /*   Başlangıç ≈ 15.000 · Standart = 25.000 · Klinik ≈ 40.000          */
+/*   Aylık reklam yönetimi YOK (bkz. dosya başındaki mevzuat kuralı).  */
 /* ------------------------------------------------------------------ */
 
 const SOSYAL_MEDYA = monthly(
@@ -47,24 +54,58 @@ const SOSYAL_MEDYA = monthly(
   "Instagram içerik planı, paylaşım, açıklama metinleri ve topluluk yönetimi",
 );
 
+// Başlangıç ≈ 15.000: 4 video + sosyal medya. 4 videonun fiyatı yaklaşık toplamı tutturmak için
+// 10.200 alındı (TODO(fiyat): kalem kırılımı fiyat listesi onayında netleşecek).
 const HEKIM_BASLANGIC: PresetItem[] = [
   SOSYAL_MEDYA,
-  monthly("4 konu-anlatım videosu / ay", 7200, "Hekimin uzmanlık konularında kısa bilgilendirici videolar (çekim + kurgu)"),
-  monthly("Reklam yönetimi (temel)", 3000, "Tek platform (Meta) kampanya kurulumu ve takibi; reklam bütçesi hariç"),
-]; // 4.800 + 7.200 + 3.000 = 15.000
+  monthly("4 konu-anlatım videosu / ay", 10200, "Hekimin uzmanlık konularında kısa bilgilendirici videolar (çekim + kurgu)"),
+]; // 4.800 + 10.200 = 15.000
 
 const HEKIM_STANDART: PresetItem[] = [
   SOSYAL_MEDYA,
   monthly("8 konu-anlatım videosu / ay", 14300, "Hekimin uzmanlık konularında kısa bilgilendirici videolar (çekim + kurgu)"),
-  monthly("Reklam yönetimi", 5900, "Meta + Google kampanya kurulumu ve optimizasyonu; reklam bütçesi hariç"),
+  // GEÇİCİ — sahip kararı bekleniyor (provisional, owner decision pending): Eski "reklam yönetimi"
+  // (5.900) mevzuat nedeniyle kalktı; toplam 25.000 korunsun diye aynı tutar Google İşletme Profili +
+  // YouTube/arama optimizasyonuna kondu. Paket/fiyat kararı verilince güncellenecek.
+  monthly(
+    "Google İşletme Profili yönetimi + YouTube/arama optimizasyonu",
+    5900,
+    "Google İşletme Profili düzeni ve güncel tutulması, YouTube başlık/açıklama ve arama görünürlüğü optimizasyonu (reklam içermez)",
+  ),
 ]; // 4.800 + 14.300 + 5.900 = 25.000
 
+// Klinik ≈ 40.000: Standart kapsamı + 12 video, story yönetimi, aylık uzun YouTube videosu, web sitesi bakımı.
+// TODO(fiyat): 12 video + ek kalemlerin tutarları toplamı ≈ 40.000'e oturtmak için geçici dağıtıldı; onayda güncelle.
 const HEKIM_KLINIK: PresetItem[] = [
-  ...HEKIM_STANDART,
-  monthly("Story yönetimi", 3500, "Haftalık story akışı: soru-cevap, klinikten anlar, duyurular"),
-  monthly("YouTube uzun video (1 / ay)", 8500, "8–15 dk bilgilendirici uzun video + YouTube başlık/açıklama optimizasyonu"),
-  monthly("Web sitesi bakımı", 3000, "Klinik web sitesi içerik güncelleme, yedekleme ve teknik bakım"),
-]; // 25.000 + 3.500 + 8.500 + 3.000 = 40.000
+  SOSYAL_MEDYA,
+  monthly("12 konu-anlatım videosu / ay", 17200, "Hekimin uzmanlık konularında kısa bilgilendirici videolar (çekim + kurgu)"),
+  monthly(
+    "Google İşletme Profili yönetimi + YouTube/arama optimizasyonu",
+    5900,
+    "Google İşletme Profili düzeni ve güncel tutulması, YouTube başlık/açıklama ve arama görünürlüğü optimizasyonu (reklam içermez)",
+  ), // provisional — owner decision pending (bkz. HEKIM_STANDART)
+  monthly("Story yönetimi", 3200, "Haftalık story akışı: soru-cevap, klinikten anlar, duyurular"),
+  monthly("YouTube uzun video (1 / ay)", 6500, "8–15 dk bilgilendirici uzun video + YouTube başlık/açıklama optimizasyonu"),
+  monthly("Web sitesi bakımı", 2400, "Klinik web sitesi içerik güncelleme, yedekleme ve teknik bakım"),
+]; // 4.800 + 17.200 + 5.900 + 3.200 + 6.500 + 2.400 = 40.000
+
+// Ek hizmetler (hekim): tek seferlik, isteğe bağlı. Aylık reklam yönetimi yerine geçmez.
+// TODO(fiyat): fiyatlar henüz belirlenmedi — 0 bırakıldı, teklifte elle girin. Yalnızca ruhsat sonrası
+// ilk 30 gün veya özel izin bulunan durumlarda teklif edilebilir (dosya başındaki kural).
+const HEKIM_EK: PresetItem[] = [
+  oneOff(
+    "Açılış dönemi tanıtımı (ruhsat sonrası ilk 30 gün)",
+    "proje",
+    0,
+    "Ruhsat sonrası ilk 30 günlük açılış duyurusu; tek seferlik, reklam bütçesi hariç",
+  ),
+  oneOff(
+    "İzinli dönem tanıtım desteği",
+    "proje",
+    0,
+    "Yalnızca özel tanıtım izni bulunan durumlarda; izin belgesi müşteriden alınır, tek seferlik",
+  ),
+];
 
 const HEKIM_NOTES = `1. Hafta — Tanışma ve keşif: hekim / klinik görüşmesi, hedef hasta kitlesi, konu listesi.
 2. Hafta — İçerik planı ve video senaryoları onaya sunulur; çekim günü planlanır.
@@ -76,12 +117,13 @@ const HEKIM_TERMS = `## Rast Creative'in sorumlulukları
 - Onaylı içerik planına göre üretim ve zamanında yayın.
 - Strateji, raporlama ve kreatif üretim tüm hizmetlere dahildir; ayrıca ücretlendirilmez.
 - İçerikler sağlık hizmetleri tanıtım mevzuatı gözetilerek hazırlanır.
+- Hekimler için ücretli reklam aylık hizmet olarak verilmez; yalnızca ruhsat sonrası ilk 30 günlük açılış duyurusu veya özel izin bulunan durumlarda, tek seferlik ek hizmet olarak yapılır.
 - Her içerik için 2 revizyon hakkı.
 ## Müşterinin sorumlulukları
 - Planlanan çekim günlerinde hekimin ve mekânın hazır olması.
 - Tıbbi bilgilerin doğruluğunun onayı; içerik onaylarının 2 iş günü içinde verilmesi.
-- Hesap erişimlerinin (Meta, Google, web sitesi) sağlanması.
-- Reklam bütçesi (platform harcaması) bu teklife dahil değildir; doğrudan müşteri tarafından ödenir.
+- Hesap erişimlerinin (Instagram, Google İşletme Profili, YouTube, web sitesi) sağlanması.
+- Tanıtım izni gerektiren ek hizmetlerde (varsa) izin belgesinin sağlanması; reklam bütçesi teklife dahil değildir.
 ## Ödeme koşulları
 - Aylık hizmet bedeli her ayın ilk 5 iş günü içinde, fatura karşılığı ödenir.
 - Fiyatlara KDV dahil değildir; KDV ayrıca gösterilmiştir.
@@ -150,6 +192,21 @@ const INSAAT_TERMS = `## Rast Creative'in sorumlulukları
 - Fiyatlara KDV dahil değildir; KDV ayrıca gösterilmiştir.
 - Asgari çalışma süresi 3 aydır; fesih için 30 gün önceden yazılı bildirim gerekir.`;
 
+const HEKIM_EK_NOTES = `Ek hizmetler yalnızca ruhsat sonrası ilk 30 gün içinde (açılış duyurusu) veya özel izin bulunan durumlarda sunulur.
+1. Uygunluk kontrolü — ruhsat tarihi / izin belgesi doğrulanır.
+2. Tek seferlik kampanya planı ve içerik onaya sunulur.
+3. Yayın ve kapanış özeti.`;
+
+const HEKIM_EK_TERMS = `## Rast Creative'in sorumlulukları
+- Onaylı plana göre tek seferlik tanıtım çalışması; sağlık hizmetleri tanıtım mevzuatına uygun içerik.
+- Strateji, raporlama ve kreatif üretim kapsama dahildir; ayrıca ücretlendirilmez.
+## Müşterinin sorumlulukları
+- Ruhsat tarihinin veya tanıtım izninin belgelenmesi; içerik onaylarının 2 iş günü içinde verilmesi.
+- Reklam bütçesi (varsa) doğrudan müşteri tarafından ödenir.
+## Ödeme koşulları
+- Tek seferlik bedel sipariş onayında ödenir; sürekli aylık hizmet değildir.
+- Fiyatlara KDV dahil değildir; KDV ayrıca gösterilmiştir.`;
+
 export const PROPOSAL_PRESETS: PresetGroup[] = [
   {
     id: "hekim",
@@ -160,6 +217,15 @@ export const PROPOSAL_PRESETS: PresetGroup[] = [
       { id: "baslangic", label: "Başlangıç", summary: "≈ 15.000 / ay", items: HEKIM_BASLANGIC },
       { id: "standart", label: "Standart", summary: "25.000 / ay", items: HEKIM_STANDART },
       { id: "klinik", label: "Klinik", summary: "≈ 40.000 / ay", items: HEKIM_KLINIK },
+    ],
+  },
+  {
+    id: "hekim-ek",
+    label: "Ek hizmetler (hekim)",
+    notes: HEKIM_EK_NOTES,
+    terms: HEKIM_EK_TERMS,
+    packages: [
+      { id: "tanitim", label: "Açılış / izinli dönem tanıtımı", summary: "tek seferlik · isteğe bağlı · fiyat girilecek", items: HEKIM_EK },
     ],
   },
   {

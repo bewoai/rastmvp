@@ -107,6 +107,17 @@ test("Hekim İçerik Sistemi tiers ≈ 15.000 / 25.000 / 40.000 (KDV hariç, ayl
   }
 });
 
+test("hekim paketlerinde aylık reklam yönetimi yok; ek hizmetler tek seferlik ve 'proje' birimli", () => {
+  for (const key of ["hekim:baslangic", "hekim:standart", "hekim:klinik"]) {
+    for (const i of findPreset(key).pkg.items) {
+      assert.doesNotMatch(i.name.toLocaleLowerCase("tr-TR"), /reklam/, `${key}: ${i.name}`);
+    }
+  }
+  const ek = findPreset("hekim-ek:tanitim").pkg.items;
+  assert.equal(ek.length, 2);
+  assert.ok(ek.every((i) => !i.is_recurring && i.unit === "proje" && i.unit_price === 0));
+});
+
 test("Aylık video paketi (inşaat/emlak) = 45.000; kurumsal film fiyatları henüz 0 ve tek seferlik", () => {
   assert.equal(presetTotal("insaat-emlak:aylik"), 45000);
   for (const key of ["kurumsal-film:cekim", "kurumsal-film:cekim-kurgu"]) {

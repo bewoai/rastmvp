@@ -34,3 +34,34 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm test
       - run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rast-os
+    # Demo modu: boş Supabase env (canlı veritabanına bağlanmaz); REQUIRE_AUTH=false ile sayfalar girişsiz açılır.
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ""
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
+      NEXT_PUBLIC_REQUIRE_AUTH: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: rast-os/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      # playwright.config.ts webServer: npm run build && npm run start (port 3499)
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            rast-os/playwright-report
+            rast-os/test-results
+          retention-days: 7

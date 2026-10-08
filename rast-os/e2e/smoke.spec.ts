@@ -62,6 +62,22 @@ test("teklif yazdırma görünümü: A4 sayfa ve Yazdır düğmesi", async ({ pa
   expect(box?.width).toBeLessThan(805);
 });
 
+test("/raporlar/aylik: kayıtlı Ağustos 2026 raporu ve yazdırma görünümü", async ({ page }) => {
+  await page.goto("/raporlar/aylik");
+  await expect(page.getByRole("heading", { name: "Aylık müşteri raporu" })).toBeVisible();
+  const saved = page.getByRole("region", { name: "Kayıtlı raporlar" });
+  await expect(saved).toBeVisible();
+  const item = saved.getByRole("listitem").filter({ hasText: "Adatıp Sağlık Grubu" });
+  await expect(item).toContainText("Ağustos 2026");
+
+  await item.getByRole("link", { name: "Yazdır" }).click();
+  await expect(page).toHaveURL(/\/raporlar\/aylik\/c2\/2026-08\/yazdir$/);
+  await expect(page.getByRole("button", { name: /Yazdır/ })).toBeVisible();
+  const sheet = page.getByRole("article", { name: /Adatıp Sağlık Grubu .*raporu/ });
+  await expect(sheet).toBeVisible();
+  await expect(sheet).toContainText("Kardiyoloji bilgilendirme serisi başladı");
+});
+
 test("/content: onay rozetleri görünür", async ({ page }) => {
   await page.goto("/content");
   await expect(page.getByRole("heading", { name: "İçerik Merkezi" })).toBeVisible();

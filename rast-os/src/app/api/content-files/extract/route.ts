@@ -1,4 +1,6 @@
 import * as XLSX from "xlsx";
+import { isSupabaseConfigured } from "@/lib/env";
+import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 
@@ -60,7 +62,19 @@ function extractSpreadsheet(data: Uint8Array) {
   return { ...capped, sheet_names: workbook.SheetNames };
 }
 
+/** ads route'larındaki requireAdsUser() ile aynı desen: imzası sunucuda doğrulanan kullanıcı. */
+async function getRequestUser() {
+  // Supabase yapılandırılmamışsa kimlik doğrulanamaz: fail-closed.
+  if (!isSupabaseConfigured) return null;
+  const supabase = await createClient();
+  const { data: { user }, error } = await supabase.auth.getUser();
+  return error ? null : user;
+}
+
 export async function POST(request: Request) {
+  const user = await getRequestUser().catch(() => null);
+  if (!user) return Response.json({ error: "Oturum gerekli." }, { status: 401 });
+
   try {
     const formData = await request.formData();
     const file = formData.get("file");

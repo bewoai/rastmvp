@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { useEffect, useMemo } from "react";
 import type { RastData } from "./types";
 import { seed } from "./seed";
-import { isSupabaseConfigured } from "./env";
+import { isAuthRequired, isSupabaseConfigured } from "./env";
 import { createClient } from "./supabase/client";
 
 type Collections = keyof RastData;
@@ -76,9 +76,12 @@ export const useStore = create<StoreState>()((set, get) => ({
     const { data: { session } } = await sb.auth.getSession();
     const user = session?.user;
 
-    // Supabase is configured but there is no active session: stay in demo mode
+    // Supabase yapılandırılmış ama oturum yok. Giriş zorunluyken (varsayılan) proxy bu
+    // sayfalara oturumsuz erişime izin vermez; buraya yalnızca istemci tarafında oturum
+    // düşerse gelinir — gerçek veri gibi görünen örnek veriyi göstermek yerine boş kal.
+    // Örnek (demo) veri yalnızca açıkça NEXT_PUBLIC_REQUIRE_AUTH=false iken gösterilir.
     if (!user) {
-      set({ ...seed, loaded: true, supabase: false, orgId: null });
+      set({ ...(isAuthRequired ? emptyData : seed), loaded: true, supabase: false, orgId: null });
       return;
     }
 

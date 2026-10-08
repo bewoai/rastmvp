@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isAuthRequired } from "@/lib/env";
 
 /**
  * Oturum çerezlerini tazeler ve giriş yapılmamışsa /login'e yönlendirir.
@@ -26,9 +27,9 @@ export async function updateSession(request: NextRequest) {
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon) return supabaseResponse;
 
-  // Kurulum aşamasında login duvarını kapalı tut. Şema + kullanıcı hazır olunca
-  // NEXT_PUBLIC_REQUIRE_AUTH=true yapılınca giriş zorunlu hale gelir.
-  const requireAuth = process.env.NEXT_PUBLIC_REQUIRE_AUTH === "true";
+  // Fail-closed: giriş varsayılan olarak ZORUNLU. Yalnızca açıkça
+  // NEXT_PUBLIC_REQUIRE_AUTH=false verilirse (yerel demo/kurulum) login duvarı kapanır.
+  const requireAuth = isAuthRequired;
 
   const path = request.nextUrl.pathname;
   const isPublic =

@@ -11,11 +11,14 @@
    Providers → "Allow new users to sign up" **kapalı**. 0008 uygulanana kadar
    yeni kayıt olan herkes en eski organizasyona otomatik bağlanıyor
    (0001/0007 `handle_new_user()`); açık kalırsa veri sızar.
-2. **Önce staging:** Tüm sırayı önce staging / branch projesinde çalıştır,
+2. **Çevrimdışı kontrol:** `cd rast-os && npm run db:check` — tüm zinciri (0001–0018 + 0008–0018 ikinci
+   geçiş) PGlite'ta uygular, yapı / yetki / RLS / RPC kontrollerini yapar (CI'da `db-check` işi).
+   Uzak veritabanına bağlanmaz; gerçek staging'in yerini tutmaz.
+3. **Önce staging:** Tüm sırayı önce staging / branch projesinde çalıştır,
    aşağıdaki kontrolleri orada yap; ancak hepsi geçince canlıda tekrarla.
-3. **Yedek al:** Canlıdan önce veritabanı yedeği / Point-in-Time Recovery
+4. **Yedek al:** Canlıdan önce veritabanı yedeği / Point-in-Time Recovery
    noktasının olduğunu doğrula.
-4. Postgres sürümünün **15+** olduğunu kontrol et (0013 ve 0015 için gerekli; güncel
+5. Postgres sürümünün **15+** olduğunu kontrol et (0013 ve 0015 için gerekli; güncel
    Supabase projeleri uygun).
 
 ## Sıra

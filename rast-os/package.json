@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test scripts/tasks-logic.test.mjs scripts/finance-logic.test.mjs scripts/proposal-logic.test.mjs scripts/activity-logic.test.mjs scripts/approval-logic.test.mjs scripts/mrr-logic.test.mjs scripts/report-logic.test.mjs scripts/proposal-convert.test.mjs scripts/writing-draft.test.mjs scripts/lead-logic.test.mjs scripts/portal-logic.test.mjs",
+    "db:check": "node scripts/db-check.mjs",
     "test:e2e": "playwright test"
   },
   "dependencies": {
@@ -23,6 +24,7 @@
     "zustand": "^5.0.14"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@playwright/test": "1.64.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",

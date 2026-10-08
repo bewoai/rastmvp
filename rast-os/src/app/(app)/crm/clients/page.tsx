@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { Globe, Plus } from "lucide-react";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { FormModal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
 import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
@@ -221,7 +222,18 @@ export default function ClientsPage() {
             label={c.name}
             onEdit={() => setModal({ initial: c })}
             onDelete={() => del.ask({ key: "clients", id: c.id, label: c.name, warning: (brandCounts.get(c.id) ?? 0) > 0 ? `Müşteriye bağlı ${brandCounts.get(c.id)} marka da silinir.` : undefined })}
-          />
+          >
+            {/* Müşteri sayfası: bilgiler + müşteri portalı bağlantıları (0018) */}
+            <Link
+              href={`/crm/clients/${encodeURIComponent(c.id)}`}
+              prefetch={false}
+              aria-label={`Müşteri sayfası ve portal: ${c.name}`}
+              title="Müşteri sayfası / Portal"
+              className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-foreground md:h-8 md:w-8"
+            >
+              <Globe className="h-4 w-4" aria-hidden />
+            </Link>
+          </RowActions>
         )}
         empty={
           clients.length === 0 ? (

@@ -126,14 +126,14 @@ export function isExpired(p: Pick<Proposal, "status" | "valid_until">, today: st
 
 export type TextBlock =
   | { type: "heading"; text: string }
-  | { type: "list"; items: string[] }
+  | { type: "list"; items: string[]; ordered: boolean }
   | { type: "paragraph"; text: string };
 
 /**
  * Not / koşul metnini yazdırma blokları haline getirir. Basit, öngörülebilir biçim:
  *   "## Başlık"            → alt başlık
  *   "- madde" / "• madde"  → madde işaretli liste (ardışık satırlar tek liste)
- *   "1. madde"             → liste maddesi (numara metinde kalır)
+ *   "1. madde"             → numaralı liste (numara metinde kalır, ek madde işareti yok)
  *   diğer satırlar         → paragraf (boş satır paragrafı böler)
  */
 export function parseTextBlocks(text: string | undefined | null): TextBlock[] {
@@ -161,8 +161,8 @@ export function parseTextBlocks(text: string | undefined | null): TextBlock[] {
       flush();
       const item = bullet ? bullet[1].trim() : line;
       const last = blocks[blocks.length - 1];
-      if (last?.type === "list") last.items.push(item);
-      else blocks.push({ type: "list", items: [item] });
+      if (last?.type === "list" && last.ordered === numbered) last.items.push(item);
+      else blocks.push({ type: "list", items: [item], ordered: numbered });
       continue;
     }
     para.push(line);

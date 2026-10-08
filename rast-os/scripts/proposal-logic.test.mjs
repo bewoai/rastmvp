@@ -163,9 +163,9 @@ test("parseTextBlocks: headings, bullet / numbered lists, paragraphs", () => {
   const blocks = parseTextBlocks("## Ödeme\n- %50 peşin\n• %50 teslimde\n\nNot satırı\ndevamı\n1. Adım\n2. Adım");
   assert.deepEqual(blocks, [
     { type: "heading", text: "Ödeme" },
-    { type: "list", items: ["%50 peşin", "%50 teslimde"] },
+    { type: "list", items: ["%50 peşin", "%50 teslimde"], ordered: false },
     { type: "paragraph", text: "Not satırı devamı" },
-    { type: "list", items: ["1. Adım", "2. Adım"] },
+    { type: "list", items: ["1. Adım", "2. Adım"], ordered: true },
   ]);
   assert.deepEqual(parseTextBlocks(undefined), []);
 });

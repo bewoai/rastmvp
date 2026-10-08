@@ -236,7 +236,7 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
         <p role="alert" className="mb-3 rounded-xl border border-danger/40 bg-danger/10 px-3.5 py-2.5 text-sm text-danger">{error}</p>
       )}
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_19rem]">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="min-w-0 space-y-4">
           {/* Başlık bilgileri */}
           <section className="card p-4" aria-labelledby="sec-head">
@@ -283,8 +283,8 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
           <section className="card p-4" aria-labelledby="sec-items">
             <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
               <h2 id="sec-items" className="text-sm font-semibold text-foreground">Kapsam ve fiyat <span className="font-normal text-muted">· KDV hariç</span></h2>
-              <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-                <Select value={preset} onChange={(e) => setPreset(e.target.value)} aria-label="Paket şablonu" className="sm:w-72">
+              <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center md:w-auto">
+                <Select value={preset} onChange={(e) => setPreset(e.target.value)} aria-label="Paket şablonu" className="min-w-0 sm:flex-1 md:w-72 md:flex-none">
                   <option value="">Paket şablonu seç…</option>
                   {PROPOSAL_PRESETS.map((g) => (
                     <optgroup key={g.id} label={g.label}>
@@ -294,7 +294,7 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
                     </optgroup>
                   ))}
                 </Select>
-                <Button variant="ghost" disabled={!preset} onClick={() => (items.length ? setConfirmPreset(true) : applyPreset())}>
+                <Button variant="ghost" className="whitespace-nowrap" disabled={!preset} onClick={() => (items.length ? setConfirmPreset(true) : applyPreset())}>
                   Kalemleri doldur
                 </Button>
               </div>
@@ -312,8 +312,9 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
                   <li key={it.id} className="rounded-xl border border-border/70 bg-background/30 p-3">
                     <div className="flex items-start gap-2">
                       <span className="mt-3 w-5 shrink-0 text-right text-xs tabular-nums text-muted" aria-hidden>{idx + 1}.</span>
-                      <div className="grid min-w-0 flex-1 grid-cols-2 gap-2 sm:grid-cols-6">
-                        <div className="col-span-2 sm:col-span-4">
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                        <div className="min-w-0 flex-1">
                           <Input
                             value={it.name}
                             onChange={(e) => setItem(idx, { name: e.target.value })}
@@ -323,7 +324,7 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
                             autoComplete="off"
                           />
                         </div>
-                        <div className="col-span-2">
+                        <div className="sm:w-36 sm:shrink-0">
                           <Select
                             value={it.is_recurring ? "1" : "0"}
                             onChange={(e) => setItem(idx, { is_recurring: e.target.value === "1" })}
@@ -333,7 +334,8 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
                             <option value="0">Tek seferlik</option>
                           </Select>
                         </div>
-                        <div className="col-span-2 sm:col-span-6">
+                        </div>
+                        <div>
                           <Input
                             value={it.description ?? ""}
                             onChange={(e) => setItem(idx, { description: e.target.value })}
@@ -342,23 +344,25 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
                             autoComplete="off"
                           />
                         </div>
-                        <label className="block">
+                        <div className="flex flex-wrap items-end gap-2">
+                        <label className="block w-20">
                           <span className="mb-1 block text-[11px] text-muted">Miktar</span>
-                          <Input type="number" inputMode="decimal" min="0" step="any" value={numValue(it.qty)} onChange={(e) => setItem(idx, { qty: toNum(e.target.value) })} placeholder="0" />
+                          <Input className="px-2.5!" type="number" inputMode="decimal" min="0" step="any" value={numValue(it.qty)} onChange={(e) => setItem(idx, { qty: toNum(e.target.value) })} placeholder="0" />
                         </label>
-                        <label className="block">
+                        <label className="block w-24">
                           <span className="mb-1 block text-[11px] text-muted">Birim</span>
-                          <Input list="proposal-units" value={it.unit} onChange={(e) => setItem(idx, { unit: e.target.value })} autoComplete="off" />
+                          <Input className="px-2.5!" list="proposal-units" value={it.unit} onChange={(e) => setItem(idx, { unit: e.target.value })} autoComplete="off" />
                         </label>
-                        <label className="col-span-1 block sm:col-span-2">
+                        <label className="block min-w-[8rem] flex-1">
                           <span className="mb-1 block text-[11px] text-muted">Birim fiyat ({head.currency})</span>
                           <Input type="number" inputMode="decimal" step="any" value={numValue(it.unit_price)} onChange={(e) => setItem(idx, { unit_price: toNum(e.target.value) })} placeholder="0" />
                         </label>
-                        <div className="col-span-1 flex flex-col justify-end sm:col-span-2">
-                          <span className="mb-1 block text-[11px] text-muted sm:text-right">Tutar</span>
-                          <span className={`py-2.5 text-sm font-medium tabular-nums sm:text-right ${lineTotal(it) === 0 ? "text-warning" : "text-foreground"}`}>
+                        <div className="flex min-w-[7.5rem] flex-1 flex-col justify-end text-right">
+                          <span className="mb-1 block text-[11px] text-muted">Tutar</span>
+                          <span className={`whitespace-nowrap py-2.5 text-sm font-medium tabular-nums ${lineTotal(it) === 0 ? "text-warning" : "text-foreground"}`}>
                             {money(lineTotal(it))}{it.is_recurring && <span className="text-xs font-normal text-muted"> / ay</span>}
                           </span>
+                        </div>
                         </div>
                       </div>
                       <div className="flex shrink-0 flex-col gap-0.5">
@@ -403,7 +407,7 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
         </div>
 
         {/* Canlı toplamlar */}
-        <aside className="lg:sticky lg:top-0 lg:self-start" aria-label="Toplamlar">
+        <aside className="xl:sticky xl:top-0 xl:self-start" aria-label="Toplamlar">
           <section className="card p-4">
             <div className="mb-3 flex items-center justify-between gap-2">
               <h2 className="text-sm font-semibold text-foreground">Toplamlar</h2>

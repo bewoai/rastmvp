@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useMemo } from "react";
+import { use, useEffect, useMemo } from "react";
 import { ArrowLeft, Printer } from "lucide-react";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { PageLoading } from "@/components/list";
@@ -70,7 +70,7 @@ const PRINT_CSS = `
 .rc-table th { background: var(--rc-navy); color: #fff; font-weight: 700; text-align: left; padding: 2.2mm 3mm; font-size: 8pt; letter-spacing: .08em; text-transform: uppercase; }
 .rc-table td { padding: 2.6mm 3mm; border-bottom: 1px solid var(--rc-line); vertical-align: top; }
 .rc-table tr { break-inside: avoid; }
-.rc-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.rc-table .num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; width: 27mm; }
 .rc-table .idx { width: 8mm; color: var(--rc-muted); }
 .rc-table .name { font-weight: 700; color: var(--rc-navy); }
 .rc-table .desc { color: var(--rc-muted); font-size: 8.5pt; margin-top: .6mm; }
@@ -79,12 +79,14 @@ const PRINT_CSS = `
 .rc-totals table { width: 92mm; max-width: 100%; border-collapse: collapse; font-size: 9.5pt; }
 .rc-totals td { padding: 1.6mm 3mm; }
 .rc-totals td:last-child { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.rc-totals .grp td { padding-top: 3mm; font-weight: 700; color: var(--rc-navy); font-size: 8pt; letter-spacing: .1em; text-transform: uppercase; }
+.rc-totals .grp td { text-align: left !important; padding-top: 3mm; font-weight: 700; color: var(--rc-navy); font-size: 8pt; letter-spacing: .1em; text-transform: uppercase; }
 .rc-totals .sub td { border-top: 1px solid var(--rc-line); font-weight: 700; }
+.rc-totals .grand { background: var(--rc-navy); }
 .rc-totals .grand td { background: var(--rc-navy); color: #fff; font-weight: 900; font-size: 11.5pt; padding: 3mm; }
 .rc-totals .grand td:last-child { color: #fff; }
 .rc-totals .grand small { display: block; font-weight: 400; font-size: 7.5pt; opacity: .8; }
-.rc-blocks ul { margin: 0 0 2mm; padding-left: 5mm; }
+.rc-blocks ul { margin: 0 0 2mm; padding-left: 5mm; list-style: disc; }
+.rc-blocks ul.ordered { list-style: none; padding-left: 0; }
 .rc-blocks li { margin: 0 0 1.2mm; }
 .rc-blocks li::marker { color: var(--rc-orange); }
 .rc-blocks h3:first-child { margin-top: 0; }
@@ -119,7 +121,7 @@ function Blocks({ blocks }: { blocks: TextBlock[] }) {
         b.type === "heading" ? (
           <h3 key={i}>{b.text}</h3>
         ) : b.type === "list" ? (
-          <ul key={i}>{b.items.map((t, j) => <li key={j}>{t}</li>)}</ul>
+          <ul key={i} className={b.ordered ? "ordered" : undefined}>{b.items.map((t, j) => <li key={j}>{t}</li>)}</ul>
         ) : (
           <p key={i}>{b.text}</p>
         ),
@@ -175,6 +177,11 @@ export default function ProposalPrintPage({ params }: { params: Promise<{ id: st
   const clients = useStore((s) => s.clients);
 
   const items = useMemo(() => sortItems(allItems.filter((i) => i.proposal_id === id)), [allItems, id]);
+
+  // Kaydırma kabı <main>; editörden gelince sayfa üstten başlasın.
+  useEffect(() => {
+    document.getElementById("main")?.scrollTo(0, 0);
+  }, []);
 
   if (!hydrated) return <PageLoading title="Teklif yazdırma görünümü" />;
   if (!proposal) {

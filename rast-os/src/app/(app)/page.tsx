@@ -8,8 +8,11 @@ import {
 } from "lucide-react";
 import { PageHeader, StatCard, Panel, Badge, EmptyState } from "@/components/ui";
 import ActivityFeed from "@/components/ActivityFeed";
+import MrrCard from "@/components/MrrCard";
 import { useStore, useHydrated } from "@/lib/store";
 import { useFx } from "@/lib/fx";
+import { computeMrr } from "@/lib/mrr";
+import { useOrgTargets } from "@/lib/orgSettings";
 import { expandRecurring, expenseTotalTRY, invoiceIncomeInRange, monthBounds } from "@/lib/finance";
 import { useToday } from "@/lib/useToday";
 import { useQuickAdd } from "@/lib/quickAdd";
@@ -39,7 +42,7 @@ function DashboardSkeleton({ subtitle }: { subtitle: string }) {
 }
 
 export default function DashboardPage() {
-  const hydrated = useHydrated(["jobs", "invoices", "payments", "expenses", "clients", "equipment", "shoots", "tasks", "contents", "activity_logs"]);
+  const hydrated = useHydrated(["jobs", "invoices", "payments", "expenses", "clients", "equipment", "shoots", "tasks", "contents", "activity_logs", "proposals", "proposal_items"]);
   
   const jobs = useStore((s) => s.jobs);
   const invoices = useStore((s) => s.invoices);
@@ -51,10 +54,13 @@ export default function DashboardPage() {
   const tasks = useStore((s) => s.tasks);
   const contents = useStore((s) => s.contents);
   const activityLogs = useStore((s) => s.activity_logs);
+  const proposals = useStore((s) => s.proposals);
+  const proposalItems = useStore((s) => s.proposal_items);
 
   const { usd, eur } = useFx();
   const today = useToday();
   const openComposer = useQuickAdd((s) => s.openComposer);
+  const orgTargets = useOrgTargets(hydrated);
 
   const stats = useMemo(() => {
     if (!hydrated) return null;
@@ -113,11 +119,16 @@ export default function DashboardPage() {
     const incomeWidth = `${Math.max((income / maxCashFlow) * 100, 4)}%`;
     const expenseWidth = `${Math.max((expense / maxCashFlow) * 100, 4)}%`;
 
+    // MRR (KDV hariç): kabul edilmiş tekliflerin aylık kalemleri + teklifsiz düzenli faturalar (src/lib/mrr.ts)
+    const mrr = computeMrr({
+      proposals, proposalItems, invoices, clients, monthStart, today, rates: { usd, eur },
+    });
+
     return {
-      income, expense, net, expected, overdue, activeClients, idleEquipment,
+      mrr, income, expense, net, expected, overdue, activeClients, idleEquipment,
       upcomingShoots, openTasks, overdueTasks, awaiting, incomeWidth, expenseWidth, month
     };
-  }, [hydrated, jobs, invoices, payments, expenses, clients, equipment, shoots, tasks, contents, usd, eur, today]);
+  }, [hydrated, jobs, invoices, payments, expenses, clients, equipment, shoots, tasks, contents, proposals, proposalItems, usd, eur, today]);
 
   if (!hydrated || !stats) {
     const now = new Date();
@@ -184,6 +195,10 @@ export default function DashboardPage() {
         <StatCard href="/crm/clients" label="Aktif müşteri" value={String(stats.activeClients)} icon={Users} />
         <StatCard href="/equipment" label="Boştaki ekipman" value={String(stats.idleEquipment)} icon={Boxes} />
         <StatCard href="/content" label="Onay bekleyen" value={String(stats.awaiting.length)} icon={CheckCircle2} tone="amber" />
+      </div>
+
+      <div className="mt-4">
+        <MrrCard result={stats.mrr} target={orgTargets.target} label={orgTargets.label} loaded={orgTargets.loaded} />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">

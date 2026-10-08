@@ -96,6 +96,7 @@ export interface Project {
   status: ProjectStatus;
   priority: Priority;
   notes?: string;
+  proposal_id?: ID | null; // 0015: kabul edilen tekliften oluşturulduysa (teklif başına tek proje)
   created_at: string;
 }
 
@@ -119,6 +120,7 @@ export interface Content {
   content_type?: string;
   status: ContentStatus;
   planned_date?: string;
+  published_date?: string; // 0001'de var; boşsa yayınlanan içerikte planned_date esas alınır
   caption?: string;
   goal?: string;
   hook?: string;
@@ -171,6 +173,7 @@ export interface Equipment {
 export interface Invoice {
   id: ID;
   client_id?: ID;
+  project_id?: ID | null; // 0001'de var; tekliften oluşturulan taslak fatura projeye bağlanır
   invoice_no?: string;
   issue_date?: string;
   due_date?: string;
@@ -329,6 +332,24 @@ export interface PublicApproval {
   agency_name: string | null;
 }
 
+// Aylık müşteri raporu (0015): yalnızca elle yazılan kısımlar saklanır; sayılar her açılışta
+// içerik / çekim / onay kayıtlarından hesaplanır (src/lib/report-logic.ts).
+export interface ClientReportHighlights {
+  points?: string[];   // öne çıkanlar (madde listesi)
+  ads_note?: string;   // Reklam / GİP notları — serbest metin, metrik YOK
+}
+
+export interface ClientReport {
+  id: ID;
+  client_id: ID;
+  period: string;      // "YYYY-MM-01"
+  notes?: string | null;
+  highlights: ClientReportHighlights;
+  generated_at: string;
+  created_at: string;
+  updated_at?: string;
+}
+
 export interface RastData {
   leads: Lead[];
   jobs: Job[];
@@ -346,6 +367,7 @@ export interface RastData {
   proposals: Proposal[];
   proposal_items: ProposalItem[];
   content_approvals: ContentApproval[];
+  client_reports: ClientReport[];
   activity_logs: ActivityLog[];
 }
 

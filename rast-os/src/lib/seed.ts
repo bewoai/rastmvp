@@ -89,6 +89,11 @@ export const seed: RastData = {
     { id: "co3", client_id: "c2", brand_id: "b2", title: "Doktor tanıtımı — Kardiyoloji", platform: "Instagram", content_type: "reels", status: "sent_to_client", planned_date: "2026-08-06", hook: "Merdiven çıkarken nefesiniz mi daralıyor?", script: SCRIPT_KARDIYOLOJI, created_at: "2026-07-30" },
     { id: "co4", client_id: "c3", brand_id: "b4", title: "Yeni ruj lansmanı", platform: "TikTok", content_type: "reels", status: "idea", planned_date: "2026-08-10", created_at: "2026-07-28" },
     { id: "co5", client_id: "c2", brand_id: "b3", title: "Global hasta deneyimi", platform: "YouTube", content_type: "video", status: "approved", planned_date: "2026-08-12", script: SCRIPT_GLOBAL, created_at: "2026-07-29" },
+    // Aylık rapor demosu (Adatıp, Ağustos 2026): 2 yayınlanan + Eylül planı
+    { id: "co6", client_id: "c2", brand_id: "b2", title: "Bilgilendirme — Hipertansiyon nedir?", platform: "Instagram", content_type: "reels", status: "published", planned_date: "2026-08-14", published_date: "2026-08-14", created_at: "2026-07-25" },
+    { id: "co7", client_id: "c2", brand_id: "b2", title: "Hekim tanıtımı — Kardiyoloji polikliniği", platform: "Instagram", content_type: "post", status: "published", planned_date: "2026-08-21", published_date: "2026-08-22", created_at: "2026-07-25" },
+    { id: "co8", client_id: "c2", brand_id: "b2", title: "Bilgilendirme — Kolesterol ve kalp sağlığı", platform: "Instagram", content_type: "reels", status: "script_ready", planned_date: "2026-09-04", created_at: "2026-08-20" },
+    { id: "co9", client_id: "c2", brand_id: "b3", title: "Uluslararası hasta birimi — süreç anlatımı", platform: "YouTube", content_type: "video", status: "brief", planned_date: "2026-09-18", created_at: "2026-08-20" },
   ],
   shoots: [
     { id: "s1", client_id: "c1", brand_id: "b1", title: "Aytaş Home — Ürün Çekimi", shoot_type: "Ürün", scheduled_at: "2026-08-05T10:00", location: "Rast Stüdyo", status: "confirmed", created_at: "2026-07-28" },
@@ -147,6 +152,18 @@ export const seed: RastData = {
       note: "Uygundur.", status: "approved",
       sent_at: daysAgo(5), expires_at: expiresAtFrom(daysAgo(5)), created_at: daysAgo(5),
       decided_at: daysAgo(4), decided_by_name: "Dr. Kemal Sarı",
+    },
+  ],
+  // Aylık müşteri raporu (0015): yalnızca elle yazılan notlar; sayılar kayıtlardan hesaplanır.
+  client_reports: [
+    {
+      id: "cr1", client_id: "c2", period: "2026-08-01",
+      notes: "Ağustos'ta kardiyoloji serisine başlandı. Doktor röportajı planlandı; kurgu ve hekim onayı Eylül'ün ilk haftasında tamamlanacak.\nEylül'de kolesterol bilgilendirme videosu ve uluslararası hasta birimi anlatımı planlandı.",
+      highlights: {
+        points: ["Kardiyoloji bilgilendirme serisi başladı", "Senaryolar 8 maddelik mevzuat kontrol listesiyle hekim onayına gönderilmeye başlandı"],
+        ads_note: "Bu ay reklam yayını yapılmadı. GİP başvurusu gerekmedi.",
+      },
+      generated_at: "2026-09-01T10:00:00+03:00", created_at: "2026-09-01T10:00:00+03:00", updated_at: "2026-09-01T10:00:00+03:00",
     },
   ],
   // İşlem geçmişi örnekleri (canlıda 0012 trigger'ı yazar). En yeni önce.

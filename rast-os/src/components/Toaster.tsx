@@ -12,7 +12,7 @@ export default function Toaster() {
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed bottom-24 left-1/2 z-[60] flex w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-2 md:bottom-6"
+      className="pointer-events-none fixed bottom-24 print:hidden left-1/2 z-[60] flex w-[min(24rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-2 md:bottom-6"
     >
       {toasts.map((t) => (
         <div

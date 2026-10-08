@@ -31,7 +31,7 @@ export default async function AppGroupLayout({
   return (
     <AppShell userName={userName}>
       {!isSupabaseConfigured && (
-        <div className="mb-4 rounded-lg border border-amber/40 bg-amber/10 px-4 py-3 text-sm text-foreground">
+        <div className="mb-4 rounded-lg border border-amber/40 print:hidden bg-amber/10 px-4 py-3 text-sm text-foreground">
           <strong className="text-amber">Kurulum bekliyor:</strong> Supabase
           bağlantısı yapılandırılmadı. <code>.env.example</code> dosyasını{" "}
           <code>.env.local</code> olarak kopyalayıp Supabase anahtarlarını girin,

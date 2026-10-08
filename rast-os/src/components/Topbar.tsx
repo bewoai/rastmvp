@@ -131,7 +131,7 @@ export default function Topbar({
   }
 
   return (
-    <header className="relative z-[30] flex h-14 shrink-0 items-center gap-2 overflow-visible border-b border-border/70 bg-background/65 px-3 backdrop-blur-xl md:gap-3 md:px-6">
+    <header className="relative z-[30] flex h-14 print:hidden shrink-0 items-center gap-2 overflow-visible border-b border-border/70 bg-background/65 px-3 backdrop-blur-xl md:gap-3 md:px-6">
       <button type="button" onClick={onMenu} className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition-colors hover:bg-surface-2 hover:text-foreground md:hidden" aria-label="Menüyü aç">
         <Menu className="h-5 w-5" />
       </button>

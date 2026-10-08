@@ -180,7 +180,9 @@ export function isCallTask(task: Pick<Task, "title" | "lead_id">): boolean {
 }
 
 /**
- * Rozet: son 48 saatte açılmış, açık (kazanılmamış/kaybedilmemiş) ve TAMAMLANMIŞ arama görevi olmayan lead.
+ * Rozet: son 48 saatte açılmış, açık (kazanılmamış/kaybedilmemiş), lead girişinden doğan (bağlı bir "Lead'i ara"
+ * görevi var) ve bu görevlerden HİÇBİRİ tamamlanmamış lead. Bağlı arama görevi olmayan lead'ler (elle girilenler,
+ * toplu içe aktarılan hedef listesi) rozet almaz: onlar "gelen talep" değildir ve 24 saat sözü yoktur.
  * `created_at` tarih-saat veya yalnızca tarih (YYYY-MM-DD) olabilir.
  */
 export function leadNeedsFirstCall(
@@ -193,21 +195,27 @@ export function leadNeedsFirstCall(
   if (!Number.isFinite(created)) return false;
   const age = nowMs - created;
   if (age < 0 || age > NEW_LEAD_WINDOW_MS) return false;
-  return !tasks.some((t) => t.lead_id === lead.id && t.status === "done" && isCallTask(t));
+  const calls = tasks.filter((t) => t.lead_id === lead.id && isCallTask(t));
+  return calls.length > 0 && !calls.some((t) => t.status === "done");
 }
 
-/** Rozeti olan lead id'leri (liste başına tek geçiş; görevler lead'e göre indekslenir). */
+/** Rozeti olan lead id'leri (tek geçiş: görevler lead'e göre indekslenir). */
 export function leadsNeedingFirstCall(
   leads: ReadonlyArray<Pick<Lead, "id" | "created_at" | "status">>,
   tasks: ReadonlyArray<Pick<Task, "title" | "lead_id" | "status">>,
   nowMs: number,
 ): Set<string> {
-  const called = new Set<string>();
-  for (const t of tasks) if (t.lead_id && t.status === "done" && isCallTask(t)) called.add(t.lead_id);
+  const byLead = new Map<string, Pick<Task, "title" | "lead_id" | "status">[]>();
+  for (const t of tasks) {
+    if (!t.lead_id || !isCallTask(t)) continue;
+    const arr = byLead.get(t.lead_id);
+    if (arr) arr.push(t);
+    else byLead.set(t.lead_id, [t]);
+  }
   const out = new Set<string>();
   for (const l of leads) {
-    if (called.has(l.id)) continue;
-    if (leadNeedsFirstCall(l, [], nowMs)) out.add(l.id);
+    const calls = byLead.get(l.id);
+    if (calls && leadNeedsFirstCall(l, calls, nowMs)) out.add(l.id);
   }
   return out;
 }

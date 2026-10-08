@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { PageHeader, EmptyState, Badge } from "@/components/ui";
 import { ContentApprovalPanel } from "@/components/ContentApprovalPanel";
+import { ScriptImportPanel } from "@/components/ScriptImportPanel";
 import { FormModal, Modal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
 import { FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Tabs, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
 import { useDeleteConfirm } from "@/components/confirm";
@@ -112,6 +113,9 @@ function ContentModal({ initial, mode, brands, onRead, onClose }: {
   const editing = Boolean(initial?.id);
   const supabaseEnabled = useStore((s) => s.supabase);
   const orgId = useStore((s) => s.orgId);
+  const clients = useStore((s) => s.clients);
+  const clientId = form.client_id || brands.find((b) => b.id === form.brand_id)?.client_id;
+  const clientName = clients.find((c) => c.id === clientId)?.name;
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [removedPaths, setRemovedPaths] = useState<string[]>([]);
   const [fileError, setFileError] = useState("");
@@ -198,6 +202,9 @@ function ContentModal({ initial, mode, brands, onRead, onClose }: {
 
       const s = useStore.getState();
       const result = editing ? await s.update("contents", contentId, payload) : await s.add("contents", payload);
+      if (!result.ok && /script_source/.test(result.error ?? "")) {
+        throw new Error(`${result.error} (0016_script_source.sql uygulanmış mı?)`);
+      }
       if (!result.ok) {
         throw new Error(editing
           ? `${result.error || "İçerik güncellenemedi."} 0006_content_attachments.sql geçişini çalıştırın.`
@@ -254,6 +261,14 @@ function ContentModal({ initial, mode, brands, onRead, onClose }: {
         </div>
 
         <div className="space-y-4 self-start">
+          {mode === "content" && (
+            <ScriptImportPanel
+              status={form.status}
+              scriptSource={form.script_source}
+              clientName={clientName}
+              onApply={(patch) => f.setForm((current) => ({ ...current, ...patch }))}
+            />
+          )}
           {editing && mode === "content" && initial && (
             <ContentApprovalPanel content={initial} draftScript={form.script} draftTitle={form.title} />
           )}

@@ -20,6 +20,8 @@ export const COLLECTIONS: Collections[] = [
   "content_approvals",
   // Aylık müşteri raporu notları (0015), clients'tan SONRA (FK).
   "client_reports",
+  // Müşteri portalı bağlantıları (0018), clients'tan SONRA (FK). Token sunucuda üretilir → portalActions.ts.
+  "client_portal_tokens",
   // Salt okunur: yalnızca DB trigger'ı yazar (0012). add/update/remove ve seedToSupabase dışında.
   "activity_logs",
 ];
@@ -30,7 +32,7 @@ const ACTIVITY_LOG_LIMIT = 500;
 const emptyData: RastData = {
   leads: [], jobs: [], clients: [], brands: [], contacts: [], projects: [],
   tasks: [], contents: [], shoots: [], equipment: [], invoices: [], payments: [], expenses: [],
-  proposals: [], proposal_items: [], content_approvals: [], client_reports: [], activity_logs: [],
+  proposals: [], proposal_items: [], content_approvals: [], client_reports: [], client_portal_tokens: [], activity_logs: [],
 };
 
 export const uid = () =>
@@ -216,6 +218,7 @@ export const useStore = create<StoreState>()((set, get) => ({
     for (const c of COLLECTIONS) {
       if (c === "activity_logs") continue; // istemci yazamaz (RLS); loglar trigger'la oluşur
       if (c === "content_approvals") continue; // karar verilmiş kayıt istemciden yazılamaz (0013 guard)
+      if (c === "client_portal_tokens") continue; // örnek bağlantılar canlıya taşınmaz (token sunucuda üretilir, 0018)
       const rows = (seed[c] as unknown as Row[]).map((r) => clean({ ...r, organization_id: orgId }));
       if (rows.length) {
         const { error } = await sb.from(c).insert(rows);

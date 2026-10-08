@@ -1,4 +1,4 @@
-# Migration uygulama sırası (0008 → 0017)
+# Migration uygulama sırası (0008 → 0018)
 
 > **Durum:** Bu dosyalardan hiçbiri henüz hiçbir veritabanında çalıştırılmadı.
 > Önce staging / branch veritabanında, sonra canlıda uygulanır. Sıra
@@ -30,12 +30,13 @@
 8. `0015_client_reports.sql` — `client_reports` (aylık müşteri raporu notları; sayılar saklanmaz) + `projects.proposal_id` (teklif → proje bağı, teklif başına tek proje).
 9. `0016_script_source.sql` — `contents.script_source` (senaryonun kaynağı; "Senaryo içe aktar" `claude-code` yazar).
 10. `0017_lead_intake_rpc.sql` — web sitesi formu → CRM lead + "Lead'i 24 saat içinde ara" görevi (`lead_intake` RPC, `lead_intake_settings`, `tasks.lead_id`). Sır + org id kurulumu için README-0017.
+11. `0018_client_portal.sql` — müşteri portalı: `client_portal_tokens` + hesapsız salt okunur portal için anon RPC'ler (`portal_get`, `portal_touch`, `portal_report_get`). 0013 ve 0015'e dayanır; iptal akışı ve gizlilik notu README-0018'de.
 
 > 0013 ve 0014 birbirinden bağımsız yazıldı; yine de numara sırasıyla
 > (0013 → 0014) uygulanır.
 
 Uygulama: Supabase Dashboard → SQL Editor → dosyayı yapıştır → Run (veya
-bağlı projede `supabase db push`). 0008–0017 dosyaları idempotent olarak yazıldı; tekrar çalıştırmak
+bağlı projede `supabase db push`). 0008–0018 dosyaları idempotent olarak yazıldı; tekrar çalıştırmak
 güvenlidir.
 
 ## Son kontroller
@@ -66,5 +67,9 @@ atlar), uygulamadan / anon key + kullanıcı JWT'si ile yap.
 - **0016:** İçerik → "Brief" durumundaki içerik → Senaryo içe aktar → vault örneğini yapıştır → Alanlara aktar → Kaydet →
   `select status, script_source from public.contents order by updated_at desc limit 5;` → `script_ready` / `claude-code`.
 - **0017:** README-0017'deki `curl` ile `/api/leads`'e test gönderimi → CRM'de lead + yarına görev; aynı komut tekrarında `duplicate: true`.
+- **0018:** Müşteriler → müşteri sayfası → Portal → "Bağlantı oluştur" → linki gizli pencerede aç
+  ("Bu ay" görünür) → "İptal et" → link "bulunamadı" der →
+  `select label, last_seen_at, revoked_at from public.client_portal_tokens order by created_at desc limit 5;`
+  ve `select has_table_privilege('anon', 'public.client_portal_tokens', 'select');` → `false`.
 - **Sonra:** Kayıtlar kapalı kalır; yeni kullanıcılar yalnız admin daveti ile
   eklenir. Kayıtları yeniden açmak gerekirse ancak 0008 doğrulandıktan sonra.

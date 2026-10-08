@@ -51,3 +51,23 @@ supabase/migrations/                # tam şema, RLS ve sürüm migration'ları
 - **Faz 1 (MVP):** Dashboard, CRM, Projeler, İçerik, Çekimler, Finans, Ekipman, Dosyalar, Yetki, Hatırlatmalar
 - **Faz 2:** Teklif/Sözleşme, Müşteri portalı, İçerik onay/revizyon, Freelancer, paket hak takibi
 - **Faz 3:** Meta Ads / GA entegrasyonu, OCR, AI asistan, Drive otomasyonu
+
+## Lead akışı (Growth Engine)
+
+- **Web formu → CRM:** `POST /api/leads` (Web3Forms webhook'u) lead'i ekler/tekilleştirir ve "Lead'i 24 saat içinde ara: <ad>" görevi açar. Kurulum (migration 0017, `LEAD_WEBHOOK_SECRET`, `LEAD_INTAKE_ORG_ID`, Web3Forms webhook'u PRO plan ister): `supabase/migrations/README-0017.md`.
+- **CRM → Potansiyel Müşteriler:** "Kaynak" sütunu + filtre (Hekim / Site / Manuel); son 48 saatte gelen ve arama görevi tamamlanmamış lead'lerde "Aranmadı · yeni" rozeti.
+
+### Hedef klinik listesini içe aktarma
+
+`scripts/data/` altında Sakarya / Kocaeli hedef klinik listesi (`hedef-klinik-listesi.md`, 2026-10-08 taraması) hazır:
+
+| Dosya | İçerik |
+| --- | --- |
+| `hedef-klinikler-2026-10.csv` | 18 doğrulanmış aday → önce bunu içe aktar |
+| `hedef-klinikler-2026-10-dogrulanacak.csv` | 7 "DOĞRULANACAK" satırı (web/Instagram/ilçe/kayıt teyit edilecek) → teyit sonrası, elle düzeltip aktar |
+
+1. Uygulamada **İçe Aktar** → hedef olarak **Potansiyel Müşteriler** seç → CSV dosyasını yükle (UTF-8, BOM'lu; başlıklar otomatik eşleşir: Firma adı, Kaynak, Instagram, Web sitesi, İlgilendiği hizmet, Notlar).
+2. **Önizleme / kuru çalıştırma** ekranında 18 "Ekle" satırını kontrol et, sonra **Uygula**. Aynı dosya tekrar yüklenirse aynı firmalar "tekrar" sayılıp atlanır.
+3. Kayıtlar `Kaynak = Hekim hedef listesi (2026-10)` ile gelir → Potansiyel Müşteriler'de **Hekim** filtresinde görünür. Şehir, öncelik (ilk 10 için 1–10) ve ilk tarama notları **Notlar** alanındadır; branş **İlgilendiği hizmet**'tedir. Bu kayıtlar "gelen talep" olmadığı için "Aranmadı" rozeti almaz.
+
+Dosyalarda yalnızca herkese açık iş bilgisi vardır (iş adı, branş, şehir/ilçe, web, herkese açık Instagram); telefon / e-posta / kişisel veri yok. Notlar içeride kullanım içindir (ön gözlemler, teyitsizdir); müşteriye veya üçüncü kişiye iletme. Toplu SMS/e-posta/DM yapılmaz: ilk temas tek, kişiye özel mesajdır.

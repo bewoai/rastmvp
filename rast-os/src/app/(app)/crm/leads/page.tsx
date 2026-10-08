@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Plus } from "lucide-react";
-import { PageHeader, EmptyState } from "@/components/ui";
+import { PageHeader, EmptyState, Badge } from "@/components/ui";
 import { Button } from "@/components/form";
 import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
 import type { Column } from "@/components/list";
@@ -10,6 +10,9 @@ import LeadModal from "@/components/LeadModal";
 import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated } from "@/lib/store";
 import { useToday } from "@/lib/useToday";
+import { useNowMs } from "@/lib/useNowMs";
+import { leadSourceKind, leadSourceKinds, leadsNeedingFirstCall } from "@/lib/lead-logic";
+import type { LeadSourceKind } from "@/lib/lead-logic";
 import { patchRecord } from "@/lib/mutate";
 import { leadStatus, leadPipeline, TRY, dateTR } from "@/lib/labels";
 import type { Lead } from "@/lib/types";
@@ -17,15 +20,20 @@ import type { Lead } from "@/lib/types";
 const statusOptions = leadPipeline.map((value) => ({ value, ...leadStatus[value] }));
 type Scope = "all" | "open" | "won" | "lost";
 const SCOPES: readonly Scope[] = ["all", "open", "won", "lost"];
+type KindFilter = "all" | LeadSourceKind;
+const KIND_FILTERS: readonly KindFilter[] = ["all", "hekim", "site", "manuel"];
 
 export default function LeadsPage() {
-  const hydrated = useHydrated(["leads"]);
+  const hydrated = useHydrated(["leads", "tasks"]);
   const leads = useStore((s) => s.leads);
+  const tasks = useStore((s) => s.tasks);
   const today = useToday();
+  const nowMs = useNowMs();
 
   const wantNew = useNewIntent();
   const [modal, setModal] = useState<{ initial: Lead | null } | null>(() => (wantNew ? { initial: null } : null));
   const [scope, setScope] = usePersistentState<Scope>("leads-scope", "all", SCOPES);
+  const [kind, setKind] = usePersistentState<KindFilter>("leads-kind", "all", KIND_FILTERS);
   const [query, setQuery] = useState("");
   const del = useDeleteConfirm();
 
@@ -38,11 +46,20 @@ export default function LeadsPage() {
     return { all: leads.length, won, lost, open: leads.length - won - lost };
   }, [leads]);
 
+  // Rozet: son 48 saatte açılmış, tamamlanmış "Lead'i ara" görevi olmayan açık lead'ler.
+  const uncalled = useMemo(() => leadsNeedingFirstCall(leads, tasks, nowMs), [leads, tasks, nowMs]);
+
+  const kindCounts = useMemo(() => {
+    const c: Record<KindFilter, number> = { all: leads.length, hekim: 0, site: 0, manuel: 0 };
+    for (const l of leads) c[leadSourceKind(l)]++;
+    return c;
+  }, [leads]);
+
   const scoped = useMemo(() => {
-    if (scope === "all") return leads;
-    return leads.filter((l) => (scope === "open" ? l.status !== "won" && l.status !== "lost" : l.status === scope));
-  }, [leads, scope]);
-  const visible = useListSearch(scoped, query, (l) => `${l.company_name} ${l.contact_person ?? ""} ${l.source ?? ""} ${l.interested_in ?? ""} ${l.phone ?? ""}`);
+    const byScope = scope === "all" ? leads : leads.filter((l) => (scope === "open" ? l.status !== "won" && l.status !== "lost" : l.status === scope));
+    return kind === "all" ? byScope : byScope.filter((l) => leadSourceKind(l) === kind);
+  }, [leads, scope, kind]);
+  const visible = useListSearch(scoped, query, (l) => `${l.company_name} ${l.contact_person ?? ""} ${l.source ?? ""} ${l.source_package ?? ""} ${l.interested_in ?? ""} ${l.phone ?? ""}`);
 
   const columns = useMemo<Column<Lead>[]>(() => [
     {
@@ -51,10 +68,30 @@ export default function LeadsPage() {
         <>
           <span className="block max-w-[20rem] truncate">{l.company_name}</span>
           {l.contact_person && <span className="block max-w-[20rem] truncate text-xs font-normal text-muted">{l.contact_person}</span>}
+          {uncalled.has(l.id) && (
+            <span className="mt-1 block font-normal" title="Son 48 saatte geldi, henüz arama görevi tamamlanmadı">
+              <Badge tone="danger">Aranmadı · yeni</Badge>
+            </span>
+          )}
         </>
       ),
     },
-    { key: "source", header: "Kaynak", sort: (l) => l.source, cell: (l) => l.source || "—" },
+    {
+      key: "source", header: "Kaynak", sort: (l) => leadSourceKind(l),
+      cell: (l) => {
+        const k = leadSourceKinds[leadSourceKind(l)];
+        return (
+          <>
+            <Badge tone={k.tone}>{k.label}</Badge>
+            {(l.source || l.source_package) && (
+              <span className="mt-0.5 block max-w-[14rem] truncate text-xs font-normal text-muted">
+                {[l.source, l.source_package].filter(Boolean).join(" · ")}
+              </span>
+            )}
+          </>
+        );
+      },
+    },
     { key: "interest", header: "İlgilendiği", mobile: "hide", sort: (l) => l.interested_in, cell: (l) => <span className="block max-w-[16rem] truncate">{l.interested_in || "—"}</span> },
     { key: "budget", header: "Bütçe", tone: "strong", sort: (l) => l.est_budget, cell: (l) => (l.est_budget ? TRY(l.est_budget) : "—") },
     {
@@ -71,7 +108,7 @@ export default function LeadsPage() {
         return <span className={overdue ? "text-danger" : undefined}>{dateTR(l.next_followup_at)}{overdue ? " · gecikti" : ""}</span>;
       },
     },
-  ], [today]);
+  ], [today, uncalled]);
 
   if (!hydrated) return <PageLoading title="Potansiyel Müşteriler" />;
 
@@ -97,6 +134,17 @@ export default function LeadsPage() {
             { id: "open", label: "Açık", count: counts.open },
             { id: "won", label: "Kazanıldı", count: counts.won },
             { id: "lost", label: "Kaybedildi", count: counts.lost },
+          ]}
+        />
+        <FilterChips
+          label="Lead kaynağı"
+          value={kind}
+          onChange={setKind}
+          options={[
+            { id: "all", label: "Tüm kaynaklar", count: kindCounts.all },
+            { id: "hekim", label: "Hekim", count: kindCounts.hekim },
+            { id: "site", label: "Site", count: kindCounts.site },
+            { id: "manuel", label: "Manuel", count: kindCounts.manuel },
           ]}
         />
         <SearchBox value={query} onChange={setQuery} placeholder="Firma, kişi, kaynak ara…" label="Lead ara" />

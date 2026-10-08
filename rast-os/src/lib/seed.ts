@@ -6,6 +6,7 @@ import { APPROVAL_CHECKLIST, expiresAtFrom } from "./approval-logic";
 const DAY = 86_400_000;
 const demoNow = Date.now();
 const daysAgo = (d: number) => new Date(demoNow - d * DAY).toISOString();
+const demoTomorrow = new Date(demoNow + DAY).toISOString();
 /** Demo onay bağlantıları: /onay/<token> (Supabase yokken sunucu seed'den okur). */
 export const DEMO_APPROVAL_TOKENS = {
   pending: "7c1e9a4b2d6f80135ae9c47d2b18f6a0c3d5e7f91b2a4c6d8e0f13579bdf2468",
@@ -68,6 +69,8 @@ export const seed: RastData = {
     { id: "l2", company_name: "Deniz Restoran", contact_person: "Ayşe Kaya", phone: "0532 222 22 22", source: "Referans", interested_in: "Menü çekimi + reels", est_budget: 18000, status: "needs_assessment", next_followup_at: "2026-08-04", created_at: "2026-07-25" },
     { id: "l3", company_name: "Form Fitness", contact_person: "Can Öz", source: "Reklam", interested_in: "Aylık yönetim", est_budget: 25000, status: "new", created_at: "2026-08-01" },
     { id: "l4", company_name: "Nar Cafe", contact_person: "Melis Ak", source: "Web sitesi", interested_in: "Ürün çekimi", est_budget: 12000, status: "awaiting_reply", next_followup_at: "2026-08-06", created_at: "2026-07-15" },
+    // Web formundan az önce gelen lead (relative tarih → "Aranmadı · yeni" rozeti demoda görünür)
+    { id: "l6", company_name: "Dr. Elif Demir Kliniği", contact_person: "Elif Demir", phone: "0532 000 00 00", source: "Hekim sistemi (web sitesi)", source_package: "standart", interested_in: "Hekim İçerik Sistemi", status: "new", next_followup_at: demoTomorrow.slice(0, 10), created_at: daysAgo(0.2), notes: "Formdan geldi. Standart paketi sordu." },
     { id: "l5", company_name: "Tekno Bilişim", contact_person: "Ozan Er", source: "LinkedIn", interested_in: "Kurumsal video", est_budget: 55000, status: "won", created_at: "2026-06-30" },
   ],
   projects: [
@@ -81,6 +84,7 @@ export const seed: RastData = {
     { id: "t3", project_id: "p2", title: "Dr. röportaj kurgusu", assignee: "Editör", due_date: "2026-08-05", priority: "urgent", status: "internal_review", created_at: "2026-07-30" },
     { id: "t4", project_id: "p2", title: "Alt yazı + renk", assignee: "Editör", due_date: "2026-08-06", priority: "high", status: "todo", created_at: "2026-07-30" },
     { id: "t5", project_id: "p3", title: "Kampanya moodboard", assignee: "Tasarım", due_date: "2026-08-07", priority: "medium", status: "todo", created_at: "2026-07-28" },
+    { id: "t7", lead_id: "l6", title: "Lead'i 24 saat içinde ara: Elif Demir", due_date: demoTomorrow.slice(0, 10), priority: "high", status: "todo", created_at: daysAgo(0.2) },
     { id: "t6", project_id: "p1", title: "Story serisi tasarım", assignee: "Tasarım", due_date: "2026-08-02", priority: "high", status: "client_review", created_at: "2026-08-01" },
   ],
   contents: [

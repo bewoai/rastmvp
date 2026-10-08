@@ -12,13 +12,12 @@ import { ConfirmDialog } from "@/components/confirm";
 import { useStore, useHydrated } from "@/lib/store";
 import { useToday } from "@/lib/useToday";
 import { addDaysKey } from "@/lib/taskLogic";
-import { patchRecord } from "@/lib/mutate";
 import { useToasts } from "@/lib/toast";
 import { proposalStatus, dateTR } from "@/lib/labels";
 import { formatMoney, isExpired, proposalTotals } from "@/lib/proposal-logic";
 import type { ProposalTotals } from "@/lib/proposal-logic";
 import { PROPOSAL_PRESETS, findPreset, presetKey, presetTitle } from "@/lib/proposal-presets";
-import { createProposal, deleteProposal, duplicateProposal } from "@/lib/proposalActions";
+import { convertProposalWithToast, createProposal, deleteProposal, duplicateProposal } from "@/lib/proposalActions";
 import type { Client, Proposal, ProposalItem, ProposalStatus } from "@/lib/types";
 
 const statusOptions = (Object.keys(proposalStatus) as ProposalStatus[]).map((value) => ({ value, ...proposalStatus[value] }));
@@ -218,7 +217,17 @@ export default function ProposalsPage() {
           value={r.proposal.status}
           options={statusOptions}
           label={`Durum: ${r.proposal.proposal_no}`}
-          onChange={(status) => patchRecord("proposals", r.proposal.id, { status }, "Durum güncellenemedi")}
+          onChange={(status) => {
+            const wasAccepted = r.proposal.status === "accepted";
+            void useStore.getState().update("proposals", r.proposal.id, { status }).then((res) => {
+              if (!res.ok) {
+                useToasts.getState().push({ message: `Durum güncellenemedi${res.error ? `: ${res.error}` : ""}`, tone: "danger" });
+                return;
+              }
+              // Kabul edildi → proje + bu ayın taslak faturası (idempotent)
+              if (status === "accepted" && !wasAccepted) void convertProposalWithToast(r.proposal.id);
+            });
+          }}
         />
       ),
     },

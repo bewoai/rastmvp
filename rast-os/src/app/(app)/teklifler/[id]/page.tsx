@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowLeft, ArrowUp, FileDown, Plus, Save, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, FileDown, FolderKanban, FolderPlus, Plus, Save, Trash2 } from "lucide-react";
 import { PageHeader, EmptyState, Badge } from "@/components/ui";
 import { Field, Input, Select, Textarea, Button } from "@/components/form";
 import { PageLoading } from "@/components/list";
@@ -13,7 +13,7 @@ import { useToasts } from "@/lib/toast";
 import { proposalStatus } from "@/lib/labels";
 import { formatMoney, lineTotal, moveItem, proposalTotals, sortItems } from "@/lib/proposal-logic";
 import { PROPOSAL_PRESETS, findPreset, presetKey, presetTitle, presetToItems } from "@/lib/proposal-presets";
-import { itemChanged, saveProposal } from "@/lib/proposalActions";
+import { convertProposalWithToast, itemChanged, saveProposal } from "@/lib/proposalActions";
 import type { Client, Currency, Proposal, ProposalItem, ProposalStatus } from "@/lib/types";
 
 const statusOptions = (Object.keys(proposalStatus) as ProposalStatus[]).map((value) => ({ value, ...proposalStatus[value] }));
@@ -57,7 +57,7 @@ const toNum = (v: string) => (v === "" ? 0 : Number(v));
 
 export default function ProposalEditorPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const hydrated = useHydrated(["proposals", "proposal_items", "clients"]);
+  const hydrated = useHydrated(["proposals", "proposal_items", "clients", "projects"]);
   const proposal = useStore((s) => s.proposals.find((p) => p.id === id));
 
   if (!hydrated) return <PageLoading title="Teklif" />;
@@ -77,6 +77,8 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
   const clients = useStore((s) => s.clients);
   const allItems = useStore((s) => s.proposal_items);
   const allProposals = useStore((s) => s.proposals);
+  // 0015: kabul edilen tekliften oluşturulan proje (teklif başına tek proje)
+  const linkedProject = useStore((s) => s.projects.find((p) => p.proposal_id === proposal.id));
   const savedItems = useMemo(() => sortItems(allItems.filter((i) => i.proposal_id === proposal.id)), [allItems, proposal.id]);
 
   const [head, setHead] = useState<Head>(() => headOf(proposal));
@@ -86,6 +88,7 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [focusId, setFocusId] = useState<string | null>(null);
+  const [converting, setConverting] = useState(false);
 
   const savedHead = useMemo(() => headOf(proposal), [proposal]);
   const dirty = !sameHead(head, savedHead) || !sameItems(items, savedItems);
@@ -105,6 +108,13 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [dirty]);
+
+  /** Kabul edilen teklif → proje (+ aylık kalemler için bu ayın taslak faturası). Idempotent. */
+  const convert = useCallback(async () => {
+    setConverting(true);
+    await convertProposalWithToast(proposal.id);
+    setConverting(false);
+  }, [proposal.id]);
 
   const save = useCallback(async (): Promise<boolean> => {
     const title = head.title.trim();
@@ -126,6 +136,8 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
       setError(`${unnamed + 1}. kalemin adı boş.`);
       return false;
     }
+    // Durum bu kayıtla "Kabul edildi"ye geçiyorsa: kayıttan sonra proje + taslak fatura oluşturulur.
+    const becameAccepted = head.status === "accepted" && proposal.status !== "accepted";
     setSaving(true);
     setError(null);
     const res = await saveProposal(
@@ -154,8 +166,9 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
     setHead((h) => ({ ...h, title, proposal_no: no }));
     setItems((list) => list.map((it) => ({ ...it, name: it.name.trim() })));
     useToasts.getState().push({ message: "Teklif kaydedildi" });
+    if (becameAccepted) void convert();
     return true;
-  }, [head, items, savedItems, allProposals, proposal.id]);
+  }, [head, items, savedItems, allProposals, proposal.id, proposal.status, convert]);
 
   // Ctrl/Cmd + S = Kaydet
   const saveRef = useRef(save);
@@ -439,6 +452,36 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
               </Button>
               <p className="text-[11px] leading-4 text-muted">{dirty ? "Değişiklikler önce kaydedilir." : "Yazdırma görünümünde “PDF olarak kaydet” seçin."} Kısayol: Ctrl+S kaydeder.</p>
             </div>
+          </section>
+
+          <section className="card mt-4 p-4" aria-labelledby="sec-project">
+            <h2 id="sec-project" className="mb-2 text-sm font-semibold text-foreground">Proje ve fatura</h2>
+            {linkedProject ? (
+              <div className="space-y-2 text-xs text-muted">
+                <p>Bu teklif projeye dönüştürüldü.</p>
+                <Link
+                  href={`/projects?ac=${encodeURIComponent(linkedProject.id)}`}
+                  prefetch={false}
+                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-2"
+                >
+                  <FolderKanban className="h-4 w-4" aria-hidden /> Projeyi aç
+                </Link>
+                <p className="truncate" title={linkedProject.name}>{linkedProject.name}</p>
+              </div>
+            ) : proposal.status === "accepted" ? (
+              <div className="grid gap-2">
+                <Button onClick={() => void convert()} loading={converting} disabled={saving || dirty} title={dirty ? "Önce değişiklikleri kaydedin" : undefined}>
+                  {!converting && <FolderPlus className="h-4 w-4" aria-hidden />} Projeye dönüştür
+                </Button>
+                <p className="text-[11px] leading-4 text-muted">
+                  Müşteri için aktif bir proje açılır; aylık kalemler varsa bu ayın taslak faturası (KDV %{proposal.vat_rate}) eklenir.
+                </p>
+              </div>
+            ) : (
+              <p className="text-[11px] leading-4 text-muted">
+                Durum “Kabul edildi” olarak kaydedilince proje ve aylık kalemler için bu ayın taslak faturası otomatik oluşturulur.
+              </p>
+            )}
           </section>
         </aside>
       </div>

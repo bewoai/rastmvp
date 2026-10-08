@@ -21,6 +21,15 @@ const empty: Project = {
 const statusOptions = (Object.keys(projectStatus) as ProjectStatus[]).map((value) => ({ value, ...projectStatus[value] }));
 const ACTIVE: ProjectStatus[] = ["planning", "active", "on_hold", "review"];
 type Scope = "active" | "closed" | "all";
+
+/** `?ac=<proje id>`: tekliften oluşturulan projeye bağlantı (teklif editörü / bildirim) — modalı açar. */
+function readOpenParam(): string | null {
+  try {
+    return new URLSearchParams(window.location.search).get("ac");
+  } catch {
+    return null;
+  }
+}
 const SCOPES: readonly Scope[] = ["active", "closed", "all"];
 
 /** Form state'i burada yaşar: yazarken sayfa listesi render olmaz; her açılışta temiz başlar. */
@@ -95,6 +104,18 @@ export default function ProjectsPage() {
 
   const wantNew = useNewIntent();
   const [modal, setModal] = useState<{ initial: Project | null } | null>(() => (wantNew ? { initial: null } : null));
+  const [openId, setOpenId] = useState(readOpenParam);
+  const linked = openId ? projects.find((p) => p.id === openId) : undefined;
+  const shown = modal ?? (linked ? { initial: linked } : null);
+  function closeModal() {
+    setModal(null);
+    if (openId) {
+      setOpenId(null);
+      const url = new URL(window.location.href);
+      url.searchParams.delete("ac");
+      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    }
+  }
   const [scope, setScope] = usePersistentState<Scope>("projects-scope", "active", SCOPES);
   const [query, setQuery] = useState("");
   const del = useDeleteConfirm();
@@ -203,7 +224,7 @@ export default function ProjectsPage() {
         }
       />
 
-      {modal && <ProjectModal initial={modal.initial} clients={clients} brands={brands} onClose={() => setModal(null)} />}
+      {shown && <ProjectModal key={shown.initial?.id ?? "new"} initial={shown.initial} clients={clients} brands={brands} onClose={closeModal} />}
       {del.dialog}
     </>
   );

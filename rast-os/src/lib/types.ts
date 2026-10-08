@@ -355,6 +355,21 @@ export interface ClientReport {
   updated_at?: string;
 }
 
+// Müşteri portalı (0018): müşteri başına gizli, salt okunur portal bağlantısı (/portal/<token>).
+// Token yalnızca sunucuda üretilir; iptal geri alınamaz. Herkese açık görünüm: src/lib/portal-logic.ts.
+export interface ClientPortalToken {
+  id: ID;
+  client_id: ID;
+  token: string;                  // 64 hex
+  label?: string | null;          // iç not; portalda gösterilmez
+  contact_line?: string | null;   // portal altındaki ajans iletişim satırı
+  created_by?: ID | null;
+  created_at: string;
+  revoked_at?: string | null;
+  last_seen_at?: string | null;
+  expires_at?: string | null;     // null = süresiz
+}
+
 export interface RastData {
   leads: Lead[];
   jobs: Job[];
@@ -373,6 +388,7 @@ export interface RastData {
   proposal_items: ProposalItem[];
   content_approvals: ContentApproval[];
   client_reports: ClientReport[];
+  client_portal_tokens: ClientPortalToken[];
   activity_logs: ActivityLog[];
 }
 

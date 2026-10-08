@@ -13,6 +13,24 @@ export const DEMO_APPROVAL_TOKENS = {
   approved: "e4b7a91c3f5d2086b9e1a7c4d3f60852a1c9e7b5d3f1a2c4e6b8d0f2a4c6e8b0",
 } as const;
 
+/**
+ * Demo müşteri portalı bağlantıları: /portal/<token> (Adatıp Sağlık Grubu). Supabase yokken sunucu
+ * seed'den okur; "revoked" iptal edilmiş bağlantıdır (portal "bulunamadı" gösterir).
+ */
+export const DEMO_PORTAL_TOKENS = {
+  active: "3f9a2c7e1b5d4086a2e9c1f7b3d5e8a0c4f6b2d9e1a3c5f7b9d0e2a4c6f8b1d3",
+  revoked: "b8d1f3a5c7e9024b6d8f0a2c4e6b8d1f3a5c7e9b0d2f4a6c8e1b3d5f7a9c2e4b",
+} as const;
+
+/** Demo ayına göre gün: bu ay (0) / geçen ay (-1), "YYYY-MM-DD" (yerel). Portal "Bu ay" demosu için. */
+const monthDay = (offset: number, day: number) => {
+  const d = new Date(demoNow);
+  const first = new Date(d.getFullYear(), d.getMonth() + offset, 1);
+  const last = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${first.getFullYear()}-${pad(first.getMonth() + 1)}-${pad(Math.min(day, last))}`;
+};
+
 const SCRIPT_KARDIYOLOJI = `[0-3 sn] Hook: "Merdiven çıkarken nefesiniz mi daralıyor?"
 [3-20 sn] Uzm. Dr. anlatır: Efor sırasında nefes darlığı ve göğüste baskı hissi kalple ilgili olabilir; tek başına tanı koymaz, değerlendirme gerekir.
 [20-35 sn] Hangi durumlarda bir kardiyoloji uzmanına başvurmak gerektiğini genel bilgi olarak sıralar.
@@ -90,7 +108,7 @@ export const seed: RastData = {
   contents: [
     { id: "co1", client_id: "c1", brand_id: "b1", title: "Yatak odası ilhamı — Reels", platform: "Instagram", content_type: "reels", status: "editing", planned_date: "2026-08-04", created_at: "2026-08-01" },
     { id: "co2", client_id: "c1", brand_id: "b1", title: "Ürün kombin — Carousel", platform: "Instagram", content_type: "post", status: "sent_to_client", planned_date: "2026-08-05", created_at: "2026-08-01" },
-    { id: "co3", client_id: "c2", brand_id: "b2", title: "Doktor tanıtımı — Kardiyoloji", platform: "Instagram", content_type: "reels", status: "sent_to_client", planned_date: "2026-08-06", hook: "Merdiven çıkarken nefesiniz mi daralıyor?", script: SCRIPT_KARDIYOLOJI, created_at: "2026-07-30" },
+    { id: "co3", client_id: "c2", brand_id: "b2", title: "Doktor tanıtımı — Kardiyoloji", platform: "Instagram", content_type: "reels", status: "sent_to_client", planned_date: monthDay(0, 14), hook: "Merdiven çıkarken nefesiniz mi daralıyor?", script: SCRIPT_KARDIYOLOJI, created_at: "2026-07-30" },
     { id: "co4", client_id: "c3", brand_id: "b4", title: "Yeni ruj lansmanı", platform: "TikTok", content_type: "reels", status: "idea", planned_date: "2026-08-10", created_at: "2026-07-28" },
     { id: "co5", client_id: "c2", brand_id: "b3", title: "Global hasta deneyimi", platform: "YouTube", content_type: "video", status: "approved", planned_date: "2026-08-12", script: SCRIPT_GLOBAL, created_at: "2026-07-29" },
     // Aylık rapor demosu (Adatıp, Ağustos 2026): 2 yayınlanan + Eylül planı
@@ -98,11 +116,17 @@ export const seed: RastData = {
     { id: "co7", client_id: "c2", brand_id: "b2", title: "Hekim tanıtımı — Kardiyoloji polikliniği", platform: "Instagram", content_type: "post", status: "published", planned_date: "2026-08-21", published_date: "2026-08-22", created_at: "2026-07-25" },
     { id: "co8", client_id: "c2", brand_id: "b2", title: "Bilgilendirme — Kolesterol ve kalp sağlığı", platform: "Instagram", content_type: "reels", status: "script_ready", planned_date: "2026-09-04", created_at: "2026-08-20" },
     { id: "co9", client_id: "c2", brand_id: "b3", title: "Uluslararası hasta birimi — süreç anlatımı", platform: "YouTube", content_type: "video", status: "brief", planned_date: "2026-09-18", created_at: "2026-08-20" },
+    // Müşteri portalı demosu (Adatıp): tarihler demo ayına göre (bu ay / geçen ay)
+    { id: "co10", client_id: "c2", brand_id: "b2", title: "Bilgilendirme — Çarpıntı ne zaman önemlidir?", platform: "Instagram", content_type: "reels", status: "scheduled", planned_date: monthDay(0, 24), created_at: daysAgo(6) },
+    { id: "co11", client_id: "c2", brand_id: "b2", title: "Hekim tanıtımı — Dahiliye polikliniği", platform: "Instagram", content_type: "post", status: "published", planned_date: monthDay(-1, 17), published_date: monthDay(-1, 18), created_at: daysAgo(30) },
   ],
   shoots: [
     { id: "s1", client_id: "c1", brand_id: "b1", title: "Aytaş Home — Ürün Çekimi", shoot_type: "Ürün", scheduled_at: "2026-08-05T10:00", location: "Rast Stüdyo", status: "confirmed", created_at: "2026-07-28" },
     { id: "s2", client_id: "c2", brand_id: "b2", title: "Adatıp — Doktor Röportajı", shoot_type: "Röportaj", scheduled_at: "2026-08-07T14:00", location: "Adatıp Hastanesi", status: "planned", created_at: "2026-07-29" },
     { id: "s3", client_id: "c3", brand_id: "b4", title: "Mira — Kampanya Çekimi", shoot_type: "Kampanya", scheduled_at: "2026-08-11T11:00", location: "Dış mekan", status: "planned", created_at: "2026-07-30" },
+    // Müşteri portalı demosu (Adatıp): bu ay + geçen ay
+    { id: "s4", client_id: "c2", brand_id: "b2", title: "Adatıp — Kolesterol videosu çekimi", shoot_type: "Bilgilendirme videosu", scheduled_at: `${monthDay(0, 20)}T10:30`, location: "Adatıp Hastanesi, Kardiyoloji katı", status: "confirmed", created_at: daysAgo(5) },
+    { id: "s5", client_id: "c2", brand_id: "b2", title: "Adatıp — Dahiliye tanıtım çekimi", shoot_type: "Tanıtım", scheduled_at: `${monthDay(-1, 9)}T14:00`, location: "Rast Stüdyo", status: "completed", created_at: daysAgo(35) },
   ],
   equipment: [
     { id: "e1", name: "Sony A7 IV", brand_model: "Sony", category: "Kamera", status: "idle", purchase_price: 95000, next_service: "2026-10-01", created_at: "2026-01-01" },
@@ -168,6 +192,17 @@ export const seed: RastData = {
         ads_note: "Bu ay reklam yayını yapılmadı. GİP başvurusu gerekmedi.",
       },
       generated_at: "2026-09-01T10:00:00+03:00", created_at: "2026-09-01T10:00:00+03:00", updated_at: "2026-09-01T10:00:00+03:00",
+    },
+  ],
+  // Müşteri portalı (0018): Adatıp için bir aktif, bir iptal edilmiş bağlantı.
+  client_portal_tokens: [
+    {
+      id: "cpt1", client_id: "c2", token: DEMO_PORTAL_TOKENS.active, label: "Dr. Kemal Sarı — WhatsApp",
+      contact_line: "Rast Creative · Berat (proje sorumlusu)", created_at: daysAgo(10), last_seen_at: daysAgo(1),
+    },
+    {
+      id: "cpt0", client_id: "c2", token: DEMO_PORTAL_TOKENS.revoked, label: "Eski bağlantı",
+      created_at: daysAgo(40), revoked_at: daysAgo(10),
     },
   ],
   // İşlem geçmişi örnekleri (canlıda 0012 trigger'ı yazar). En yeni önce.

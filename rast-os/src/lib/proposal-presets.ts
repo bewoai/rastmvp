@@ -6,8 +6,10 @@
 // Yeni paket eklerken de bu kalemleri ayrı satır/fiyat olarak eklemeyin.
 //
 // MEVZUAT KURALI (sahibin kararı, bağlayıcı): Türkiye'de hekimler için ücretli reklam / tanıtım
-// SÜREKLİ AYLIK HİZMET olarak sunulamaz; yalnızca ruhsat sonrası ilk 30 günlük AÇILIŞ DUYURUSU
-// için veya özel izin bulunan durumlarda yapılabilir. Bu yüzden hekim paketlerinde "Meta ve Google
+// SÜREKLİ AYLIK HİZMET olarak sunulamaz; yalnızca açılış tarihini izleyen ilk bir ay AÇILIŞ DUYURUSU
+// için veya Bakanlıkça kabul edilmiş yeni tıbbi yöntemler için yapılabilir (Sağlık Hizmetlerinde Tanıtım ve
+// Bilgilendirme Faaliyetleri Hakkında Yönetmelik, RG 12.11.2025/33075, md. 5/1-k). Paylaşan taraf olarak
+// ajans da sorumludur (md. 5/2). Bu yüzden hekim paketlerinde "Meta ve Google
 // reklam yönetimi" tekrarlayan (aylık) kalem OLARAK YER ALMAZ. Reklam yalnızca "Ek hizmetler (hekim)"
 // altında, tek seferlik ve isteğe bağlı kalem olarak teklif edilir.
 //
@@ -90,14 +92,14 @@ const HEKIM_KLINIK: PresetItem[] = [
 ]; // 4.800 + 17.200 + 5.900 + 3.200 + 6.500 + 2.400 = 40.000
 
 // Ek hizmetler (hekim): tek seferlik, isteğe bağlı. Aylık reklam yönetimi yerine geçmez.
-// TODO(fiyat): fiyatlar henüz belirlenmedi — 0 bırakıldı, teklifte elle girin. Yalnızca ruhsat sonrası
-// ilk 30 gün veya özel izin bulunan durumlarda teklif edilebilir (dosya başındaki kural).
+// TODO(fiyat): fiyatlar henüz belirlenmedi — 0 bırakıldı, teklifte elle girin. Yalnızca açılış tarihini izleyen
+// ilk bir ay veya özel izin bulunan durumlarda teklif edilebilir (dosya başındaki kural).
 const HEKIM_EK: PresetItem[] = [
   oneOff(
-    "Açılış dönemi tanıtımı (ruhsat sonrası ilk 30 gün)",
+    "Açılış dönemi tanıtımı (açılış tarihini izleyen ilk bir ay)",
     "proje",
     0,
-    "Ruhsat sonrası ilk 30 günlük açılış duyurusu; tek seferlik, reklam bütçesi hariç",
+    "Açılış tarihini izleyen ilk bir ayda açılış duyurusu; tek seferlik, reklam bütçesi hariç",
   ),
   oneOff(
     "İzinli dönem tanıtım desteği",
@@ -117,7 +119,7 @@ const HEKIM_TERMS = `## Rast Creative'in sorumlulukları
 - Onaylı içerik planına göre üretim ve zamanında yayın.
 - Strateji, raporlama ve kreatif üretim tüm hizmetlere dahildir; ayrıca ücretlendirilmez.
 - İçerikler sağlık hizmetleri tanıtım mevzuatı gözetilerek hazırlanır.
-- Hekimler için ücretli reklam aylık hizmet olarak verilmez; yalnızca ruhsat sonrası ilk 30 günlük açılış duyurusu veya özel izin bulunan durumlarda, tek seferlik ek hizmet olarak yapılır.
+- Hekimler için ücretli reklam aylık hizmet olarak verilmez; yalnızca açılış tarihini izleyen ilk bir ayda açılış duyurusu veya özel izin bulunan durumlarda, tek seferlik ek hizmet olarak yapılır.
 - Her içerik için 2 revizyon hakkı.
 ## Müşterinin sorumlulukları
 - Planlanan çekim günlerinde hekimin ve mekânın hazır olması.
@@ -192,8 +194,8 @@ const INSAAT_TERMS = `## Rast Creative'in sorumlulukları
 - Fiyatlara KDV dahil değildir; KDV ayrıca gösterilmiştir.
 - Asgari çalışma süresi 3 aydır; fesih için 30 gün önceden yazılı bildirim gerekir.`;
 
-const HEKIM_EK_NOTES = `Ek hizmetler yalnızca ruhsat sonrası ilk 30 gün içinde (açılış duyurusu) veya özel izin bulunan durumlarda sunulur.
-1. Uygunluk kontrolü — ruhsat tarihi / izin belgesi doğrulanır.
+const HEKIM_EK_NOTES = `Ek hizmetler yalnızca açılış tarihini izleyen ilk bir ay içinde (açılış duyurusu) veya özel izin bulunan durumlarda sunulur.
+1. Uygunluk kontrolü — açılış tarihi / izin belgesi doğrulanır.
 2. Tek seferlik kampanya planı ve içerik onaya sunulur.
 3. Yayın ve kapanış özeti.`;
 
@@ -201,7 +203,7 @@ const HEKIM_EK_TERMS = `## Rast Creative'in sorumlulukları
 - Onaylı plana göre tek seferlik tanıtım çalışması; sağlık hizmetleri tanıtım mevzuatına uygun içerik.
 - Strateji, raporlama ve kreatif üretim kapsama dahildir; ayrıca ücretlendirilmez.
 ## Müşterinin sorumlulukları
-- Ruhsat tarihinin veya tanıtım izninin belgelenmesi; içerik onaylarının 2 iş günü içinde verilmesi.
+- Açılış tarihinin veya tanıtım izninin belgelenmesi; içerik onaylarının 2 iş günü içinde verilmesi.
 - Reklam bütçesi (varsa) doğrudan müşteri tarafından ödenir.
 ## Ödeme koşulları
 - Tek seferlik bedel sipariş onayında ödenir; sürekli aylık hizmet değildir.

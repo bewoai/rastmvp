@@ -7,6 +7,8 @@ import { PageHeader, Panel, Badge } from "@/components/ui";
 import { Button, Field, Input } from "@/components/form";
 import { useStore, useHydrated } from "@/lib/store";
 import { useFx } from "@/lib/fx";
+import { DEFAULT_MRR_LABEL, useOrgTargets } from "@/lib/orgSettings";
+import { useToasts } from "@/lib/toast";
 
 /**
  * Kur alanı: yazılan metin yerel taslakta tutulur, geçerli (>0) sayı olunca hemen kaydedilir.
@@ -33,6 +35,66 @@ function RateInput({ value, onCommit, label }: { value: number; onCommit: (n: nu
   );
 }
 
+/** MRR eşiği (hastaneden ayrılma hedefi): org başına tutar + ad. Supabase'de yalnızca yönetici kaydedebilir. */
+function MrrTargetForm({ hydrated }: { hydrated: boolean }) {
+  const { loaded, target, label, canEdit, save } = useOrgTargets(hydrated);
+  const push = useToasts((s) => s.push);
+  // Yerel taslak: kayıtlı değer değişince (yükleme / başka sekme) taslak o değere döner.
+  const saved = `${target ?? ""}|${label}`;
+  const [draftKey, setDraftKey] = useState(saved);
+  const [amount, setAmount] = useState(target === null ? "" : String(target));
+  const [name, setName] = useState(label);
+  const [busy, setBusy] = useState(false);
+  if (draftKey !== saved) {
+    setDraftKey(saved);
+    setAmount(target === null ? "" : String(target));
+    setName(label);
+  }
+
+  const parsed = amount.trim() === "" ? null : Number(amount.replace(/\./g, "").replace(",", "."));
+  const invalid = parsed !== null && (!Number.isFinite(parsed) || parsed < 0);
+  const dirty = saved !== `${parsed ?? ""}|${name.trim() || DEFAULT_MRR_LABEL}`;
+
+  async function onSave() {
+    if (invalid) return;
+    setBusy(true);
+    const r = await save(parsed === 0 ? null : parsed, name);
+    setBusy(false);
+    push(r.ok ? { message: "Eşik kaydedildi." } : { message: r.error ?? "Kaydedilemedi.", tone: "danger" });
+  }
+
+  return (
+    <div id="mrr-esigi" className="scroll-mt-20">
+      <Panel title="MRR Eşiği">
+        <p className="text-sm text-muted">
+          Dashboard&apos;daki aylık tekrarlayan gelir (MRR) kartının hedefi — ör. hastaneden ayrılmak için
+          gereken aylık gelir. Tutar KDV hariç, TL cinsindendir. Boş bırakırsan hedef kaldırılır.
+        </p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          <Field label="Hedef tutar (₺ / ay)" hint={invalid ? "Geçerli bir tutar gir." : undefined}>
+            <Input
+              type="text"
+              inputMode="decimal"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              disabled={!loaded || !canEdit}
+              placeholder="ör. 90000"
+              aria-invalid={invalid || undefined}
+            />
+          </Field>
+          <Field label="Hedefin adı">
+            <Input value={name} maxLength={80} onChange={(e) => setName(e.target.value)} disabled={!loaded || !canEdit} placeholder={DEFAULT_MRR_LABEL} />
+          </Field>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center gap-3">
+          <Button onClick={onSave} loading={busy} disabled={!loaded || !canEdit || invalid || !dirty}>Kaydet</Button>
+          {loaded && !canEdit && <span className="text-xs text-muted">Eşiği yalnızca yönetici değiştirebilir.</span>}
+        </div>
+      </Panel>
+    </div>
+  );
+}
+
 const roles = [
   { name: "Yönetici", desc: "Tüm müşteriler, finans, teklifler, raporlar, ekip, ayarlar" },
   { name: "Proje Yöneticisi", desc: "Müşteriler, projeler, içerikler, görevler, çekimler" },
@@ -44,7 +106,7 @@ const roles = [
 export default function SettingsPage() {
   // Yalnızca oturum/mod bilgisi için init (koleksiyon yüklenmez). Bu olmadan Ayarlar ilk açılan sayfaysa
   // "Yerel (demo)" yanlış gösteriliyordu.
-  useHydrated();
+  const hydrated = useHydrated();
   const supabase = useStore((s) => s.supabase);
   const { usd, eur, updated, setRate } = useFx();
 
@@ -87,6 +149,8 @@ export default function SettingsPage() {
             </p>
           )}
         </Panel>
+
+        <MrrTargetForm hydrated={hydrated} />
 
         <Panel title="Döviz Kurları">
           <p className="text-sm text-muted">

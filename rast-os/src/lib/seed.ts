@@ -28,6 +28,18 @@ const demoProposalItems = (() => {
   return preset ? presetToItems(preset.pkg, "pr1", () => `pi${++n}`, "2026-10-01") : [];
 })();
 
+// Demo MRR: kabul edilmiş 3 teklif, aylık (tekrarlayan) kalemler, KDV hariç → toplam 75.000 TL/ay
+// (Aytaş Home 30.000 + Adatıp Global 25.000 + Mira Kozmetik 20.000). Eşik demo'da 90.000 (src/lib/orgSettings.ts).
+const demoAcceptedItems: RastData["proposal_items"] = [
+  { id: "pi-a1", proposal_id: "pr2", position: 0, name: "Sosyal medya yönetimi", description: "Instagram içerik planı, paylaşım ve topluluk yönetimi", qty: 1, unit: "ay", unit_price: 12000, is_recurring: true, created_at: "2026-02-15" },
+  { id: "pi-a2", proposal_id: "pr2", position: 1, name: "Aylık video üretimi (8 video)", qty: 1, unit: "ay", unit_price: 18000, is_recurring: true, created_at: "2026-02-15" },
+  { id: "pi-a3", proposal_id: "pr2", position: 2, name: "Kampanya çekim günü", qty: 1, unit: "gün", unit_price: 9000, is_recurring: false, created_at: "2026-02-15" },
+  { id: "pi-b1", proposal_id: "pr3", position: 0, name: "Uluslararası içerik yönetimi", qty: 1, unit: "ay", unit_price: 17000, is_recurring: true, created_at: "2026-03-10" },
+  { id: "pi-b2", proposal_id: "pr3", position: 1, name: "Çok dilli video (4 / ay)", qty: 1, unit: "ay", unit_price: 8000, is_recurring: true, created_at: "2026-03-10" },
+  { id: "pi-c1", proposal_id: "pr4", position: 0, name: "Sosyal medya yönetimi", qty: 1, unit: "ay", unit_price: 8000, is_recurring: true, created_at: "2026-06-20" },
+  { id: "pi-c2", proposal_id: "pr4", position: 1, name: "Aylık reels paketi (6 video)", qty: 1, unit: "ay", unit_price: 12000, is_recurring: true, created_at: "2026-06-20" },
+];
+
 // Gerçekçi tohum veri (Rast Creative örnek müşterileri).
 export const seed: RastData = {
   jobs: [
@@ -115,8 +127,11 @@ export const seed: RastData = {
       notes: findPreset("hekim:standart")?.group.notes, terms: findPreset("hekim:standart")?.group.terms,
       created_at: "2026-10-01", updated_at: "2026-10-01",
     },
+    { id: "pr2", client_id: "c1", title: "Aytaş Home — Aylık içerik paketi", proposal_no: "RC-2026-002", status: "accepted", currency: "TRY", vat_rate: 20, created_at: "2026-02-15", updated_at: "2026-02-20" },
+    { id: "pr3", client_id: "c2", title: "Adatıp Global — Uluslararası içerik", proposal_no: "RC-2026-003", status: "accepted", currency: "TRY", vat_rate: 20, created_at: "2026-03-10", updated_at: "2026-03-14" },
+    { id: "pr4", client_id: "c3", title: "Mira Kozmetik — Aylık sosyal medya", proposal_no: "RC-2026-004", status: "accepted", currency: "TRY", vat_rate: 20, created_at: "2026-06-20", updated_at: "2026-06-25" },
   ],
-  proposal_items: demoProposalItems,
+  proposal_items: [...demoProposalItems, ...demoAcceptedItems],
   // İçerik onayları (0013): biri hekim onayı bekliyor, biri onaylandı.
   content_approvals: [
     {

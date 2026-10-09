@@ -153,16 +153,16 @@ export function ProspectDetailModal({ prospect, live, onClose }: { prospect: Pro
         </div>
 
         <section aria-label="Temas geçmişi">
-          <h3 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Temas geçmişi</h3>
+          <h3 className="mb-2 text-xs font-medium text-muted">Temas geçmişi</h3>
           {timeline.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-border/80 px-3 py-6 text-center text-xs text-muted">Henüz temas yok.</p>
+            <p className="rounded-lg border border-dashed border-border/80 px-3 py-6 text-center text-xs text-muted">Henüz temas yok.</p>
           ) : (
             <ol className="relative space-y-3 border-l border-border/80 pl-4">
               {timeline.map((m) => {
                 const st = m.manual && m.status === "sent" ? { label: "Yapıldı", tone: "default" as const } : messageStatusLabel[m.status];
                 return (
                   <li key={m.id} className="text-sm">
-                    <span className="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full bg-amber/70" aria-hidden />
+                    <span className="absolute -left-[5px] mt-1.5 h-2.5 w-2.5 rounded-full bg-accent/70" aria-hidden />
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-foreground">{channelLabel[m.channel]}</span>
                       <Badge tone={st.tone}>{st.label}</Badge>

@@ -64,7 +64,7 @@ export function QueueTab({ status }: { status: GrowthStatus | null }) {
   return (
     <div className="space-y-3">
       {!emailEnabled && (
-        <div role="status" className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
+        <div role="status" className="flex items-start gap-3 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3 text-sm text-warning">
           <MailX className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <div>
             <p className="font-medium">E-posta gönderimi kapalı (İYS kaydı bekleniyor)</p>
@@ -74,17 +74,17 @@ export function QueueTab({ status }: { status: GrowthStatus | null }) {
       )}
 
       <dl className="card grid grid-cols-3 gap-px overflow-hidden bg-border/70 text-sm">
-        <div className="bg-surface/95 px-4 py-3"><dt className="text-[11px] uppercase tracking-wide text-muted">Bugün gönderilen</dt><dd className="text-lg font-semibold text-foreground">{sentToday} / {cap}</dd></div>
-        <div className="bg-surface/95 px-4 py-3"><dt className="text-[11px] uppercase tracking-wide text-muted">Kalan limit</dt><dd className="text-lg font-semibold text-foreground">{emailEnabled ? remainingCap(cap, sentToday) : "—"}</dd></div>
-        <div className="bg-surface/95 px-4 py-3"><dt className="text-[11px] uppercase tracking-wide text-muted">Onaylı bekleyen</dt><dd className="text-lg font-semibold text-amber">{approvedPending}</dd></div>
+        <div className="bg-surface px-4 py-3"><dt className="text-xs text-muted">Bugün gönderilen</dt><dd className="text-lg font-semibold text-foreground">{sentToday} / {cap}</dd></div>
+        <div className="bg-surface px-4 py-3"><dt className="text-xs text-muted">Kalan limit</dt><dd className="text-lg font-semibold text-foreground">{emailEnabled ? remainingCap(cap, sentToday) : "—"}</dd></div>
+        <div className="bg-surface px-4 py-3"><dt className="text-xs text-muted">Onaylı bekleyen</dt><dd className="text-lg font-semibold text-foreground">{approvedPending}</dd></div>
       </dl>
       <div className="h-1.5 overflow-hidden rounded-full bg-surface-2" aria-hidden>
-        <div className="h-full bg-amber" style={{ width: `${Math.min(100, cap ? (sentToday / cap) * 100 : 0)}%` }} />
+        <div className="h-full bg-accent" style={{ width: `${Math.min(100, cap ? (sentToday / cap) * 100 : 0)}%` }} />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <label className="inline-flex items-center gap-2 text-sm text-muted">
-          <input type="checkbox" checked={allDrafts} disabled={!drafts.length} onChange={() => setSelected(allDrafts ? new Set() : new Set(drafts.map((m) => m.id)))} className="h-4 w-4 accent-[var(--amber)]" />
+          <input type="checkbox" checked={allDrafts} disabled={!drafts.length} onChange={() => setSelected(allDrafts ? new Set() : new Set(drafts.map((m) => m.id)))} className="h-4 w-4 accent-[var(--accent)]" />
           Tüm taslaklar ({drafts.length})
         </label>
         <Button disabled={!selected.size || busy} onClick={() => approve(queue.filter((m) => selected.has(m.id)))}><Check className="h-4 w-4" aria-hidden /> Seçilenleri onayla ({selected.size})</Button>
@@ -111,7 +111,7 @@ export function QueueTab({ status }: { status: GrowthStatus | null }) {
               <li key={m.id} className="card p-3.5">
                 <div className="flex items-start gap-3">
                   {m.status === "draft" && (
-                    <input type="checkbox" aria-label={`Seç: ${subj.text}`} checked={selected.has(m.id)} onChange={() => setSelected((s) => { const n = new Set(s); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; })} className="mt-1 h-4 w-4 accent-[var(--amber)]" />
+                    <input type="checkbox" aria-label={`Seç: ${subj.text}`} checked={selected.has(m.id)} onChange={() => setSelected((s) => { const n = new Set(s); if (n.has(m.id)) n.delete(m.id); else n.add(m.id); return n; })} className="mt-1 h-4 w-4 accent-[var(--accent)]" />
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
@@ -178,8 +178,8 @@ function EditMessageModal({ message, prospect, onClose }: { message: OutreachMes
         <Field label="Alıcı"><Input type="email" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
         <Field label="Konu" hint="Belirteçler ({{isim}} vb.) gönderimde doldurulur."><Input value={subject} onChange={(e) => setSubject(e.target.value)} maxLength={300} /></Field>
         <Field label="Gövde"><Textarea rows={10} value={body} onChange={(e) => setBody(e.target.value)} maxLength={10000} /></Field>
-        <div className="rounded-xl border border-border/70 bg-background/40 p-3 text-[13px]">
-          <p className="text-xs uppercase tracking-wide text-muted">Önizleme</p>
+        <div className="rounded-lg border border-border/70 bg-background/40 p-3 text-[13px]">
+          <p className="text-xs text-muted">Önizleme</p>
           <p className="mt-1 font-medium text-foreground">{renderTemplate(subject, ctx).text}</p>
           <p className="mt-1 whitespace-pre-wrap leading-5 text-muted">{renderTemplate(body, ctx).text}</p>
         </div>

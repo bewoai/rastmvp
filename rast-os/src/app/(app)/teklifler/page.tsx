@@ -261,7 +261,7 @@ export default function ProposalsPage() {
       <StatStrip
         items={[
           { label: "Açık teklif", value: String(stats.openCount), hint: "taslak + gönderildi" },
-          { label: "Açık tutar (KDV hariç)", value: formatMoney(stats.openSum), tone: "amber" },
+          { label: "Açık tutar (KDV hariç)", value: formatMoney(stats.openSum), tone: "accent" },
           { label: "Kabul edilen (KDV hariç)", value: formatMoney(stats.acceptedSum), tone: "success" },
           { label: "Kabul oranı", value: stats.rate === null ? "—" : `%${stats.rate}`, hint: "kabul / (kabul + ret)" },
         ]}

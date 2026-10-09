@@ -118,7 +118,7 @@ export function Modal({
     <>
       <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-5">{children}</div>
       {footer && (
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border/80 bg-white/[0.02] px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 border-t border-border px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           {footer}
         </div>
       )}
@@ -141,16 +141,16 @@ export function Modal({
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={trapTab}
-        className={`relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-surface shadow-2xl outline-none md:max-h-[88dvh] md:rounded-2xl ${sizeCls[size]}`}
+        className={`popover relative z-10 flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-b-none outline-none md:max-h-[88dvh] md:rounded-b-[var(--radius)] ${sizeCls[size]}`}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-border/80 bg-white/[0.02] px-5 py-3.5">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-5 py-3.5">
           <h3 id={titleId} className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
           <button
             type="button"
             onClick={() => {
               if (!locked) onClose();
             }}
-            className="-mr-2 flex h-10 w-10 items-center justify-center rounded-xl text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
+            className="-mr-2 flex h-10 w-10 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground"
             aria-label="Kapat"
           >
             <X className="h-4 w-4" />
@@ -280,14 +280,14 @@ export function Field({
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-muted">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-[11px] text-muted">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs text-faint">{hint}</span>}
     </label>
   );
 }
 
 // text-base (16px) mobilde: iOS Safari <16px alanlara odaklanınca sayfayı yakınlaştırır.
 const inputCls =
-  "w-full rounded-xl border border-border/80 bg-background/70 px-3.5 py-2.5 text-base text-foreground outline-none transition-shadow placeholder:text-muted/60 focus:border-amber/70 focus:ring-4 focus:ring-amber/10 disabled:opacity-60 md:text-sm";
+  "w-full rounded-lg border border-border bg-background px-3 py-2 text-base text-foreground outline-none transition-colors placeholder:text-faint hover:border-[#333] focus:border-accent/70 disabled:opacity-60 md:text-sm";
 
 const join = (a: string, b?: string) => (b ? `${a} ${b}` : a);
 
@@ -308,7 +308,7 @@ export function Select({ className, ...props }: React.SelectHTMLAttributes<HTMLS
  * `loading`: düğme kilitlenir, spinner çıkar (genişlik değişmez).
  */
 export function Button({
-  variant = "amber",
+  variant = "accent",
   className = "",
   loading = false,
   type = "button",
@@ -316,13 +316,13 @@ export function Button({
   children,
   ...props
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "amber" | "ghost" | "danger";
+  variant?: "accent" | "ghost" | "danger";
   loading?: boolean;
 }) {
   const map = {
-    amber: "btn-amber",
-    ghost: "border border-border text-foreground hover:bg-surface-2",
-    danger: "bg-danger/15 text-danger hover:bg-danger/25",
+    accent: "btn-accent",
+    ghost: "border border-border bg-surface text-foreground hover:bg-surface-2",
+    danger: "bg-danger/12 text-danger hover:bg-danger/20",
   };
   return (
     <button
@@ -330,7 +330,7 @@ export function Button({
       type={type}
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all disabled:cursor-not-allowed disabled:opacity-50 ${map[variant]} ${className}`}
+      className={`inline-flex min-h-10 items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 md:min-h-9 ${map[variant]} ${className}`}
     >
       {loading && <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden />}
       {children}
@@ -349,8 +349,8 @@ export function MoreFields({
   children: React.ReactNode;
 }) {
   return (
-    <details open={defaultOpen} className="group rounded-xl border border-border/70 sm:col-span-2">
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-xl px-3.5 py-2.5 text-xs font-medium text-muted transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
+    <details open={defaultOpen} className="group rounded-lg border border-border sm:col-span-2">
+      <summary className="flex cursor-pointer list-none items-center gap-1.5 rounded-lg px-3.5 py-2.5 text-xs font-medium text-muted transition-colors hover:text-foreground [&::-webkit-details-marker]:hidden">
         <ChevronRight className="h-3.5 w-3.5 transition-transform group-open:rotate-90" aria-hidden />
         {label}
       </summary>

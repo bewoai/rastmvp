@@ -37,7 +37,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
       <Link
         href="/crm/clients"
         prefetch={false}
-        className="mb-3 inline-flex min-h-9 items-center gap-1.5 rounded-xl px-1 text-sm text-muted transition-colors hover:text-foreground"
+        className="mb-3 inline-flex min-h-9 items-center gap-1.5 rounded-lg px-1 text-sm text-muted transition-colors hover:text-foreground"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden /> Müşteriler
       </Link>
@@ -48,7 +48,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
           <Link
             href={`/raporlar/aylik?musteri=${encodeURIComponent(client.id)}`}
             prefetch={false}
-            className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2"
+            className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2"
           >
             <FileText className="h-4 w-4" aria-hidden /> Aylık rapor
           </Link>
@@ -75,7 +75,7 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                   <p key={c.id}>
                     {c.full_name}
                     {c.title && <span className="text-muted"> · {c.title}</span>}
-                    {c.is_approver && <span className="ml-1.5"><Badge tone="amber">Onaylayan</Badge></span>}
+                    {c.is_approver && <span className="ml-1.5"><Badge tone="accent">Onaylayan</Badge></span>}
                   </p>
                 ))}
               </dd>

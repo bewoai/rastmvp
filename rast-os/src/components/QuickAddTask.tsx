@@ -15,7 +15,7 @@ import type { Priority, Task } from "@/lib/types";
 const PRIORITIES: Priority[] = ["urgent", "high", "medium", "low"];
 
 const chipCls =
-  "inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/80 bg-background/60 px-2.5 text-xs text-muted transition-colors focus-within:border-amber/60 hover:text-foreground";
+  "inline-flex h-8 items-center gap-1.5 rounded-lg border border-border/80 bg-background/60 px-2.5 text-xs text-muted transition-colors focus-within:border-accent/60 hover:text-foreground";
 
 function isTypingTarget(target: EventTarget | null) {
   const el = target as HTMLElement | null;
@@ -97,12 +97,12 @@ function Composer() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-[10vh] md:pt-[14vh]">
-      <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={close} />
+      <div className="fixed inset-0 bg-black/60" onClick={close} />
       <div
         role="dialog"
         aria-modal="true"
         aria-label="Hızlı görev ekle"
-        className="card relative z-10 w-full max-w-xl overflow-hidden shadow-2xl"
+        className="popover relative z-10 w-full max-w-xl overflow-hidden"
       >
         <div className="px-4 pt-4">
           <input
@@ -133,7 +133,7 @@ function Composer() {
             type="button"
             onClick={() => setDue(due === today ? "" : today)}
             aria-pressed={due === today}
-            className={`${chipCls} ${due === today ? "!border-amber/60 !text-amber" : ""}`}
+            className={`${chipCls} ${due === today ? "!border-accent/60 !text-accent" : ""}`}
           >
             Bugün
           </button>
@@ -141,7 +141,7 @@ function Composer() {
             type="button"
             onClick={() => setDue(due === addDaysKey(today, 1) ? "" : addDaysKey(today, 1))}
             aria-pressed={due === addDaysKey(today, 1)}
-            className={`${chipCls} ${due === addDaysKey(today, 1) ? "!border-amber/60 !text-amber" : ""}`}
+            className={`${chipCls} ${due === addDaysKey(today, 1) ? "!border-accent/60 !text-accent" : ""}`}
           >
             Yarın
           </button>
@@ -178,7 +178,7 @@ function Composer() {
           )}
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-border/80 bg-white/[0.02] px-4 py-3">
+        <div className="flex items-center justify-between gap-3 border-t border-border px-4 py-3">
           <p className="hidden text-[11px] text-muted sm:block">
             <kbd className="rounded border border-border px-1">Enter</kbd> ekle ·{" "}
             <kbd className="rounded border border-border px-1">Shift+Enter</kbd> ekle, devam et ·{" "}

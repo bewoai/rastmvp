@@ -16,7 +16,7 @@ import type { Client, ClientPortalToken } from "@/lib/types";
 const toast = (message: string, tone: "default" | "danger" = "default") => useToasts.getState().push({ message, tone });
 
 const linkBtn =
-  "inline-flex min-h-9 items-center gap-2 rounded-xl border border-border px-3 text-xs font-medium text-foreground hover:bg-surface-2";
+  "inline-flex min-h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium text-foreground hover:bg-surface-2";
 
 /**
  * Müşteri sayfasındaki "Portal" kartı: hesapsız, salt okunur müşteri portalı (/portal/<token>) için gizli
@@ -84,7 +84,7 @@ export function ClientPortalCard({ client }: { client: Pick<Client, "id" | "name
   return (
     <section aria-labelledby="portal-card-title" className="card p-4">
       <div className="flex items-center gap-2">
-        <Globe className="h-4 w-4 text-amber" aria-hidden />
+        <Globe className="h-4 w-4 text-muted" aria-hidden />
         <h2 id="portal-card-title" className="text-sm font-semibold text-foreground">Portal</h2>
         <span className="ml-auto">
           <Badge tone={active.length ? "success" : "muted"}>{active.length ? `${active.length} aktif bağlantı` : "Bağlantı yok"}</Badge>
@@ -99,9 +99,9 @@ export function ClientPortalCard({ client }: { client: Pick<Client, "id" | "name
       {active.length > 0 && (
         <ul className="mt-3 space-y-3" aria-label="Aktif portal bağlantıları">
           {active.map((t) => (
-            <li key={t.id} className="rounded-lg border border-amber/30 bg-amber/5 p-3">
+            <li key={t.id} className="rounded-lg border border-border bg-surface-2/50 p-3">
               <div className="flex flex-wrap items-center gap-2">
-                <Link2 className="h-3.5 w-3.5 text-amber" aria-hidden />
+                <Link2 className="h-3.5 w-3.5 text-muted" aria-hidden />
                 <p className="text-xs font-medium text-foreground">{t.label?.trim() || "Portal bağlantısı"}</p>
                 <span className="ml-auto text-[11px] text-muted">Oluşturuldu: {dateTimeTR(t.created_at)}</span>
               </div>

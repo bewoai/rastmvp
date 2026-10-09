@@ -65,7 +65,7 @@ export default function BackupPanel() {
           </span>
         </div>
         {stale && !busy && (
-          <p className="mt-3 flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground">
+          <p className="mt-3 flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/[0.06] px-3 py-2 text-xs text-foreground">
             <TriangleAlert className="mt-px h-3.5 w-3.5 shrink-0 text-warning" aria-hidden />
             Son yedek 7 günden eski. Düzenli yedek almanı öneririz.
           </p>
@@ -88,7 +88,7 @@ export function BackupReminder() {
     <Link
       href="/settings#yedek"
       prefetch={false}
-      className="mb-4 flex items-center gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-foreground outline-none transition-colors hover:bg-warning/15 focus-visible:ring-2 focus-visible:ring-amber/60"
+      className="mb-5 flex items-center gap-2 rounded-lg border border-warning/25 bg-warning/[0.06] px-3 py-2 text-[13px] text-foreground outline-none transition-colors hover:bg-warning/10 focus-visible:ring-2 focus-visible:ring-accent/60"
     >
       <TriangleAlert className="h-3.5 w-3.5 shrink-0 text-warning" aria-hidden />
       <span>

@@ -26,7 +26,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#080c0a", // globals.css --background (manifest.ts ile aynı)
+  themeColor: "#141414", // globals.css --background (manifest.ts ile aynı)
 };
 
 export default function RootLayout({

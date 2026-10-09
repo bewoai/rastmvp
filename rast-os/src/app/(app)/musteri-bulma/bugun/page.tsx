@@ -56,16 +56,16 @@ export default function BugunPage() {
       />
 
       <dl className="card mb-4 grid grid-cols-3 gap-px overflow-hidden bg-border/70" aria-label="Günlük sayaç">
-        <div className="bg-surface/95 px-4 py-3">
-          <dt className="text-[11px] font-medium uppercase tracking-wide text-muted">Bugün temas</dt>
-          <dd className="mt-0.5 text-lg font-semibold text-amber" data-testid="daily-count">{stats.today}</dd>
+        <div className="bg-surface px-4 py-3">
+          <dt className="text-xs font-medium text-muted">Bugün temas</dt>
+          <dd className="mt-0.5 text-lg font-semibold text-foreground" data-testid="daily-count">{stats.today}</dd>
         </div>
-        <div className="bg-surface/95 px-4 py-3">
-          <dt className="text-[11px] font-medium uppercase tracking-wide text-muted">Liste</dt>
+        <div className="bg-surface px-4 py-3">
+          <dt className="text-xs font-medium text-muted">Liste</dt>
           <dd className="mt-0.5 text-lg font-semibold text-foreground">{done}/{list.length}</dd>
         </div>
-        <div className="bg-surface/95 px-4 py-3">
-          <dt className="flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-muted"><Flame className="h-3 w-3" aria-hidden /> Seri</dt>
+        <div className="bg-surface px-4 py-3">
+          <dt className="flex items-center gap-1 text-xs font-medium text-muted"><Flame className="h-3 w-3" aria-hidden /> Seri</dt>
           <dd className="mt-0.5 text-lg font-semibold text-foreground" data-testid="streak">{stats.streak} gün</dd>
         </div>
       </dl>
@@ -154,7 +154,7 @@ function DailyCard({
     }
   }
 
-  const btn = "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors";
+  const btn = "inline-flex min-h-11 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors";
   const ghost = `${btn} border border-border text-foreground hover:bg-surface-2`;
 
   return (
@@ -197,14 +197,14 @@ function DailyCard({
         )}
       </div>
 
-      <details className="rounded-xl border border-border/70 bg-background/30 px-3 py-2 text-sm">
+      <details className="rounded-lg border border-border/70 bg-background/30 px-3 py-2 text-sm">
         <summary className="cursor-pointer text-xs font-medium text-muted">Telefon konuşması (20 sn) ve mesaj metinleri</summary>
         <p className="mt-2 text-[13px] leading-5 text-foreground">{phoneScript}</p>
-        <p className="mt-2 text-[11px] uppercase tracking-wide text-muted">WhatsApp</p>
+        <p className="mt-2 text-xs text-muted">WhatsApp</p>
         <p className="text-[13px] leading-5 text-muted">{waText}</p>
-        <p className="mt-2 flex items-center gap-2 text-[11px] uppercase tracking-wide text-muted">
+        <p className="mt-2 flex items-center gap-2 text-xs text-muted">
           Instagram DM
-          <button type="button" onClick={() => void copyInstagram()} className="inline-flex items-center gap-1 normal-case tracking-normal text-amber"><Copy className="h-3 w-3" aria-hidden /> kopyala</button>
+          <button type="button" onClick={() => void copyInstagram()} className="inline-flex items-center gap-1 normal-case tracking-normal text-accent"><Copy className="h-3 w-3" aria-hidden /> kopyala</button>
         </p>
         <p className="text-[13px] leading-5 text-muted">{igText}</p>
       </details>
@@ -213,7 +213,7 @@ function DailyCard({
         <button type="button" disabled={busy !== null} onClick={() => log("phone")} className={ghost}><PhoneCall className="h-4 w-4" aria-hidden /> Aradım</button>
         <button type="button" disabled={busy !== null} onClick={() => log("whatsapp")} className={ghost}><MessageCircle className="h-4 w-4" aria-hidden /> WhatsApp attım</button>
         <button type="button" disabled={busy !== null} onClick={() => log("instagram")} className={ghost}><AtSign className="h-4 w-4" aria-hidden /> DM attım</button>
-        <button type="button" disabled={busy !== null} onClick={() => onReply(item.doneToday.at(-1) ?? null)} className={`${btn} btn-amber`}><Reply className="h-4 w-4" aria-hidden /> Yanıt geldi</button>
+        <button type="button" disabled={busy !== null} onClick={() => onReply(item.doneToday.at(-1) ?? null)} className={`${btn} btn-accent`}><Reply className="h-4 w-4" aria-hidden /> Yanıt geldi</button>
         <button
           type="button"
           disabled={busy !== null}
@@ -230,7 +230,7 @@ function DailyCard({
       </div>
       <div className="flex justify-between text-xs">
         <button type="button" onClick={onDetail} className="inline-flex items-center gap-1 text-muted hover:text-foreground"><UserRound className="h-3.5 w-3.5" aria-hidden /> Ayrıntı ve geçmiş</button>
-        {p.lead_id && <Link href="/crm/leads" prefetch={false} className="text-amber">CRM&apos;de</Link>}
+        {p.lead_id && <Link href="/crm/leads" prefetch={false} className="text-accent">CRM&apos;de</Link>}
       </div>
       {confirm.dialog}
     </article>

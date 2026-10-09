@@ -71,7 +71,7 @@ export default function MonthlyReportPrintPage({ params }: { params: Promise<{ c
         <button
           type="button"
           onClick={() => window.print()}
-          className="btn-amber inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
+          className="btn-accent inline-flex min-h-10 items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
         >
           <Printer className="h-4 w-4" aria-hidden /> Yazdır / PDF kaydet
         </button>

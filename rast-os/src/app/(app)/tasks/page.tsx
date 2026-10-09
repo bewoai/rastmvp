@@ -72,7 +72,7 @@ export default function TasksPage() {
           <Button className="max-md:hidden" onClick={openComposer}>
             <span className="flex items-center gap-1.5">
               <Plus className="h-4 w-4" /> Yeni Görev
-              <kbd className="ml-1 rounded border border-black/25 px-1 text-[10px] font-semibold leading-4">Q</kbd>
+              <kbd className="ml-1 rounded border border-black/25 px-1 text-[11px] font-semibold leading-4">Q</kbd>
             </span>
           </Button>
         }
@@ -125,7 +125,7 @@ export default function TasksPage() {
         type="button"
         onClick={openComposer}
         aria-label="Yeni görev"
-        className="btn-amber fixed bottom-5 right-5 z-30 flex items-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold md:hidden"
+        className="btn-accent fixed bottom-5 right-5 z-30 flex items-center gap-2 rounded-full px-5 py-3.5 text-sm font-semibold md:hidden"
       >
         <Plus className="h-5 w-5" /> Yeni Görev
       </button>

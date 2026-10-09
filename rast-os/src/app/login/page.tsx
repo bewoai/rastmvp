@@ -78,7 +78,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-foreground outline-none focus:border-amber/60 focus:ring-4 focus:ring-amber/10 md:text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-foreground outline-none focus:border-accent/60 md:text-sm"
                 placeholder="ornek@rastcreative.com"
               />
             </div>
@@ -91,7 +91,7 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-foreground outline-none focus:border-amber/60 focus:ring-4 focus:ring-amber/10 md:text-sm"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2.5 text-base text-foreground outline-none focus:border-accent/60 md:text-sm"
                 placeholder="••••••••"
               />
             </div>
@@ -105,7 +105,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="btn-amber min-h-11 w-full rounded-lg py-2.5 text-sm font-medium disabled:opacity-60"
+              className="btn-accent min-h-11 w-full rounded-lg py-2.5 text-sm font-medium disabled:opacity-60"
             >
               {loading ? "Giriş yapılıyor…" : "Giriş yap"}
             </button>

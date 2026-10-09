@@ -5,11 +5,11 @@ import { ShieldCheck, Sun, Radar } from "lucide-react";
 import { Badge } from "@/components/ui";
 import type { OutreachMessage, Prospect, ScoreItem } from "@/lib/types";
 
-type Tone = "default" | "amber" | "success" | "warning" | "danger" | "muted";
+type Tone = "default" | "accent" | "success" | "warning" | "danger" | "muted";
 
 export const prospectStatusLabel: Record<Prospect["status"], { label: string; tone: Tone }> = {
   new: { label: "Yeni", tone: "muted" },
-  qualified: { label: "Kalifiye", tone: "amber" },
+  qualified: { label: "Kalifiye", tone: "accent" },
   queued: { label: "Dizide", tone: "default" },
   contacted: { label: "Temas edildi", tone: "default" },
   replied: { label: "Yanıt verdi", tone: "success" },
@@ -21,7 +21,7 @@ export const PROSPECT_STATUSES = Object.keys(prospectStatusLabel) as Prospect["s
 
 export const messageStatusLabel: Record<OutreachMessage["status"], { label: string; tone: Tone }> = {
   draft: { label: "Taslak", tone: "muted" },
-  approved: { label: "Onaylandı", tone: "amber" },
+  approved: { label: "Onaylandı", tone: "accent" },
   scheduled: { label: "Gönderimde", tone: "warning" },
   sent: { label: "Gönderildi", tone: "default" },
   bounced: { label: "Teslim edilemedi", tone: "danger" },
@@ -53,14 +53,14 @@ export function GoogleAttribution({ className = "" }: { className?: string }) {
 }
 
 export function ScoreBadge({ score, breakdown }: { score: number; breakdown?: ScoreItem[] }) {
-  const tone: Tone = score >= 70 ? "success" : score >= 50 ? "amber" : score >= 30 ? "default" : "muted";
+  const tone: Tone = score >= 70 ? "success" : score >= 50 ? "accent" : score >= 30 ? "default" : "muted";
   if (!breakdown?.length) return <Badge tone={tone}>{score}</Badge>;
   return (
     <details className="group relative inline-block">
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden" aria-label={`Puan ${score} — dökümü göster`}>
         <Badge tone={tone}>{score}</Badge>
       </summary>
-      <div className="absolute left-0 z-20 mt-1 w-64 rounded-xl border border-border bg-surface p-3 text-xs shadow-xl">
+      <div className="absolute left-0 z-20 mt-1 w-64 popover p-3 text-xs">
         <p className="mb-2 font-medium text-foreground">Puan dökümü · {score}/100</p>
         <ul className="space-y-1">
           {breakdown.map((i) => (
@@ -80,7 +80,7 @@ export function CompliancePanel({ dailyCap, emailEnabled }: { dailyCap?: number;
   return (
     <details className="card mb-4 overflow-hidden text-sm">
       <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 font-medium text-foreground [&::-webkit-details-marker]:hidden">
-        <ShieldCheck className="h-4 w-4 text-amber" aria-hidden />
+        <ShieldCheck className="h-4 w-4 text-muted" aria-hidden />
         Uyum notları — ticari ileti, İYS, ret hakkı, KVKK
         <span className="ml-auto text-xs font-normal text-muted">aç / kapat</span>
       </summary>
@@ -100,7 +100,7 @@ export function CompliancePanel({ dailyCap, emailEnabled }: { dailyCap?: number;
         </p>
         <p>
           <strong className="text-foreground">KVKK.</strong> Kişisel veri en az düzeyde (yetkili adı, cep telefonu yalnızca gerekirse).{" "}
-          <a href={KVKK_URL} target="_blank" rel="noreferrer" className="text-amber underline-offset-2 hover:underline">Aydınlatma metni</a>.
+          <a href={KVKK_URL} target="_blank" rel="noreferrer" className="text-accent underline-offset-2 hover:underline">Aydınlatma metni</a>.
           Google Places verisi saklanmaz; gösterimde canlı çekilir.
         </p>
         <p>
@@ -119,7 +119,7 @@ export function CompliancePanel({ dailyCap, emailEnabled }: { dailyCap?: number;
 /** Modül içi gezinme (Bugün ↔ Müşteri Bulma). */
 export function GrowthNav({ active }: { active: "bugun" | "modul" }) {
   const cls = (on: boolean) =>
-    `inline-flex min-h-10 items-center gap-1.5 rounded-xl px-3 py-2 text-sm font-medium transition-colors ${on ? "bg-amber/20 text-amber" : "border border-border text-foreground hover:bg-surface-2"}`;
+    `inline-flex min-h-10 items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${on ? "border border-[#3a3a3a] bg-surface-2 text-foreground" : "border border-border text-muted hover:bg-surface-2 hover:text-foreground"}`;
   return (
     <nav aria-label="Müşteri Bulma" className="flex flex-wrap gap-2">
       <Link href="/musteri-bulma/bugun" prefetch={false} className={cls(active === "bugun")} aria-current={active === "bugun" ? "page" : undefined}>

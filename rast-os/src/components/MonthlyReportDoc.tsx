@@ -32,7 +32,7 @@ const REPORT_CSS = `
 `;
 
 const toneClass = (tone: string) =>
-  tone === "success" ? "ok" : tone === "amber" || tone === "warning" ? "wait" : tone === "danger" ? "bad" : "";
+  tone === "success" ? "ok" : tone === "accent" || tone === "warning" ? "wait" : tone === "danger" ? "bad" : "";
 
 const longDate = (s?: string | null) => {
   const day = localDay(s);

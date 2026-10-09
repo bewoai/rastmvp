@@ -174,11 +174,11 @@ export default function ExpensesPage() {
     { key: "date", header: "Tarih", sort: (x) => x.paid_at, cell: (x) => dateTR(x.paid_at) },
     {
       key: "installment", header: "Taksit", sort: (x) => x.installment_total,
-      cell: (x) => (x.installment_total ? <Badge tone="amber">{x.installment_number ?? "?"}/{x.installment_total}</Badge> : "—"),
+      cell: (x) => (x.installment_total ? <Badge tone="accent">{x.installment_number ?? "?"}/{x.installment_total}</Badge> : "—"),
     },
     {
       key: "recurring", header: "Tekrar", mobile: "hide", sort: (x) => (x.is_recurring ? 0 : 1),
-      cell: (x) => (x.is_recurring ? <Badge tone="amber">Aylık</Badge> : "—"),
+      cell: (x) => (x.is_recurring ? <Badge tone="accent">Aylık</Badge> : "—"),
     },
     {
       key: "payment", header: "Ödeme", mobile: "badge", sort: (x) => (x.payment_status === "pending" ? 0 : 1),
@@ -198,7 +198,7 @@ export default function ExpensesPage() {
             }
             aria-label={`Ödendi olarak işaretle: ${x.vendor || x.category || "gider"}`}
             title="Ödendi olarak işaretle"
-            className="inline-flex items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+            className="inline-flex items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             <Badge tone="warning">Bekliyor · Ödendi işaretle</Badge>
           </button>
@@ -225,7 +225,7 @@ export default function ExpensesPage() {
       <StatStrip
         items={[
           { label: "Ödenen gider (TL)", value: TRY(stats.total), tone: "warning" },
-          { label: "Tekrarlayan (aylık, TL)", value: TRY(stats.recurring), tone: "amber", hint: `Kur: $${usd} · €${eur}` },
+          { label: "Tekrarlayan (aylık, TL)", value: TRY(stats.recurring), tone: "accent", hint: `Kur: $${usd} · €${eur}` },
           { label: "Bekleyen taksit / ödeme", value: TRY(stats.pending), tone: "danger" },
           { label: "Kayıt sayısı", value: String(stats.period.length) },
         ]}

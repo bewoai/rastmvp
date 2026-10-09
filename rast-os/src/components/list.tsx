@@ -100,14 +100,14 @@ export function SearchBox({
         placeholder={placeholder}
         aria-label={label}
         autoComplete="off"
-        className="h-10 w-full rounded-xl border border-border/80 bg-surface/60 pl-9 pr-9 text-base text-foreground outline-none transition-shadow placeholder:text-muted/60 focus:border-amber/60 focus:ring-4 focus:ring-amber/10 md:h-9 md:text-sm [&::-webkit-search-cancel-button]:hidden"
+        className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-9 text-base text-foreground outline-none transition-colors placeholder:text-faint hover:border-[#333] focus:border-accent/60 md:h-9 md:text-sm [&::-webkit-search-cancel-button]:hidden"
       />
       {value && (
         <button
           type="button"
           onClick={() => onChange("")}
           aria-label="Aramayı temizle"
-          className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-lg text-muted hover:bg-surface-2 hover:text-foreground"
+          className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-foreground"
         >
           <X className="h-3.5 w-3.5" aria-hidden />
         </button>
@@ -164,7 +164,7 @@ export function Tabs<T extends string>({
       role="tablist"
       aria-label={label}
       onKeyDown={onKeyDown}
-      className={`flex gap-0.5 overflow-x-auto overflow-y-hidden border-b border-border/70 [scrollbar-width:none] sm:gap-1 [&::-webkit-scrollbar]:hidden ${className}`}
+      className={`flex gap-0.5 overflow-x-auto overflow-y-hidden border-b border-border [scrollbar-width:none] sm:gap-1 [&::-webkit-scrollbar]:hidden ${className}`}
     >
       {tabs.map((t) => {
         const active = t.id === value;
@@ -180,12 +180,12 @@ export function Tabs<T extends string>({
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(t.id)}
             className={`-mb-px flex min-h-10 shrink-0 items-center gap-1.5 border-b-2 px-2.5 py-2 text-sm transition-colors sm:px-3 ${
-              active ? "border-amber text-foreground" : "border-transparent text-muted hover:text-foreground"
+              active ? "border-accent font-medium text-foreground" : "border-transparent text-muted hover:text-foreground"
             }`}
           >
             {t.icon}
             {t.label}
-            {t.count !== undefined && <span className="text-xs text-muted">{t.count}</span>}
+            {t.count !== undefined && <span className="text-xs text-faint">{t.count}</span>}
           </button>
         );
       })}
@@ -215,12 +215,12 @@ export function FilterChips<T extends string>({
             type="button"
             aria-pressed={active}
             onClick={() => onChange(o.id)}
-            className={`inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-xs font-medium transition-colors md:h-8 ${
-              active ? "bg-amber/20 text-amber" : "bg-surface-2/70 text-muted hover:text-foreground"
+            className={`inline-flex h-9 items-center gap-1.5 rounded-md border px-3 text-[13px] font-medium transition-colors md:h-8 ${
+              active ? "border-[#3a3a3a] bg-surface-2 text-foreground" : "border-transparent text-muted hover:bg-surface-2/60 hover:text-foreground"
             }`}
           >
             {o.label}
-            {o.count !== undefined && <span className={active ? "text-amber/80" : "text-muted/80"}>{o.count}</span>}
+            {o.count !== undefined && <span className={active ? "text-muted" : "text-faint"}>{o.count}</span>}
           </button>
         );
       })}
@@ -238,7 +238,7 @@ export function Toolbar({ children }: { children: React.ReactNode }) {
 /* ------------------------------------------------------------------ */
 
 const iconBtn =
-  "flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors md:h-8 md:w-8";
+  "flex h-10 w-10 items-center justify-center rounded-md text-faint transition-colors md:h-8 md:w-8";
 
 /** Tüm listelerde aynı yerde/aynı biçimde düzenle + sil. `label` ekran okuyucu için kaydın adı. */
 export function RowActions({
@@ -261,7 +261,7 @@ export function RowActions({
         </button>
       )}
       {onDelete && (
-        <button type="button" onClick={onDelete} aria-label={`Sil: ${label}`} title="Sil" className={`${iconBtn} hover:bg-danger/15 hover:text-danger`}>
+        <button type="button" onClick={onDelete} aria-label={`Sil: ${label}`} title="Sil" className={`${iconBtn} hover:bg-danger/12 hover:text-danger`}>
           <Trash2 className="h-4 w-4" aria-hidden />
         </button>
       )}
@@ -280,13 +280,13 @@ export function StatusSelect<T extends string>({
   label,
 }: {
   value: T;
-  options: { value: T; label: string; tone: "default" | "amber" | "success" | "warning" | "danger" | "muted" }[];
+  options: { value: T; label: string; tone: "default" | "accent" | "success" | "warning" | "danger" | "muted" }[];
   onChange: (next: T) => void;
   label: string;
 }) {
   const current = options.find((o) => o.value === value);
   return (
-    <label className="relative inline-flex cursor-pointer rounded-full focus-within:ring-2 focus-within:ring-amber/60">
+    <label className="relative inline-flex cursor-pointer rounded-full focus-within:ring-2 focus-within:ring-accent/60">
       <Badge tone={current?.tone ?? "muted"}>
         {current?.label ?? value}
         <ChevronDown className="ml-1 h-3 w-3 opacity-70" aria-hidden />
@@ -391,7 +391,7 @@ export function DataTable<T>({
           type="button"
           onClick={() => onOpen(row)}
           aria-label={openLabel ? openLabel(row) : undefined}
-          className="block max-w-full rounded-md text-left outline-none transition-colors hover:text-amber focus-visible:ring-2 focus-visible:ring-amber/60"
+          className="block max-w-full rounded-md text-left outline-none transition-colors hover:text-accent-hi focus-visible:ring-2 focus-visible:ring-accent/60"
         >
           {content}
         </button>
@@ -405,7 +405,7 @@ export function DataTable<T>({
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-border text-left text-xs text-muted">
+            <tr className="border-b border-border text-left text-xs text-faint">
               {columns.map((col) => {
                 const active = sortState?.key === col.key;
                 return (
@@ -413,13 +413,13 @@ export function DataTable<T>({
                     key={col.key}
                     scope="col"
                     aria-sort={active ? (sortState.dir === 1 ? "ascending" : "descending") : undefined}
-                    className={`px-3 py-2.5 font-medium ${col.className ?? ""}`}
+                    className={`px-4 py-2.5 font-medium ${col.className ?? ""}`}
                   >
                     {col.sort ? (
                       <button
                         type="button"
                         onClick={() => toggleSort(col.key)}
-                        className={`inline-flex items-center gap-1 rounded outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-amber/60 ${active ? "text-foreground" : ""}`}
+                        className={`inline-flex items-center gap-1 rounded outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent/60 ${active ? "text-foreground" : ""}`}
                       >
                         {col.header}
                         {active && (sortState.dir === 1 ? <ArrowUp className="h-3 w-3" aria-hidden /> : <ArrowDown className="h-3 w-3" aria-hidden />)}
@@ -430,14 +430,14 @@ export function DataTable<T>({
                   </th>
                 );
               })}
-              {actions && <th scope="col" className="w-px px-3 py-2.5"><span className="sr-only">İşlemler</span></th>}
+              {actions && <th scope="col" className="w-px px-4 py-2.5"><span className="sr-only">İşlemler</span></th>}
             </tr>
           </thead>
           <tbody>
             {sortedRows.map((row) => (
-              <tr key={rowKey(row)} className="border-b border-border/50 last:border-0 hover:bg-surface-2/40">
+              <tr key={rowKey(row)} className="border-b border-border/70 last:border-0 hover:bg-surface-2/50">
                 {columns.map((col) => (
-                  <td key={col.key} className={`px-3 py-2 align-middle ${toneCls[col.tone ?? "quiet"]} ${col.className ?? ""}`}>
+                  <td key={col.key} className={`px-4 py-2.5 align-middle ${toneCls[col.tone ?? "quiet"]} ${col.className ?? ""}`}>
                     {renderCell(col, row)}
                   </td>
                 ))}
@@ -466,13 +466,13 @@ export function DataTable<T>({
             <dl className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
               {metas.map((m) => (
                 <div key={m.key} className="min-w-0">
-                  <dt className="text-muted/80">{m.header}</dt>
+                  <dt className="text-faint">{m.header}</dt>
                   <dd className={`truncate ${m.tone === "strong" ? "text-foreground" : "text-muted"}`}>{m.cell(row)}</dd>
                 </div>
               ))}
             </dl>
           )}
-          {actions && <div className="mt-2 border-t border-border/60 pt-1.5">{actions(row)}</div>}
+          {actions && <div className="mt-2 border-t border-border pt-1.5">{actions(row)}</div>}
         </li>
       ))}
     </ul>
@@ -489,7 +489,7 @@ export function PageLoading({ title, subtitle, rows = 6 }: { title: string; subt
     <div role="status" aria-live="polite" aria-busy="true">
       <PageHeader title={title} subtitle={subtitle} />
       <span className="sr-only">Yükleniyor…</span>
-      <div className="card divide-y divide-border/50 overflow-hidden" aria-hidden>
+      <div className="card divide-y divide-border overflow-hidden" aria-hidden>
         {Array.from({ length: rows }, (_, i) => (
           <div key={i} className="flex animate-pulse items-center gap-4 px-4 py-3.5">
             <div className="h-3 w-1/4 rounded bg-surface-2" />

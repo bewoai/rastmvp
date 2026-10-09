@@ -72,18 +72,18 @@ export default function PipelinePage() {
                         type="button"
                         onClick={() => setModal({ initial: l })}
                         aria-label={`Düzenle: ${l.company_name}`}
-                        className="block w-full rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-amber/60"
+                        className="block w-full rounded-md text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/60"
                       >
                         <span className="block truncate text-sm font-medium text-foreground">{l.company_name}</span>
                         {l.contact_person && <span className="mt-0.5 block truncate text-xs text-muted">{l.contact_person}</span>}
-                        {l.est_budget ? <span className="mt-1 block text-xs text-amber">{TRY(l.est_budget)}</span> : null}
+                        {l.est_budget ? <span className="mt-1 block text-xs tabular-nums text-muted">{TRY(l.est_budget)}</span> : null}
                         {due && <span className={`mt-1 block text-xs ${overdue ? "text-danger" : "text-muted"}`}>Takip: {dateTR(l.next_followup_at)}{overdue ? " · gecikti" : ""}</span>}
                       </button>
                       <select
                         aria-label={`Aşama: ${l.company_name}`}
                         value={l.status}
                         onChange={(e) => patchRecord("leads", l.id, { status: e.target.value as LeadStatus }, "Aşama güncellenemedi")}
-                        className="mt-2 h-9 w-full rounded-md border border-border bg-background px-2 text-base text-muted outline-none focus:border-amber/60 md:h-8 md:text-xs"
+                        className="mt-2 h-9 w-full rounded-md border border-border bg-background px-2 text-base text-muted outline-none focus:border-accent/60 md:h-8 md:text-xs"
                       >
                         {leadPipeline.map((s) => (
                           <option key={s} value={s}>{leadStatus[s].label}</option>

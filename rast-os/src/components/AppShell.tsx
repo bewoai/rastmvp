@@ -78,7 +78,7 @@ function NavProgress() {
   if (pendingFor === null || pendingFor !== pathname) return null;
   return (
     <div aria-hidden className="pointer-events-none fixed inset-x-0 top-0 z-[70] h-0.5">
-      <div className="nav-progress h-full origin-left bg-amber" />
+      <div className="nav-progress h-full origin-left bg-accent" />
     </div>
   );
 }
@@ -147,7 +147,7 @@ export default function AppShell({
     <div className="relative flex h-dvh overflow-hidden bg-background print:block print:h-auto print:overflow-visible print:bg-white">
       <a
         href="#main"
-        className="sr-only z-[80] rounded-lg bg-amber px-4 py-2 text-sm font-medium text-background focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
+        className="sr-only z-[80] rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-fg focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
       >
         İçeriğe geç
       </a>
@@ -163,7 +163,7 @@ export default function AppShell({
 
       <div className="relative z-10 flex min-w-0 flex-1 flex-col print:block">
         <Topbar onMenu={() => setOpen(true)} userName={userName} />
-        <main id="main" tabIndex={-1} className="app-main flex-1 overflow-y-auto p-4 outline-none md:p-6 print:overflow-visible print:bg-none print:p-0">{children}</main>
+        <main id="main" tabIndex={-1} className="app-main flex-1 overflow-y-auto p-4 outline-none md:px-8 md:py-7 print:overflow-visible print:bg-none print:p-0"><div className="mx-auto w-full max-w-[1280px] print:max-w-none">{children}</div></main>
       </div>
 
       {/* Global Q Hızlı Görev Ekle + bildirimler (kendi state'leri; kabuğu render etmez).

@@ -175,7 +175,7 @@ export default function EquipmentManager({ view }: { view: EquipmentView }) {
           : "Yalnızca elinizde bulunan ekipmanların durum, zimmet ve bakım takibi"}
         action={
           <div className="flex flex-wrap gap-2">
-            <Link prefetch={false} href={isPlanned ? "/equipment" : "/equipment/planned"} className="inline-flex min-h-10 items-center rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2">
+            <Link prefetch={false} href={isPlanned ? "/equipment" : "/equipment/planned"} className="inline-flex min-h-10 items-center rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-surface-2">
               {isPlanned ? "Aktif ekipmanları gör" : "Alınacakları gör"}
             </Link>
             <Button onClick={add}>
@@ -188,7 +188,7 @@ export default function EquipmentManager({ view }: { view: EquipmentView }) {
       <StatStrip
         items={[
           { label: isPlanned ? "Alınacak sayısı" : "Aktif ekipman", value: String(rows.length) },
-          { label: isPlanned ? "Tahmini toplam bütçe" : "Toplam envanter değeri", value: TRY(inventoryValue), tone: "amber" },
+          { label: isPlanned ? "Tahmini toplam bütçe" : "Toplam envanter değeri", value: TRY(inventoryValue), tone: "accent" },
           ...(!isPlanned ? [{ label: "Bakımda / arızalı", value: String(counts.issue), tone: "warning" as const }] : []),
         ]}
       />

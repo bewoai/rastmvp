@@ -4,11 +4,11 @@ import { ShieldAlert } from "lucide-react";
 
 export const PORTAL_PRIVACY_NOTE = "Bu sayfa gizli bağlantıyla paylaşılır; bağlantıyı iletmeyin.";
 
-type Tone = "default" | "amber" | "success" | "warning" | "danger" | "muted";
+type Tone = "default" | "accent" | "success" | "warning" | "danger" | "muted";
 
 const chipTone: Record<Tone, string> = {
   default: "bg-[#eef1f6] text-[#1B2A49] ring-[#dfe4ee]",
-  amber: "bg-[#fff3e8] text-[#a8430a] ring-[#f7d3b8]",
+  accent: "bg-[#fff3e8] text-[#a8430a] ring-[#f7d3b8]",
   success: "bg-[#e8f5ee] text-[#1d6b41] ring-[#c4e5d2]",
   warning: "bg-[#fff7e0] text-[#8a5a00] ring-[#f1dfa6]",
   danger: "bg-[#fdecec] text-[#a12828] ring-[#f3c7c7]",

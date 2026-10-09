@@ -112,10 +112,10 @@ function SequenceModal({ initial, onClose }: { initial: OutreachSequence | null;
             </Field>
           </div>
           <label className="inline-flex items-center gap-2 text-sm text-muted">
-            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="h-4 w-4 accent-[var(--amber)]" /> Etkin (yeni taslak ve sonraki adımlar açılır)
+            <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} className="h-4 w-4 accent-[var(--accent)]" /> Etkin (yeni taslak ve sonraki adımlar açılır)
           </label>
           {steps.map((st, i) => (
-            <fieldset key={i} className="rounded-xl border border-border/70 p-3" onFocus={() => setPreview(i)}>
+            <fieldset key={i} className="rounded-lg border border-border/70 p-3" onFocus={() => setPreview(i)}>
               <legend className="px-1 text-xs font-medium text-muted">{i + 1}. adım</legend>
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-[6rem_1fr_auto] sm:items-end">
                 <Field label="Gün"><Input type="number" min={0} max={90} value={st.day} onChange={(e) => setStep(i, { day: Number(e.target.value) })} /></Field>
@@ -129,8 +129,8 @@ function SequenceModal({ initial, onClose }: { initial: OutreachSequence | null;
             <Plus className="h-4 w-4" aria-hidden /> Adım ekle
           </Button>
         </div>
-        <aside className="rounded-xl border border-border/70 bg-background/40 p-3 text-sm">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted">Önizleme · {Math.min(preview, steps.length - 1) + 1}. adım (örnek aday)</p>
+        <aside className="rounded-lg border border-border/70 bg-background/40 p-3 text-sm">
+          <p className="mb-2 text-xs font-medium text-muted">Önizleme · {Math.min(preview, steps.length - 1) + 1}. adım (örnek aday)</p>
           {pv && (
             <>
               <p className="font-medium text-foreground">{renderTemplate(pv.subject, SAMPLE).text || "—"}</p>

@@ -172,7 +172,7 @@ export default function AdsPage() {
             type="button"
             onClick={() => { void loadAccounts(); setRefreshKey((value) => value + 1); }}
             disabled={accountsLoading || reportLoading}
-            className="btn-amber inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-accent inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${accountsLoading || reportLoading ? "animate-spin" : ""}`} />
             Yenile
@@ -181,7 +181,7 @@ export default function AdsPage() {
       />
 
       {pageError && (
-        <div role="alert" className="mb-4 flex items-center gap-3 rounded-xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
+        <div role="alert" className="mb-4 flex items-center gap-3 rounded-lg border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
           <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden /> <span className="min-w-0 break-words">{pageError}</span>
         </div>
       )}
@@ -197,10 +197,10 @@ export default function AdsPage() {
               type="button"
               key={item}
               onClick={() => { setPlatform(item); setAccountId(""); setReportError(null); }}
-              className={`card card-hover flex items-center justify-between gap-4 p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-amber/70 ${active ? "border-amber/50 bg-amber/[0.055]" : ""}`}
+              className={`card card-hover flex items-center justify-between gap-4 p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-accent/70 ${active ? "border-accent/50 bg-surface-2" : ""}`}
             >
               <span className="flex min-w-0 items-center gap-3">
-                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-sm font-semibold ${item === "google" ? "bg-[#4285f4]/15 text-[#8ab4f8]" : "bg-[#1877f2]/15 text-[#70a7ff]"}`}>
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg text-sm font-semibold ${item === "google" ? "bg-[#4285f4]/15 text-[#8ab4f8]" : "bg-[#1877f2]/15 text-[#70a7ff]"}`}>
                   {item === "google" ? "G" : "M"}
                 </span>
                 <span className="min-w-0">
@@ -224,7 +224,7 @@ export default function AdsPage() {
               value={effectiveAccountId}
               onChange={(event) => setAccountId(event.target.value)}
               disabled={!platformAccounts.length}
-              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-amber/60 disabled:cursor-not-allowed disabled:opacity-60"
+              className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-accent/60 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {!platformAccounts.length && <option value="">Bağlı hesap bulunamadı</option>}
               {platformAccounts.map((account) => <option key={account.id} value={account.id}>{account.name} · {account.currency}</option>)}
@@ -243,11 +243,11 @@ export default function AdsPage() {
           <div className="grid grid-cols-2 gap-2">
             <label>
               <span className="mb-1.5 block text-xs font-medium text-muted">Başlangıç</span>
-              <input type="date" value={from} max={to} onChange={(event) => setFrom(event.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-amber/60" />
+              <input type="date" value={from} max={to} onChange={(event) => setFrom(event.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-accent/60" />
             </label>
             <label>
               <span className="mb-1.5 block text-xs font-medium text-muted">Bitiş</span>
-              <input type="date" value={to} min={from} onChange={(event) => setTo(event.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-amber/60" />
+              <input type="date" value={to} min={from} onChange={(event) => setTo(event.target.value)} className="h-10 rounded-lg border border-border bg-background px-3 text-sm text-foreground outline-none focus:border-accent/60" />
             </label>
           </div>
         </div>
@@ -280,7 +280,7 @@ export default function AdsPage() {
       ) : effectiveAccountId ? (
         <div className={reportLoading ? "opacity-60 transition-opacity" : "transition-opacity"} aria-busy={reportLoading}>
           <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-6">
-            <StatCard label="Harcama" value={formatMoney(currentInsight?.totals.spend ?? 0, currency)} icon={CircleDollarSign} tone="amber" />
+            <StatCard label="Harcama" value={formatMoney(currentInsight?.totals.spend ?? 0, currency)} icon={CircleDollarSign} tone="accent" />
             <StatCard label="Gösterim" value={formatNumber(currentInsight?.totals.impressions ?? 0)} icon={Eye} />
             <StatCard label="Tıklama" value={formatNumber(currentInsight?.totals.clicks ?? 0)} icon={MousePointerClick} />
             <StatCard label="Tıklama oranı" value={formatPercent(currentInsight?.totals.ctr ?? 0)} icon={Gauge} />
@@ -319,7 +319,7 @@ export default function AdsPage() {
                           <div className="min-w-52">
                             <p className="font-medium text-foreground">{campaign.name}</p>
                             <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface-2">
-                              <div className="h-full rounded-full bg-amber/70" style={{ width: `${Math.max((campaign.spend / maxSpend) * 100, campaign.spend ? 3 : 0)}%` }} />
+                              <div className="h-full rounded-full bg-accent/70" style={{ width: `${Math.max((campaign.spend / maxSpend) * 100, campaign.spend ? 3 : 0)}%` }} />
                             </div>
                           </div>
                         </td>

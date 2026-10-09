@@ -1,4 +1,4 @@
-# Migration uygulama sırası (0008 → 0019)
+# Migration uygulama sırası (0008 → 0020)
 
 > **Durum:** Bu dosyalardan hiçbiri henüz hiçbir veritabanında çalıştırılmadı.
 > Önce staging / branch veritabanında, sonra canlıda uygulanır. Sıra
@@ -11,7 +11,7 @@
    Providers → "Allow new users to sign up" **kapalı**. 0008 uygulanana kadar
    yeni kayıt olan herkes en eski organizasyona otomatik bağlanıyor
    (0001/0007 `handle_new_user()`); açık kalırsa veri sızar.
-2. **Çevrimdışı kontrol:** `cd rast-os && npm run db:check` — tüm zinciri (0001–0018 + 0008–0018 ikinci
+2. **Çevrimdışı kontrol:** `cd rast-os && npm run db:check` — tüm zinciri (0001–0020 + 0008–0020 ikinci
    geçiş) PGlite'ta uygular, yapı / yetki / RLS / RPC kontrollerini yapar (CI'da `db-check` işi).
    Uzak veritabanına bağlanmaz; gerçek staging'in yerini tutmaz.
 3. **Önce staging:** Tüm sırayı önce staging / branch projesinde çalıştır,
@@ -35,12 +35,13 @@
 10. `0017_lead_intake_rpc.sql` — web sitesi formu → CRM lead + "Lead'i 24 saat içinde ara" görevi (`lead_intake` RPC, `lead_intake_settings`, `tasks.lead_id`). Sır + org id kurulumu için README-0017.
 11. `0018_client_portal.sql` — müşteri portalı: `client_portal_tokens` + hesapsız salt okunur portal için anon RPC'ler (`portal_get`, `portal_touch`, `portal_report_get`). 0013 ve 0015'e dayanır; iptal akışı ve gizlilik notu README-0018'de.
 12. `0019_growth_engine.sql` — Müşteri Bulma: `prospects`, `outreach_sequences`, `outreach_messages`, `suppression_list`, `outreach_settings` + `outreach_unsubscribe` / `outreach_cron_claim` / `outreach_cron_result` RPC'leri. 0011, 0012 ve 0017'den sonra. CRON_SECRET hash'i + ret anahtarı kurulumu için README-0019.
+13. `0020_bootstrap_rpc.sql` — hız: `app_bootstrap(p_collections, p_since)` RPC'si; profil + org hedefleri + istenen koleksiyonlar tek istekte (SECURITY INVOKER, RLS aynen; büyük tablolarda son 18 ay + açık kayıtlar). Tablo değişikliği yok; uygulanmadan önce de uygulama çalışır (eski yola düşer). Ayrıntı README-0020.
 
 > 0013 ve 0014 birbirinden bağımsız yazıldı; yine de numara sırasıyla
 > (0013 → 0014) uygulanır.
 
 Uygulama: Supabase Dashboard → SQL Editor → dosyayı yapıştır → Run (veya
-bağlı projede `supabase db push`). 0008–0019 dosyaları idempotent olarak yazıldı; tekrar çalıştırmak
+bağlı projede `supabase db push`). 0008–0020 dosyaları idempotent olarak yazıldı; tekrar çalıştırmak
 güvenlidir.
 
 ## Son kontroller
@@ -76,5 +77,7 @@ atlar), uygulamadan / anon key + kullanıcı JWT'si ile yap.
   `select label, last_seen_at, revoked_at from public.client_portal_tokens order by created_at desc limit 5;`
   ve `select has_table_privilege('anon', 'public.client_portal_tokens', 'select');` → `false`.
 - **0019:** README-0019'daki son kontroller: keşif tekrarında aday çoğalmaz; onaylanmamış mesaj gönderilmez; `curl -H "Authorization: Bearer $CRON_SECRET" …/api/growth/cron`; ret bağlantısı → `suppression_list`.
+- **0020:** Sayfayı yenile → DevTools Network'te Supabase'e tek `rpc/app_bootstrap` isteği;
+  `select has_function_privilege('anon', 'public.app_bootstrap(text[],date)', 'execute');` → `false`.
 - **Sonra:** Kayıtlar kapalı kalır; yeni kullanıcılar yalnız admin daveti ile
   eklenir. Kayıtları yeniden açmak gerekirse ancak 0008 doğrulandıktan sonra.

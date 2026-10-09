@@ -64,3 +64,18 @@ Notlar:
   e-posta mesajları zamanla büyüdükçe yük de büyür (yalnızca `activity_logs` 500 satırla sınırlı).
 - Sayfa geçişi örnekleri: Dashboard → İçerik: brands + content_approvals (2 istek, 1 tur);
   Dashboard → Müşteri Bulma: 5 istek, 1 tur; Dashboard → Teklifler: 0 tur.
+
+## Değişiklikler (`perf/hiz`)
+
+### 1) Açılış RPC'si — `app_bootstrap` (0020)
+
+- `init()` + ilk `load()` birleşti: `getSession()` (yerel) → **tek** `rpc('app_bootstrap', { p_collections })`.
+  Yanıt profili (org, rol, ad) ve org hedeflerini de içerir → ayrı `profiles` sorgusu yok; Dashboard ve
+  Ayarlar'daki `useOrgTargets` da ek istek atmaz.
+- Aynı commit'te (sayfa + kabuk bileşenleri) istenen tüm koleksiyonlar bir mikro-görevde toplanır,
+  tek RPC'de çekilir. Sonradan istenenler (sayfa geçişi) yine tek RPC. Uçuştaki koleksiyon ikinci kez istenmez.
+- Büyük tablolarda son 18 ay + açık kayıtlar (README-0020); `activity_logs` 500.
+- **0020 uygulanmamışsa** (`PGRST202`): eski yola düşülür, ama profil artık tablolarla **paralel**
+  (RLS org'u zaten bilir) → 2 tur yerine 1 tur (+ ilk RPC denemesi; sekme başına bir kez).
+- Yenileme sırasında yapılan yerel değişiklikler (ekle/güncelle/sil) ezilmez: `mergeRows` + değişiklik sırası.
+- Demo modu (Supabase env yok) aynı: bellek içi örnek veri, ağ yok.

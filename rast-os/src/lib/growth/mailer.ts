@@ -2,7 +2,9 @@
 //   Mailer arayüzü · SmtpMailer (nodemailer; SMTP_HOST/PORT/USER/PASS/FROM) · NoopMailer (SMTP yokken)
 //   buildOutgoingEmail: gönderen kimliği + iletişim nedeni (B2B) + ret bağlantısı altbilgisi, List-Unsubscribe
 // E-POSTA GÖNDERİMİ VARSAYILAN KAPALI: cron route'u OUTREACH_EMAIL_ENABLED=true olmadan hiçbir Mailer çağırmaz.
-// Not: nodemailer yalnızca SmtpMailer.send içinde dinamik yüklenir; testler ağsız çalışır (type-stripping).
+// Not: nodemailer yalnızca SmtpMailer.send içinde (ortak src/lib/mailer.ts üzerinden) dinamik yüklenir; testler ağsız çalışır (type-stripping).
+import { createSmtpTransport, smtpConfigFromEnv } from "../mailer.ts";
+import type { SmtpConfig } from "../mailer.ts";
 
 export interface OutgoingEmail {
   from: string;
@@ -73,23 +75,9 @@ export class NoopMailer implements Mailer {
   }
 }
 
-export interface SmtpConfig {
-  host: string;
-  port: number;
-  user: string;
-  pass: string;
-  from: string;
-}
-
-export function smtpConfigFromEnv(env: Record<string, string | undefined>): SmtpConfig | null {
-  const host = (env.SMTP_HOST ?? "").trim();
-  const user = (env.SMTP_USER ?? "").trim();
-  const pass = env.SMTP_PASS ?? "";
-  const from = (env.SMTP_FROM ?? "").trim();
-  const port = Number(env.SMTP_PORT ?? 587);
-  if (!host || !user || !pass || !from || !Number.isInteger(port) || port <= 0 || port > 65535) return null;
-  return { host, port, user, pass, from };
-}
+// SMTP yapılandırması ve taşıyıcı (transport) ortak modülde (src/lib/mailer.ts); burada geriye uyumlu yeniden dışa aktarım.
+export { smtpConfigFromEnv };
+export type { SmtpConfig };
 
 /** "Ad <adres>" ya da "adres" → adres. */
 export function addressOf(from: string): string | null {
@@ -105,15 +93,7 @@ export class SmtpMailer implements Mailer {
     this.cfg = cfg;
   }
   async send(mail: OutgoingEmail): Promise<SendResult> {
-    const nodemailer = await import("nodemailer");
-    const transport = nodemailer.createTransport({
-      host: this.cfg.host,
-      port: this.cfg.port,
-      secure: this.cfg.port === 465,
-      auth: { user: this.cfg.user, pass: this.cfg.pass },
-      connectionTimeout: 10_000,
-      socketTimeout: 20_000,
-    });
+    const transport = await createSmtpTransport(this.cfg);
     try {
       const info = await transport.sendMail({ from: mail.from, to: mail.to, subject: mail.subject, text: mail.text, headers: mail.headers });
       const rejected = (info.rejected ?? []).length > 0;

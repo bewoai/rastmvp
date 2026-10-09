@@ -1,7 +1,8 @@
 "use client";
 
+import { Suspense } from "react";
 import { PageHeader } from "@/components/ui";
-import { PageLoading, Tabs, usePersistentState } from "@/components/list";
+import { PageLoading, Tabs, useOpenIntent, usePersistentState } from "@/components/list";
 import { useHydrated, useStore } from "@/lib/store";
 import { useGrowthStatus } from "@/lib/growth/client";
 import { CompliancePanel, GrowthNav } from "@/components/growth/GrowthChrome";
@@ -14,11 +15,23 @@ import { SentTab } from "@/components/growth/SentTab";
 type Tab = "kesfet" | "adaylar" | "diziler" | "kuyruk" | "gonderilenler";
 const TABS: readonly Tab[] = ["kesfet", "adaylar", "diziler", "kuyruk", "gonderilenler"];
 
+// `?ac=<aday id>` (Ctrl/⌘K kayıt araması) için useSearchParams → statik sayfada Suspense sınırı gerekir.
 export default function MusteriBulmaPage() {
+  return (
+    <Suspense fallback={<PageLoading title="Müşteri Bulma" />}>
+      <MusteriBulma />
+    </Suspense>
+  );
+}
+
+function MusteriBulma() {
   const hydrated = useHydrated(["prospects", "outreach_sequences", "outreach_messages", "suppression_list", "leads", "tasks"]);
-  const [tab, setTab] = usePersistentState<Tab>("growth-tab", "kesfet", TABS);
+  const [savedTab, setTab] = usePersistentState<Tab>("growth-tab", "kesfet", TABS);
   const status = useGrowthStatus();
   const prospects = useStore((s) => s.prospects);
+  // Aramadan gelinen aday: "Adaylar" sekmesinde detay penceresi açılır (kapanınca parametre silinir).
+  const intent = useOpenIntent(prospects);
+  const tab: Tab = intent.target ? "adaylar" : savedTab;
   const sequences = useStore((s) => s.outreach_sequences);
   const messages = useStore((s) => s.outreach_messages);
 
@@ -50,7 +63,7 @@ export default function MusteriBulmaPage() {
       />
       <div role="tabpanel" aria-label={tab}>
         {tab === "kesfet" && <DiscoverTab status={status} />}
-        {tab === "adaylar" && <ProspectsTab />}
+        {tab === "adaylar" && <ProspectsTab linked={intent.target} onLinkedClose={() => { if (intent.target) setTab("adaylar"); intent.dismiss(); }} />}
         {tab === "diziler" && <SequencesTab />}
         {tab === "kuyruk" && <QueueTab status={status} />}
         {tab === "gonderilenler" && <SentTab />}

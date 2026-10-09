@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { FormModal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
-import { DataTable, PageLoading, RowActions, SearchBox, Toolbar, useListSearch, useNewIntent } from "@/components/list";
+import { DataTable, PageLoading, RowActions, SearchBox, Toolbar, useListSearch, useNewIntent, useOpenIntent } from "@/components/list";
 import type { Column } from "@/components/list";
 import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
@@ -56,13 +56,29 @@ function BrandModal({ initial, clients, onClose }: { initial: Brand | null; clie
   );
 }
 
+// `?ac=<id>` (Ctrl/⌘K kayıt araması, bildirim zili) için useSearchParams → statik sayfada Suspense sınırı gerekir.
 export default function BrandsPage() {
+  return (
+    <Suspense fallback={<PageLoading title="Markalar" />}>
+      <BrandsList />
+    </Suspense>
+  );
+}
+
+function BrandsList() {
   const hydrated = useHydrated(["brands", "clients"]);
   const brands = useStore((s) => s.brands);
   const clients = useStore((s) => s.clients);
 
   const wantNew = useNewIntent();
   const [modal, setModal] = useState<{ initial: Brand | null } | null>(() => (wantNew ? { initial: null } : null));
+  // `?ac=<id>`: kayıt araması / bildirimden gelinince düzenleme penceresi açılır.
+  const intent = useOpenIntent(brands);
+  const shown = modal ?? (intent.target ? { initial: intent.target } : null);
+  function closeModal() {
+    setModal(null);
+    intent.dismiss();
+  }
   const [query, setQuery] = useState("");
   const del = useDeleteConfirm();
 
@@ -126,7 +142,7 @@ export default function BrandsPage() {
         }
       />
 
-      {modal && <BrandModal initial={modal.initial} clients={clients} onClose={() => setModal(null)} />}
+      {shown && <BrandModal initial={shown.initial} clients={clients} onClose={closeModal} />}
       {del.dialog}
     </>
   );

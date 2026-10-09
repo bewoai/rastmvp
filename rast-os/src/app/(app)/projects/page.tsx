@@ -1,11 +1,10 @@
 "use client";
 
 import { Suspense, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { Plus } from "lucide-react";
 import { PageHeader, Badge, EmptyState } from "@/components/ui";
 import { FormModal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
-import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
+import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, useOpenIntent, usePersistentState } from "@/components/list";
 import type { Column } from "@/components/list";
 import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
@@ -106,19 +105,12 @@ function ProjectsList() {
 
   const wantNew = useNewIntent();
   const [modal, setModal] = useState<{ initial: Project | null } | null>(() => (wantNew ? { initial: null } : null));
-  // `?ac=<proje id>`: tekliften oluşturulan projeye bağlantı (teklif editörü / bildirim) — modalı açar.
-  const openId = useSearchParams().get("ac");
-  const [dismissedId, setDismissedId] = useState<string | null>(null);
-  const linked = openId && openId !== dismissedId ? projects.find((p) => p.id === openId) : undefined;
-  const shown = modal ?? (linked ? { initial: linked } : null);
+  // `?ac=<proje id>`: tekliften oluşturulan projeye bağlantı (teklif editörü / bildirim / Ctrl+K) — modalı açar.
+  const intent = useOpenIntent(projects);
+  const shown = modal ?? (intent.target ? { initial: intent.target } : null);
   function closeModal() {
     setModal(null);
-    if (openId) {
-      setDismissedId(openId);
-      const url = new URL(window.location.href);
-      url.searchParams.delete("ac");
-      window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
-    }
+    intent.dismiss();
   }
   const [scope, setScope] = usePersistentState<Scope>("projects-scope", "active", SCOPES);
   const [query, setQuery] = useState("");

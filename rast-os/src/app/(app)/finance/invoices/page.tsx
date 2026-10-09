@@ -1,11 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { ExternalLink, Plus } from "lucide-react";
 import { PageHeader, Badge, EmptyState, StatStrip } from "@/components/ui";
 import { FormModal, Field, Input, Select, Button, useFormState } from "@/components/form";
-import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
+import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, useOpenIntent, usePersistentState } from "@/components/list";
 import type { Column } from "@/components/list";
 import MonthFilter from "@/components/MonthFilter";
 import type { PeriodMode } from "@/components/MonthFilter";
@@ -113,7 +113,16 @@ function InvoiceModal({ initial, clients, today, onClose }: { initial: Invoice |
   );
 }
 
+// `?ac=<id>` (Ctrl/⌘K kayıt araması, bildirim zili) için useSearchParams → statik sayfada Suspense sınırı gerekir.
 export default function InvoicesPage() {
+  return (
+    <Suspense fallback={<PageLoading title="Gelirler / Faturalar" />}>
+      <InvoicesList />
+    </Suspense>
+  );
+}
+
+function InvoicesList() {
   const hydrated = useHydrated(["invoices", "payments", "clients", "jobs"]);
   const invoices = useStore((s) => s.invoices);
   const payments = useStore((s) => s.payments);
@@ -123,6 +132,13 @@ export default function InvoicesPage() {
 
   const wantNew = useNewIntent();
   const [modal, setModal] = useState<{ initial: Invoice | null } | null>(() => (wantNew ? { initial: null } : null));
+  // `?ac=<id>`: kayıt araması / bildirimden gelinince düzenleme penceresi açılır.
+  const intent = useOpenIntent(invoices);
+  const shown = modal ?? (intent.target ? { initial: intent.target } : null);
+  function closeModal() {
+    setModal(null);
+    intent.dismiss();
+  }
   const [incomeView, setIncomeView] = usePersistentState<IncomeView>("invoices-income-view", "all", INCOME_VIEWS);
   const [periodView, setPeriodView] = usePersistentState<PeriodMode>("finance-period", "month", PERIODS);
   const [selectedMonth, setSelectedMonth] = useState(() => today.slice(0, 7));
@@ -278,7 +294,7 @@ export default function InvoicesPage() {
         }
       />
 
-      {modal && <InvoiceModal initial={modal.initial} clients={clients} today={today} onClose={() => setModal(null)} />}
+      {shown && <InvoiceModal initial={shown.initial} clients={clients} today={today} onClose={closeModal} />}
       {del.dialog}
     </>
   );

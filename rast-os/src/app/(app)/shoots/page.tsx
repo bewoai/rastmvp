@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { PageHeader, EmptyState } from "@/components/ui";
 import { FormModal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
-import { DataTable, PageLoading, RowActions, SearchBox, StatusSelect, Tabs, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
+import { DataTable, PageLoading, RowActions, SearchBox, StatusSelect, Tabs, Toolbar, useListSearch, useNewIntent, useOpenIntent, usePersistentState } from "@/components/list";
 import type { Column } from "@/components/list";
 import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
@@ -88,7 +88,16 @@ function ShootModal({ initial, brands, onClose }: { initial: Shoot | null; brand
   );
 }
 
+// `?ac=<id>` (Ctrl/⌘K kayıt araması, bildirim zili) için useSearchParams → statik sayfada Suspense sınırı gerekir.
 export default function ShootsPage() {
+  return (
+    <Suspense fallback={<PageLoading title="Çekimler" />}>
+      <ShootsList />
+    </Suspense>
+  );
+}
+
+function ShootsList() {
   const hydrated = useHydrated(["shoots", "clients", "brands"]);
   const shoots = useStore((s) => s.shoots);
   const brands = useStore((s) => s.brands);
@@ -96,6 +105,13 @@ export default function ShootsPage() {
 
   const wantNew = useNewIntent();
   const [modal, setModal] = useState<{ initial: Shoot | null } | null>(() => (wantNew ? { initial: null } : null));
+  // `?ac=<id>`: kayıt araması / bildirimden gelinince düzenleme penceresi açılır.
+  const intent = useOpenIntent(shoots);
+  const shown = modal ?? (intent.target ? { initial: intent.target } : null);
+  function closeModal() {
+    setModal(null);
+    intent.dismiss();
+  }
   const [view, setView] = usePersistentState<View>("shoots-view", "upcoming", VIEWS);
   const [query, setQuery] = useState("");
   const del = useDeleteConfirm();
@@ -198,7 +214,7 @@ export default function ShootsPage() {
         />
       </div>
 
-      {modal && <ShootModal initial={modal.initial} brands={brands} onClose={() => setModal(null)} />}
+      {shown && <ShootModal initial={shown.initial} brands={brands} onClose={closeModal} />}
       {del.dialog}
     </>
   );

@@ -27,7 +27,8 @@ type StatusFilter = "all" | Prospect["status"];
 const STATUS_FILTERS: readonly StatusFilter[] = ["all", ...PROSPECT_STATUSES];
 const statusOptions = PROSPECT_STATUSES.map((value) => ({ value, ...prospectStatusLabel[value] }));
 
-export function ProspectsTab() {
+/** `linked`: kayıt aramasından (`?ac=`) gelinen aday — detay penceresi açık gelir; kapanınca `onLinkedClose`. */
+export function ProspectsTab({ linked, onLinkedClose }: { linked?: Prospect; onLinkedClose?: () => void } = {}) {
   const prospects = useStore((s) => s.prospects);
   const messages = useStore((s) => s.outreach_messages);
   const [status, setStatus] = usePersistentState<StatusFilter>("growth-status", "all", STATUS_FILTERS);
@@ -38,6 +39,7 @@ export function ProspectsTab() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [picker, setPicker] = useState(false);
   const [detail, setDetail] = useState<Prospect | null>(null);
+  const shownDetail = detail ?? linked ?? null;
   const [reply, setReply] = useState<Prospect | null>(null);
   const [busy, setBusy] = useState(false);
   const confirm = useConfirm();
@@ -206,7 +208,13 @@ export function ProspectsTab() {
       )}
 
       {picker && <SequencePicker prospects={selectedRows} onClose={() => setPicker(false)} onDone={() => setSelected(new Set())} />}
-      {detail && <ProspectDetailModal prospect={detail} live={detail.external_id ? details[detail.external_id] : undefined} onClose={() => setDetail(null)} />}
+      {shownDetail && (
+        <ProspectDetailModal
+          prospect={shownDetail}
+          live={shownDetail.external_id ? details[shownDetail.external_id] : undefined}
+          onClose={() => { setDetail(null); onLinkedClose?.(); }}
+        />
+      )}
       {reply && <ReplyLeadModal prospect={reply} live={reply.external_id ? details[reply.external_id] : undefined} channel={null} onClose={() => setReply(null)} />}
       {confirm.dialog}
     </div>

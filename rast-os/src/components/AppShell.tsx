@@ -6,6 +6,7 @@ import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import QuickAddHost from "./QuickAddTask";
 import Toaster from "./Toaster";
+import KeyboardShortcuts from "./KeyboardShortcuts";
 import { prefetchBootstrap, prefetchRoute, refreshIfStale } from "@/lib/store";
 
 // Açılış verisi: bu modül tarayıcıda yüklenir yüklenmez (sayfa bileşenleri mount olmadan, hydration
@@ -166,9 +167,10 @@ export default function AppShell({
         <main id="main" tabIndex={-1} className="app-main flex-1 overflow-y-auto p-4 outline-none md:px-8 md:py-7 print:overflow-visible print:bg-none print:p-0"><div className="mx-auto w-full max-w-[1280px] print:max-w-none">{children}</div></main>
       </div>
 
-      {/* Global Q Hızlı Görev Ekle + bildirimler (kendi state'leri; kabuğu render etmez).
+      {/* Global Q Hızlı Görev Ekle, "g"+harf / "?" kısayolları + bildirimler (kendi state'leri; kabuğu render etmez).
           Yazdırmada (Teklif PDF) kabuk gizlenir: print:* sınıfları sidebar/topbar'ı kaldırır, kaydırma kabını açar. */}
       <QuickAddHost />
+      <KeyboardShortcuts />
       <Toaster />
     </div>
   );

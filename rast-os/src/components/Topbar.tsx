@@ -1,23 +1,98 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowUpRight, Bell, Check, ChevronDown, CircleAlert, FileText, LogOut, Menu, Search, Settings, Wallet } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import type { LucideIcon } from "lucide-react";
+import {
+  Bell, CalendarDays, Check, CheckCircle2, ChevronDown, CircleAlert, FileSignature, FileText, Keyboard, LogOut,
+  MessageSquareWarning, Settings, UserPlus, Users, Wallet, Menu,
+} from "lucide-react";
 import { forgetSessionSnapshot, useStore } from "@/lib/store";
-import { activeNavItem, searchNav } from "@/lib/nav";
+import { activeNavItem } from "@/lib/nav";
+import { useNotifications } from "@/lib/useNotifications";
+import { initialsOf } from "@/lib/assignee-logic";
+import { dateKey, formatDue } from "@/lib/taskLogic";
+import type { Notice } from "@/lib/notifications";
+import GlobalSearch from "./GlobalSearch";
+import { useShortcutHelp } from "./KeyboardShortcuts";
 
-type Notice = {
-  id: string;
-  title: string;
-  body: string;
-  href: string;
-  icon: typeof Bell;
-  tone: "accent" | "danger" | "warning";
+const NOTICE_ICON: Record<Notice["kind"], LucideIcon> = {
+  lead: UserPlus, "leads-more": Users, approval: CheckCircle2, proposal: FileSignature,
+  invoices: FileText, expenses: Wallet, tasks: CircleAlert, contents: CalendarDays,
 };
 
-function dayStamp(value?: string) {
-  return value ? new Date(`${value}T12:00:00`).getTime() : Number.POSITIVE_INFINITY;
+const TONE_CLS: Record<Notice["tone"], string> = {
+  accent: "bg-surface-2 text-muted",
+  success: "bg-success/10 text-success",
+  warning: "bg-warning/10 text-warning",
+  danger: "bg-danger/10 text-danger",
+};
+
+function NotificationBell({ open, onToggle, onClose }: { open: boolean; onToggle: () => void; onClose: () => void }) {
+  const { ready, notices, unread, isRead, markRead, nowMs } = useNotifications();
+  const today = dateKey(new Date(nowMs));
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`relative flex h-10 w-10 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground ${open ? "bg-surface-2 text-foreground" : ""}`}
+        aria-label={unread ? `Bildirimler (${unread} okunmamış)` : "Bildirimler"}
+        aria-expanded={open}
+      >
+        <Bell className="h-5 w-5" aria-hidden />
+        {unread > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent" />}
+      </button>
+      {open && (
+        // Dar ekranda zil sağ kenarda değil (arama + hesap düğmeleri): panel ekrana sabitlenir, taşmaz.
+        <div className="popover absolute right-0 top-12 z-50 w-[min(23rem,calc(100vw-2rem))] overflow-hidden max-sm:fixed max-sm:inset-x-4 max-sm:top-14 max-sm:w-auto" role="region" aria-label="Bildirimler">
+          <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Bildirimler</p>
+              <p className="text-xs text-muted">{!ready ? "Yükleniyor…" : unread ? `${unread} okunmamış bildirim` : "Güncel bildirim yok"}</p>
+            </div>
+            {unread > 0 && (
+              <button type="button" onClick={() => markRead(notices.map((n) => n.id))} className="flex shrink-0 items-center gap-1 text-xs text-muted hover:text-foreground">
+                <Check className="h-3.5 w-3.5" aria-hidden /> Tümünü okundu işaretle
+              </button>
+            )}
+          </div>
+          {notices.length ? (
+            <ul className="max-h-[min(26rem,65vh)] overflow-y-auto p-1.5">
+              {notices.map((notice) => {
+                const Icon = notice.kind === "approval" && notice.tone === "warning" ? MessageSquareWarning : NOTICE_ICON[notice.kind];
+                const read = isRead(notice.id);
+                return (
+                  <li key={notice.id}>
+                    <Link
+                      prefetch={false}
+                      href={notice.href}
+                      onClick={() => { markRead([notice.id]); onClose(); }}
+                      className={`flex gap-3 rounded-md p-2.5 outline-none hover:bg-surface-2 focus-visible:bg-surface-2 ${read ? "opacity-60" : ""}`}
+                    >
+                      <span className={`mt-0.5 h-fit rounded-md p-1.5 ${TONE_CLS[notice.tone]}`}><Icon className="h-4 w-4" aria-hidden /></span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex items-baseline gap-2">
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium text-foreground">{notice.title}</span>
+                          {notice.at && <span className="shrink-0 text-[11px] text-faint">{formatDue(dateKey(new Date(notice.at)), today)}</span>}
+                        </span>
+                        {notice.body && <span className="mt-0.5 block truncate text-xs text-muted">{notice.body}</span>}
+                      </span>
+                      {!read && <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-label="Okunmadı" />}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <div className="px-4 py-8 text-center text-sm text-muted">{ready ? "Şu an yeni bildirim yok." : "Bildirimler yükleniyor…"}</div>
+          )}
+        </div>
+      )}
+    </>
+  );
 }
 
 export default function Topbar({
@@ -25,70 +100,25 @@ export default function Topbar({
   userName,
 }: {
   onMenu?: () => void;
+  /** Sunucudan gelen ilk ad (JWT: user_metadata.full_name / e-posta); açılış isteğindeki profil adı gelince o kullanılır. */
   userName?: string | null;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const current = activeNavItem(pathname);
-  const invoices = useStore((s) => s.invoices);
-  const expenses = useStore((s) => s.expenses);
-  const tasks = useStore((s) => s.tasks);
-  const contents = useStore((s) => s.contents);
+  const profileName = useStore((s) => s.profile?.full_name);
+  // Demo modunda profil yok: ekip listesindeki oturum kullanıcısının adı
+  const memberName = useStore((s) => (s.userId ? s.profiles.find((p) => p.id === s.userId)?.full_name : null));
+  const displayName = profileName || userName || memberName || null;
   const [notificationOpen, setNotificationOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchOpen, setSearchOpen] = useState(false);
-  const [readIds, setReadIds] = useState<string[]>([]);
-  const searchRef = useRef<HTMLInputElement>(null);
-  const searchContainerRef = useRef<HTMLDivElement>(null);
   const notificationRef = useRef<HTMLDivElement>(null);
   const accountRef = useRef<HTMLDivElement>(null);
-
-  const initials = (userName || "Rast")
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
-  const notifications = useMemo<Notice[]>(() => {
-    const today = new Date();
-    const nextWeek = new Date(today);
-    nextWeek.setDate(today.getDate() + 7);
-    const notices: Notice[] = [];
-
-    const unpaidInvoices = invoices.filter((invoice) => invoice.status !== "paid" && invoice.status !== "cancelled" && invoice.paid_amount < invoice.amount + invoice.vat);
-    if (unpaidInvoices.length) {
-      notices.push({ id: "unpaid-invoices", title: `${unpaidInvoices.length} bekleyen gelir`, body: "Tahsilat bekleyen faturaları kontrol et.", href: "/finance/invoices", icon: FileText, tone: "accent" });
-    }
-
-    const pendingExpenses = expenses.filter((expense) => expense.payment_status === "pending");
-    if (pendingExpenses.length) {
-      notices.push({ id: "pending-expenses", title: `${pendingExpenses.length} bekleyen gider`, body: "Taksit veya ödeme durumlarını kontrol et.", href: "/finance/expenses", icon: Wallet, tone: "danger" });
-    }
-
-    const upcomingTasks = tasks.filter((task) => task.status !== "done" && dayStamp(task.due_date) >= today.getTime() && dayStamp(task.due_date) <= nextWeek.getTime());
-    if (upcomingTasks.length) {
-      notices.push({ id: "upcoming-tasks", title: `${upcomingTasks.length} yaklaşan görev`, body: "Önümüzdeki 7 gün içindeki görevler.", href: "/tasks", icon: CircleAlert, tone: "warning" });
-    }
-
-    const upcomingContents = contents.filter((content) => content.status !== "published" && dayStamp(content.planned_date) >= today.getTime() && dayStamp(content.planned_date) <= nextWeek.getTime());
-    if (upcomingContents.length) {
-      notices.push({ id: "upcoming-content", title: `${upcomingContents.length} yaklaşan içerik`, body: "İçerik takvimindeki yayınları kontrol et.", href: "/content", icon: Bell, tone: "accent" });
-    }
-
-    return notices;
-  }, [contents, expenses, invoices, tasks]);
-
-  const unreadCount = notifications.filter((notice) => !readIds.includes(notice.id)).length;
-  const searchResults = useMemo(() => searchNav(searchTerm), [searchTerm]);
 
   useEffect(() => {
     function closeMenus(event: MouseEvent) {
       const target = event.target as Node;
       if (!notificationRef.current?.contains(target)) setNotificationOpen(false);
       if (!accountRef.current?.contains(target)) setAccountOpen(false);
-      if (!searchContainerRef.current?.contains(target)) setSearchOpen(false);
     }
     document.addEventListener("mousedown", closeMenus);
     return () => document.removeEventListener("mousedown", closeMenus);
@@ -99,22 +129,9 @@ export default function Topbar({
       if (event.key !== "Escape") return;
       setNotificationOpen(false);
       setAccountOpen(false);
-      setSearchOpen(false);
     }
     document.addEventListener("keydown", onEscape);
     return () => document.removeEventListener("keydown", onEscape);
-  }, []);
-
-  useEffect(() => {
-    function focusSearch(event: KeyboardEvent) {
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
-        event.preventDefault();
-        searchRef.current?.focus();
-        setSearchOpen(true);
-      }
-    }
-    document.addEventListener("keydown", focusSearch);
-    return () => document.removeEventListener("keydown", focusSearch);
   }, []);
 
   function toggleNotifications() {
@@ -132,47 +149,29 @@ export default function Topbar({
       <button type="button" onClick={onMenu} className="flex h-10 w-10 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground md:hidden" aria-label="Menüyü aç">
         <Menu className="h-5 w-5" />
       </button>
-      {/* Mobilde arama yok: bulunduğun bölümü göster */}
+      {/* Mobilde bulunduğun bölüm; arama büyüteç düğmesinde */}
       <p className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground md:hidden">{current?.label ?? "Rast OS"}</p>
 
-      <div ref={searchContainerRef} className="relative hidden max-w-xl flex-1 md:block">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
-        <input ref={searchRef} value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setSearchOpen(true); }} onFocus={() => setSearchOpen(Boolean(searchTerm.trim()))} aria-label="Ekrana git" placeholder="Ekrana git… (Görevler, Projeler, Faturalar)" onKeyDown={(event) => { if (event.key === "Enter" && searchResults[0]) { event.preventDefault(); router.push(searchResults[0].href); setSearchOpen(false); setSearchTerm(""); searchRef.current?.blur(); } }} className="h-9 w-full rounded-lg border border-border bg-surface pl-10 pr-20 text-sm text-foreground outline-none transition-colors placeholder:text-faint hover:border-[#333] focus:border-accent/60" />
-        <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-border px-1.5 py-px font-sans text-[11px] text-faint">Ctrl K</kbd>
-        {searchOpen && searchTerm.trim() && <div className="popover absolute left-0 right-0 top-11 z-50 overflow-hidden p-1.5">
-          {searchResults.length ? searchResults.map((item) => { const Icon = item.icon; return <Link prefetch={false} key={item.href} href={item.href} onClick={() => { setSearchOpen(false); setSearchTerm(""); }} className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted outline-none hover:bg-surface-2 hover:text-foreground focus-visible:bg-surface-2 focus-visible:text-foreground"><Icon className="h-4 w-4 text-faint" /><span>{item.label}</span><ArrowUpRight className="ml-auto h-3.5 w-3.5" /></Link>; }) : <p className="px-3 py-3 text-sm text-muted">Eşleşen ekran bulunamadı.</p>}
-        </div>}
-      </div>
+      <GlobalSearch />
 
-      <div className="ml-auto flex items-center gap-2.5">
+      <div className="flex items-center gap-1.5 md:ml-auto md:gap-2.5">
         <div ref={notificationRef} className="relative">
-          <button type="button" onClick={toggleNotifications} className={`relative flex h-10 w-10 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground ${notificationOpen ? "bg-surface-2 text-foreground" : ""}`} aria-label={unreadCount ? `Bildirimler (${unreadCount} okunmamış)` : "Bildirimler"} aria-expanded={notificationOpen}>
-            <Bell className="h-5 w-5" aria-hidden />
-            {unreadCount > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent" />}
-          </button>
-          {notificationOpen && <div className="popover absolute right-0 top-12 z-50 w-[min(23rem,calc(100vw-2rem))] overflow-hidden">
-            <div className="flex items-center justify-between border-b border-border px-4 py-3">
-              <div><p className="text-sm font-semibold text-foreground">Bildirimler</p><p className="text-xs text-muted">{unreadCount ? `${unreadCount} okunmamış bildirim` : "Güncel bildirim yok"}</p></div>
-              {unreadCount > 0 && <button type="button" onClick={() => setReadIds(notifications.map((notice) => notice.id))} className="flex items-center gap-1 text-xs text-muted hover:text-foreground"><Check className="h-3.5 w-3.5" /> Tümünü okundu işaretle</button>}
-            </div>
-            {notifications.length ? <div className="max-h-[min(22rem,60vh)] overflow-y-auto p-1.5">
-              {notifications.map((notice) => { const Icon = notice.icon; return <Link prefetch={false} key={notice.id} href={notice.href} onClick={() => { setReadIds((ids) => ids.includes(notice.id) ? ids : [...ids, notice.id]); setNotificationOpen(false); }} className={`flex gap-3 rounded-md p-2.5 hover:bg-surface-2 ${readIds.includes(notice.id) ? "opacity-60" : ""}`}>
-                <span className={`mt-0.5 rounded-md p-1.5 ${notice.tone === "danger" ? "bg-danger/10 text-danger" : notice.tone === "warning" ? "bg-warning/10 text-warning" : "bg-surface-2 text-muted"}`}><Icon className="h-4 w-4" /></span>
-                <span className="min-w-0"><span className="block text-sm font-medium text-foreground">{notice.title}</span><span className="mt-0.5 block text-xs text-muted">{notice.body}</span></span>
-              </Link>; })}
-            </div> : <div className="px-4 py-8 text-center text-sm text-muted">Şu an yeni bildirim yok.</div>}
-          </div>}
+          <NotificationBell open={notificationOpen} onToggle={toggleNotifications} onClose={() => setNotificationOpen(false)} />
         </div>
 
         <div ref={accountRef} className="relative">
           <button type="button" onClick={toggleAccount} className={`flex items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-surface-2 ${accountOpen ? "bg-surface-2" : ""}`} aria-label="Hesap menüsü" aria-expanded={accountOpen}>
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-foreground ring-1 ring-border">{initials}</span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-foreground ring-1 ring-border">{initialsOf(displayName || "Rast")}</span>
             <ChevronDown className={`hidden h-4 w-4 text-muted transition-transform sm:block ${accountOpen ? "rotate-180" : ""}`} />
           </button>
           {accountOpen && <div className="popover absolute right-0 top-12 z-50 w-64 overflow-hidden">
-            <div className="border-b border-border px-4 py-3"><p className="text-sm font-semibold text-foreground">{userName || "Rast kullanıcısı"}</p><p className="mt-0.5 text-xs text-muted">Rast Creative hesabı</p></div>
+            <div className="border-b border-border px-4 py-3"><p className="truncate text-sm font-semibold text-foreground">{displayName || "Rast kullanıcısı"}</p><p className="mt-0.5 text-xs text-muted">Rast Creative hesabı</p></div>
             <div className="p-1.5">
               <Link prefetch={false} href="/settings" onClick={() => setAccountOpen(false)} className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-foreground"><Settings className="h-4 w-4" /> Hesap ve ayarlar</Link>
+              <button type="button" onClick={() => { setAccountOpen(false); useShortcutHelp.getState().setOpen(true); }} className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-foreground">
+                <Keyboard className="h-4 w-4" aria-hidden /> Klavye kısayolları
+                <kbd className="ml-auto rounded border border-border px-1.5 font-sans text-[11px] text-faint">?</kbd>
+              </button>
               <form action="/auth/signout" method="post" onSubmit={() => forgetSessionSnapshot()}><button type="submit" className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted hover:bg-danger/10 hover:text-danger"><LogOut className="h-4 w-4" aria-hidden /> Çıkış yap</button></form>
             </div>
           </div>}

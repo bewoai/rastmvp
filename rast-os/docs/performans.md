@@ -115,3 +115,65 @@ Notlar:
   yenilenmiyordu; sayfa yenilenene kadar başkalarının değişiklikleri görünmüyordu).
 - Çekim sürerken / açılış bitmeden no-op; iki olay aynı anda gelse de tek istek.
 - Yerel değişiklikler korunur; başka yerde silinen kayıtlar düşer.
+
+## Sonrası — sayfa başına tur sayısı (0020 uygulandıktan sonra)
+
+Tarayıcı → Supabase, sayfa **tam yüklenirken** (yeni sekme / ilk giriş). Her sayfada istek kümesi =
+çekirdek (16 koleksiyon) ∪ sayfanınkiler, **tek** `app_bootstrap`.
+
+| Sayfa | Önce: istek / tur | Sonra: istek / tur | ≈ @400 ms (önce → sonra) | Aynı sekmede yenileme |
+|---|---|---|---|---|
+| `/` Dashboard | 15 / 3 | **1 / 1** | 1,2 sn → 0,4 sn | 0 tur (anlık görüntü) + 1 arka plan |
+| `/teklifler`, `/teklifler/[id]` | 4–5 / 2 | **1 / 1** | 0,8 → 0,4 sn | 0 + 1 |
+| `/content` | 5 / 2 | **1 / 1** | 0,8 → 0,4 sn | 0 + 1 |
+| `/crm/*` (müşteriler, lead, pipeline, kişiler, markalar) | 2–5 / 2 | **1 / 1** | 0,8 → 0,4 sn | 0 + 1 |
+| `/finance/invoices`, `/finance/expenses` | 5 / 2, 2 / 2 | **1 / 1** | 0,8 → 0,4 sn | 0 + 1 |
+| `/musteri-bulma`, `/bugun` | 7 / 2, 6 / 2 (+status) | **1 / 1** (+status) | 0,8 → 0,4 sn | 0 + 1 |
+| `/raporlar/aylik` (+ yazdır) | 6–7 / 2 | **1 / 1** | 0,8 → 0,4 sn | 0 + 1 |
+| `/settings` | 3 / 2 | **1 / 1** | 0,8 → 0,4 sn | 0 + 1 |
+| Diğerleri (tasks, projects, jobs, shoots, equipment, işlem geçmişi, import) | 2–9 / 2 | **1 / 1** | 0,8 → 0,4 sn | 0 + 1 |
+
+Sayfa geçişi (istemci tarafı):
+
+| Geçiş | Önce | Sonra |
+|---|---|---|
+| Çekirdek sayfalar arası (Dashboard, Teklifler, CRM, Finans, Görevler, Projeler, Çekimler, İşler, Ekipman) | 0–1 tur (eksik tablo başına istek) | **0 tur** |
+| Çekirdek dışına (İçerik, Raporlar, Müşteri Bulma, İşlem geçmişi, müşteri detayı) | 1 tur, 1–5 istek | bağlantı üzerinde ~120 ms durulduysa **0**, değilse **1 tur / 1 istek** |
+| Pencereye dönüş (> 60 sn) | hiçbir şey (veri bayat) | **1 istek** ile tüm yüklü veri tazelenir |
+| Giriş → Dashboard | tam sayfa yükleme, sonra 3 tur | RPC şifre doğrulanınca başlar, sayfa ile **paralel** |
+
+**0020 uygulanmadan önce** (geçiş dönemi): ilk yüklemede 1 RPC denemesi (404) + profil ve tablolar paralel
+→ **2 tur** (önce 2–3); sekmenin sonraki yüklemelerinde RPC denenmez → **1 tur**; yenilemede anlık görüntü → 0.
+
+Gecikme ≥ 60 ms'e düştüğünde: Dashboard 180 ms → 60 ms; anlık görüntülü yenileme her durumda ağ beklemesiz.
+
+### Yerel doğrulama (sahte Supabase, yalnız 127.0.0.1)
+
+Üretim derlemesi `NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:54399` (istekleri sayan sahte sunucu) ile
+çalıştırıldı; uzak hiçbir yere bağlanılmadı. Tarayıcı → Supabase istekleri:
+
+| Senaryo | Gözlenen |
+|---|---|
+| Dashboard ilk yükleme | `POST rpc/app_bootstrap` × **1** (16 koleksiyon); `organizations` / `profiles` isteği yok |
+| Dashboard → Markalar | **0** |
+| Markalar → İçerik | **1** RPC (`["content_approvals"]`) |
+| İçerik sayfası yenileme | anlık görüntü getSession'dan 2 ms sonra ekranda; **1** arka plan RPC |
+| Pencereye dönüş (< 60 sn / > 60 sn; focus + visibilitychange birlikte) | 0 / **1** RPC |
+| RPC yok (PGRST202) | 404 → profil + 16 tablo paralel; sonraki sayfa geçişinde RPC tekrar denenmedi |
+| Giriş | `token` → hemen `rpc/app_bootstrap`, sayfa paralel geldi |
+| Çıkış | sessionStorage anlık görüntüsü silindi |
+
+(Sunucu tarafındaki `auth/v1/user` istekleri sahte sunucunun HS256 jetonundan; üretimde ES256 ile `getClaims`
+yereldir. `(app)/layout.tsx`'teki görünen ad için `profiles` sorgusu sunucu tarafında kaldı — bkz. Kalan işler.)
+
+## Kalan işler / riskler
+
+- **Sunucu `profiles` turu:** `(app)/layout.tsx` her tam yüklemede görünen ad için Supabase'e gidiyor (TTFB'yi
+  bekletir). Ad artık açılış yanıtında da var; layout'u claims'teki e-posta / `user_metadata.full_name` ile
+  açıp adı istemcide güncellemek bir tur daha kazandırır (görsel değişiklik olduğu için bu dalda yapılmadı).
+- **Supabase "Max rows" (varsayılan 1000):** eski `select *` yolu tablo başına 1000 satırda sessizce kesiliyordu;
+  RPC tek jsonb döndürdüğü için bu sınıra takılmaz (18 ay penceresi yükü sınırlar).
+- **18 ay penceresi:** 18 aydan eski kapanmış kayıtlar listelerde / eski dönem raporlarında görünmez (README-0020).
+- **Çekirdek küme ilk yüklemeyi büyütür:** küçük bir sayfa ilk açılışta da 16 koleksiyonu çeker (tek tur, daha
+  büyük yanıt). Veri büyüdükçe yanıt boyutu `[perf]` günlüğüyle izlenmeli.
+- **Anlık görüntü:** aynı sekmede ≤ 12 saat bayat veri kısa süre (1 tur) görünebilir; ardından tazelenir.

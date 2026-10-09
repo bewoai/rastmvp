@@ -27,10 +27,10 @@ test("/teklifler: seed teklifleri ve toplamlar listelenir", async ({ page }) => 
   await expect(row).toContainText("₺25.000");
   await expect(row).toContainText("₺30.000");
   await expect(row).toContainText("Gönderildi");
-  // Özet şeridi: 1 açık teklif (25.000), 3 kabul edilen (84.000)
+  // Özet şeridi: 1 açık teklif (25.000), 3 kabul edilen (84.000); + 1 reddedilen (bildirim demosu)
   await expect(page.getByText("Açık tutar (KDV hariç)")).toBeVisible();
   await expect(page.getByText("₺84.000")).toBeVisible();
-  await expect(page.getByRole("button", { name: /^Tümü\s*4$/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Tümü\s*5$/ })).toBeVisible();
 });
 
 test("teklif oluştur: Hekim Standart paketi → 25.000 / 30.000", async ({ page }) => {

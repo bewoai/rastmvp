@@ -3,12 +3,12 @@
 import { create } from "zustand";
 import { useEffect, useMemo } from "react";
 import type { RastData, WritableCollection } from "./types";
-import { seed } from "./seed";
+import { DEMO_USER_ID, seed } from "./seed";
 import { isAuthRequired, isSupabaseConfigured } from "./env";
 import { createClient } from "./supabase/client";
 import { perfLog, perfStart } from "./perf";
 import {
-  bootCollections, isRpcMissing, mergeRows, parseBootstrap, routeCollections, shouldRefreshOnFocus, unionCollections,
+  bootCollections, isProfilesRejected, isRpcMissing, mergeRows, parseBootstrap, routeCollections, shouldRefreshOnFocus, unionCollections,
 } from "./bootstrap-logic";
 import { clearSnapshots, readSnapshot, writeSnapshot } from "./snapshot";
 import type { BootstrapOrganization, BootstrapProfile } from "./bootstrap-logic";
@@ -32,10 +32,15 @@ export const COLLECTIONS: Collections[] = [
   "activity_logs",
   // Müşteri Bulma (0019): prospects ve outreach_sequences, outreach_messages'tan ÖNCE (FK).
   "prospects", "outreach_sequences", "outreach_messages", "suppression_list",
+  // Ekip (0021): görev atama listesi. Salt okunur; yalnız id, ad, rol, aktiflik gelir.
+  "profiles",
 ];
 
 /** seedToSupabase'in atladığı koleksiyonlar (demo Müşteri Bulma verisi sahte Places kimlikleri içerir). */
-const SEED_SKIP = new Set<Collections>(["activity_logs", "content_approvals", "client_portal_tokens", "prospects", "outreach_sequences", "outreach_messages", "suppression_list"]);
+const SEED_SKIP = new Set<Collections>(["activity_logs", "content_approvals", "client_portal_tokens", "prospects", "outreach_sequences", "outreach_messages", "suppression_list", "profiles"]);
+
+/** Ekip listesinde istemciye gelen alanlar (0021 ile aynı; telefon / avatar gelmez). */
+const PROFILE_COLUMNS = "id, full_name, role, is_active";
 
 /** Tek seferde çekilecek en fazla işlem geçmişi satırı (en yeniler). 0020 app_bootstrap ile aynı. */
 const ACTIVITY_LOG_LIMIT = 500;
@@ -45,6 +50,7 @@ const emptyData: RastData = {
   tasks: [], contents: [], shoots: [], equipment: [], invoices: [], payments: [], expenses: [],
   proposals: [], proposal_items: [], content_approvals: [], client_reports: [], client_portal_tokens: [], activity_logs: [],
   prospects: [], outreach_sequences: [], outreach_messages: [], suppression_list: [],
+  profiles: [],
 };
 
 const noneLoaded = () => COLLECTIONS.reduce((acc, c) => ({ ...acc, [c]: false }), {} as Record<Collections, boolean>);
@@ -70,6 +76,8 @@ interface StoreState extends RastData {
   loaded: boolean;
   supabase: boolean;
   orgId: string | null;
+  /** Oturumdaki kullanıcının id'si (auth.uid; demo modunda DEMO_USER_ID). "Bana atanan" filtresi için. */
+  userId: string | null;
   /** Oturumdaki kullanıcının profili (rol, görünen ad) — açılış isteğinden gelir. */
   profile: BootstrapProfile | null;
   /** Org hedefleri (0014); `orgTargetsKnown` false ise bilinmiyor (orgSettings kendisi çeker). */
@@ -140,6 +148,42 @@ function markRpcMissing() {
   }
 }
 
+/**
+ * 0021 uygulanmamışsa `app_bootstrap` `profiles`'ı reddeder (22023): bu sekmede bir daha RPC'ye
+ * eklenmez, ekip ayrı bir sorguyla RPC ile PARALEL çekilir (ek tur yok, yalnız +1 istek).
+ */
+const PROFILES_RPC_MISSING_KEY = "rast-os:bootstrap-profiles-missing";
+let profilesInRpc = true;
+function profilesRpcEnabled(): boolean {
+  if (!profilesInRpc) return false;
+  try {
+    if (sessionStorage.getItem(PROFILES_RPC_MISSING_KEY) === "1") profilesInRpc = false;
+  } catch {
+    /* depolama kapalı */
+  }
+  return profilesInRpc;
+}
+function markProfilesRpcMissing() {
+  profilesInRpc = false;
+  try {
+    sessionStorage.setItem(PROFILES_RPC_MISSING_KEY, "1");
+  } catch {
+    /* yok say */
+  }
+}
+
+/** Ekip listesi (0021 yokken): RLS aynı org'u gösterir (0001 profiles_self); yalnız gerekli kolonlar. */
+async function fetchProfilesTable(): Promise<Row[] | null> {
+  const t0 = perfStart();
+  const { data, error } = await createClient().from("profiles").select(PROFILE_COLUMNS).order("created_at", { ascending: true });
+  perfLog("load: profiles (ayrı, 0021 yok)", t0, { rows: data?.length ?? 0 });
+  if (error) {
+    console.error("[profiles] ekip listesi alınamadı:", error.message);
+    return null;
+  }
+  return (data ?? []) as unknown as Row[];
+}
+
 interface Fetched {
   rows: Partial<Record<Collections, Row[]>>;
   /** undefined: bu çekimde profil istenmedi. */
@@ -166,7 +210,9 @@ async function fetchLegacy(cols: Collections[], userId: string | null, startSeq:
   await Promise.all(
     cols.map(async (c) => {
       const tTable = perfStart();
-      const query = sb.from(c).select("*").order("created_at", { ascending: false });
+      const query = c === "profiles"
+        ? sb.from(c).select(PROFILE_COLUMNS).order("created_at", { ascending: true })
+        : sb.from(c).select("*").order("created_at", { ascending: false });
       const { data, error } = await (c === "activity_logs" ? query.limit(ACTIVITY_LOG_LIMIT) : query);
       if (error) failed.push(c);
       rows[c] = (data ?? []) as Row[];
@@ -186,17 +232,39 @@ async function fetchLegacy(cols: Collections[], userId: string | null, startSeq:
   return { rows, profile, startSeq, failed, profileFailed };
 }
 
-/** Koleksiyonları (ve istenirse profili) çeker: önce 0020 RPC (1 istek), olmazsa eski yol. */
+/** Koleksiyonları (ve istenirse profili) çeker: önce 0020/0021 RPC (1 istek), olmazsa eski yol. */
 async function fetchRemote(cols: Collections[], userId: string | null): Promise<Fetched> {
   const startSeq = changeSeq;
   if (rpcEnabled()) {
     const t0 = perfStart();
-    const { data, error } = await createClient().rpc("app_bootstrap", { p_collections: cols });
+    const wantProfiles = cols.includes("profiles");
+    let rpcCols = wantProfiles && !profilesRpcEnabled() ? cols.filter((c) => c !== "profiles") : cols;
+    // 0021 yoksa ekip RPC ile aynı turda (paralel) ayrı sorguyla gelir.
+    let side: Promise<Row[] | null> | null = rpcCols === cols ? null : fetchProfilesTable();
+    let { data, error } = await createClient().rpc("app_bootstrap", { p_collections: rpcCols });
+    if (error && rpcCols.includes("profiles") && isProfilesRejected(error)) {
+      // 0020 var, 0021 yok: bu sekmede profiles RPC'ye bir daha eklenmez (yalnız ilk açılışta +1 tur).
+      markProfilesRpcMissing();
+      perfLog("bootstrap: app_bootstrap profiles'ı tanımıyor (0021 yok) → ekip ayrı sorguyla", t0);
+      rpcCols = cols.filter((c) => c !== "profiles");
+      side = fetchProfilesTable();
+      ({ data, error } = await createClient().rpc("app_bootstrap", { p_collections: rpcCols }));
+    }
     if (!error) {
-      const parsed = parseBootstrap(data, cols);
+      const parsed = parseBootstrap(data, rpcCols);
       if (parsed) {
-        perfLog("bootstrap: app_bootstrap (1 istek)", t0, { collections: cols });
-        return { rows: parsed.rows, profile: parsed.profile, organization: parsed.organization, startSeq };
+        perfLog("bootstrap: app_bootstrap (1 istek)", t0, { collections: rpcCols, profilesSeparate: Boolean(side) });
+        const rows = parsed.rows;
+        let failed: Collections[] | undefined;
+        if (side) {
+          const team = await side;
+          if (team) rows.profiles = team;
+          else {
+            rows.profiles = [];
+            failed = ["profiles"];
+          }
+        }
+        return { rows, profile: parsed.profile, organization: parsed.organization, startSeq, failed };
       }
       console.error("[bootstrap] app_bootstrap beklenmeyen yanıt döndü; tablo tablo yükleniyor.");
     } else if (isRpcMissing(error)) {
@@ -292,10 +360,14 @@ async function runInit(): Promise<void> {
     pending.clear();
     currentUserId = null;
     clearSnapshots();
-    useStore.setState({ ...(isAuthRequired ? emptyData : seed), loaded: true, supabase: false, orgId: null });
+    useStore.setState({
+      ...(isAuthRequired ? emptyData : seed), loaded: true, supabase: false, orgId: null,
+      userId: isAuthRequired ? null : DEMO_USER_ID,
+    });
     return;
   }
   currentUserId = user.id;
+  useStore.setState({ userId: user.id });
 
   // Stale-while-revalidate: bu sekmede son görülen veri varsa HEMEN göster, arka planda tek istekle tazele.
   const snap = readSnapshot(user.id, COLLECTIONS);
@@ -449,6 +521,7 @@ export function resetSession(): void {
     loaded: false,
     supabase: false,
     orgId: null,
+    userId: null,
     profile: null,
     orgTargets: null,
     orgTargetsKnown: false,
@@ -461,15 +534,16 @@ export const useStore = create<StoreState>()((set, get) => ({
   loaded: false,
   supabase: false,
   orgId: null,
+  userId: null,
   profile: null,
   orgTargets: null,
   orgTargetsKnown: false,
   loadedCollections: noneLoaded(),
 
   init: async () => {
-    // Supabase yoksa: bellek içi örnek verilerle çalış (demo modu)
+    // Supabase yoksa: bellek içi örnek verilerle çalış (demo modu; oturumdaki kullanıcı = demo Bewo)
     if (!isSupabaseConfigured) {
-      set({ ...seed, loaded: true, supabase: false });
+      set({ ...seed, loaded: true, supabase: false, userId: DEMO_USER_ID });
       return;
     }
 

@@ -6,7 +6,7 @@ import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   CORE_COLLECTIONS, DASHBOARD_COLLECTIONS, FOCUS_REFRESH_AFTER_MS, SNAPSHOT_MAX_AGE_MS, SNAPSHOT_MAX_BYTES, SNAPSHOT_VERSION, bootCollections,
-  isRpcMissing, mergeRows, parseBootstrap, parseSnapshot, routeCollections, serializeSnapshot, shouldRefreshOnFocus, unionCollections,
+  NOTIFICATION_COLLECTIONS, isProfilesRejected, isRpcMissing, mergeRows, parseBootstrap, parseSnapshot, routeCollections, serializeSnapshot, shouldRefreshOnFocus, unionCollections,
 } from "../src/lib/bootstrap-logic.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -23,26 +23,56 @@ function storeCollections() {
 // 0020 izin listesi ↔ store
 // ---------------------------------------------------------------------------
 
-test("0020 app_bootstrap izin listesi store.ts COLLECTIONS ile birebir aynı", () => {
-  const sql = read("supabase/migrations/0020_bootstrap_rpc.sql");
-  const arr = sql.match(/v_allowed constant text\[\] := array\[([\s\S]*?)\];/);
-  assert.ok(arr, "v_allowed bulunamadı");
-  const allowed = [...arr[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
-  assert.deepEqual([...allowed].sort(), [...storeCollections()].sort());
+const allowedIn = (file) => {
+  const arr = read(file).match(/v_allowed constant text\[\] := array\[([\s\S]*?)\];/);
+  assert.ok(arr, `${file}: v_allowed bulunamadı`);
+  return [...arr[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+};
+const BOOTSTRAP_SQL = ["supabase/migrations/0020_bootstrap_rpc.sql", "supabase/migrations/0021_bootstrap_profiles.sql"];
+
+test("0021 (geçerli) app_bootstrap izin listesi store.ts COLLECTIONS ile birebir aynı", () => {
+  assert.deepEqual([...allowedIn(BOOTSTRAP_SQL[1])].sort(), [...storeCollections()].sort());
 });
 
-test("0020: activity_logs sınırı istemcideki ACTIVITY_LOG_LIMIT ile aynı", () => {
+test("0020 izin listesi = COLLECTIONS − profiles (0020 dosyası değişmedi; profiles yalnız 0021'de)", () => {
+  assert.deepEqual([...allowedIn(BOOTSTRAP_SQL[0])].sort(), storeCollections().filter((c) => c !== "profiles").sort());
+});
+
+test("0020/0021: activity_logs sınırı istemcideki ACTIVITY_LOG_LIMIT ile aynı", () => {
   const limit = read("src/lib/store.ts").match(/const ACTIVITY_LOG_LIMIT = (\d+);/)?.[1];
   assert.equal(limit, "500");
-  assert.match(read("supabase/migrations/0020_bootstrap_rpc.sql"), /v_limit := ' limit 500';/);
+  for (const f of BOOTSTRAP_SQL) assert.match(read(f), /v_limit := ' limit 500';/);
 });
 
-test("0020: yalnız authenticated çalıştırır; SECURITY INVOKER", () => {
-  const sql = read("supabase/migrations/0020_bootstrap_rpc.sql");
-  assert.match(sql, /security invoker/);
-  assert.doesNotMatch(sql, /security definer/);
-  assert.match(sql, /revoke all on function public\.app_bootstrap\(text\[\], date\) from anon;/);
-  assert.match(sql, /grant execute on function public\.app_bootstrap\(text\[\], date\) to authenticated;/);
+test("0020/0021: yalnız authenticated çalıştırır; SECURITY INVOKER", () => {
+  for (const f of BOOTSTRAP_SQL) {
+    const sql = read(f);
+    assert.match(sql, /security invoker/);
+    assert.doesNotMatch(sql, /security definer/);
+    assert.match(sql, /revoke all on function public\.app_bootstrap\(text\[\], date\) from anon;/);
+    assert.match(sql, /grant execute on function public\.app_bootstrap\(text\[\], date\) to authenticated;/);
+  }
+});
+
+test("0021: profiles yalnız id, full_name, role, is_active ve yalnız çağıranın org'u (to_jsonb yok)", () => {
+  const sql = read(BOOTSTRAP_SQL[1]);
+  const branch = (sql.match(/if v_col = 'profiles' then([\s\S]*?)end if;/)?.[1] ?? "").replace(/--.*$/gm, "");
+  assert.match(branch, /jsonb_build_object\(\s*'id', p\.id, 'full_name', p\.full_name, 'role', p\.role, 'is_active', p\.is_active\s*\)/);
+  assert.match(branch, /where p\.organization_id = v_org/);
+  assert.doesNotMatch(branch, /to_jsonb|phone|avatar/);
+  // İstemcinin eski yolları da aynı kolonları ister
+  assert.match(read("src/lib/store.ts"), /const PROFILE_COLUMNS = "id, full_name, role, is_active";/);
+});
+
+test("isProfilesRejected: yalnız 0020'nin profiles reddi (22023 + 'profiles')", () => {
+  assert.equal(isProfilesRejected({ code: "22023", message: "app_bootstrap: bilinmeyen koleksiyon 'profiles'" }), true);
+  assert.equal(isProfilesRejected({ code: "22023", message: "app_bootstrap: bilinmeyen koleksiyon 'x'" }), false);
+  assert.equal(isProfilesRejected({ code: "42501", message: "profiles" }), false);
+  assert.equal(isProfilesRejected(null), false);
+});
+
+test("zil ve atama koleksiyonları çekirdekte (açılış isteğine yeni tur eklenmez)", () => {
+  for (const c of [...NOTIFICATION_COLLECTIONS, "profiles"]) assert.ok(CORE_COLLECTIONS.includes(c), c);
 });
 
 // ---------------------------------------------------------------------------

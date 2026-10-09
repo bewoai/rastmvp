@@ -23,6 +23,13 @@ export const DEMO_PORTAL_TOKENS = {
   revoked: "b8d1f3a5c7e9024b6d8f0a2c4e6b8d1f3a5c7e9b0d2f4a6c8e1b3d5f7a9c2e4b",
 } as const;
 
+/**
+ * Demo ekibi (profiles): görev atama demosu. Demo modunda oturumdaki kullanıcı Bewo sayılır
+ * (`DEMO_USER_ID`) — "Bana atanan" filtresi buna göre çalışır.
+ */
+export const DEMO_MEMBERS = { bewo: "u-bewo", mami: "u-mami" } as const;
+export const DEMO_USER_ID = DEMO_MEMBERS.bewo;
+
 /** Demo ayına göre gün: bu ay (0) / geçen ay (-1), "YYYY-MM-DD" (yerel). Portal "Bu ay" demosu için. */
 const monthDay = (offset: number, day: number) => {
   const d = new Date(demoNow);
@@ -100,13 +107,13 @@ export const seed: RastData = {
     { id: "p3", client_id: "c3", brand_id: "b4", name: "Mira — Yaz Kampanyası", type: "Kampanya", owner: "Berat", start_date: "2026-08-05", end_date: "2026-09-05", budget: 30000, status: "planning", priority: "medium", created_at: "2026-07-28" },
   ],
   tasks: [
-    { id: "t1", project_id: "p1", title: "Reels #8 kurgu", assignee: "Editör", due_date: "2026-08-03", priority: "high", status: "in_progress", created_at: "2026-08-01" },
-    { id: "t2", project_id: "p1", title: "Ağustos caption seti", assignee: "İçerik", due_date: "2026-08-04", priority: "medium", status: "todo", created_at: "2026-08-01" },
-    { id: "t3", project_id: "p2", title: "Dr. röportaj kurgusu", assignee: "Editör", due_date: "2026-08-05", priority: "urgent", status: "internal_review", created_at: "2026-07-30" },
-    { id: "t4", project_id: "p2", title: "Alt yazı + renk", assignee: "Editör", due_date: "2026-08-06", priority: "high", status: "todo", created_at: "2026-07-30" },
-    { id: "t5", project_id: "p3", title: "Kampanya moodboard", assignee: "Tasarım", due_date: "2026-08-07", priority: "medium", status: "todo", created_at: "2026-07-28" },
-    { id: "t7", lead_id: "l6", title: "Lead'i 24 saat içinde ara: Elif Demir", due_date: demoTomorrow.slice(0, 10), priority: "high", status: "todo", created_at: daysAgo(0.2) },
-    { id: "t6", project_id: "p1", title: "Story serisi tasarım", assignee: "Tasarım", due_date: "2026-08-02", priority: "high", status: "client_review", created_at: "2026-08-01" },
+    { id: "t1", project_id: "p1", title: "Reels #8 kurgu", assignee_id: DEMO_MEMBERS.mami, assignee: "Mohammed Akram Adnan", due_date: "2026-08-03", priority: "high", status: "in_progress", created_at: "2026-08-01" },
+    { id: "t2", project_id: "p1", title: "Ağustos caption seti", assignee_id: DEMO_MEMBERS.bewo, assignee: "Berat Değirmenci", due_date: "2026-08-04", priority: "medium", status: "todo", created_at: "2026-08-01" },
+    { id: "t3", project_id: "p2", title: "Dr. röportaj kurgusu", assignee_id: DEMO_MEMBERS.mami, assignee: "Mohammed Akram Adnan", due_date: "2026-08-05", priority: "urgent", status: "internal_review", created_at: "2026-07-30" },
+    { id: "t4", project_id: "p2", title: "Alt yazı + renk", due_date: "2026-08-06", priority: "high", status: "todo", created_at: "2026-07-30" },
+    { id: "t5", project_id: "p3", title: "Kampanya moodboard", assignee_id: DEMO_MEMBERS.bewo, assignee: "Berat Değirmenci", due_date: "2026-08-07", priority: "medium", status: "todo", created_at: "2026-07-28" },
+    { id: "t7", lead_id: "l6", title: "Lead'i 24 saat içinde ara: Elif Demir", assignee_id: DEMO_MEMBERS.bewo, assignee: "Berat Değirmenci", due_date: demoTomorrow.slice(0, 10), priority: "high", status: "todo", created_at: daysAgo(0.2) },
+    { id: "t6", project_id: "p1", title: "Story serisi tasarım", assignee_id: DEMO_MEMBERS.mami, assignee: "Mohammed Akram Adnan", due_date: "2026-08-02", priority: "high", status: "client_review", created_at: "2026-08-01" },
   ],
   contents: [
     { id: "co1", client_id: "c1", brand_id: "b1", title: "Yatak odası ilhamı — Reels", platform: "Instagram", content_type: "reels", status: "editing", planned_date: "2026-08-04", created_at: "2026-08-01" },
@@ -166,6 +173,8 @@ export const seed: RastData = {
     { id: "pr2", client_id: "c1", title: "Aytaş Home — Aylık içerik paketi", proposal_no: "RC-2026-002", status: "accepted", currency: "TRY", vat_rate: 20, created_at: "2026-02-15", updated_at: "2026-02-20" },
     { id: "pr3", client_id: "c2", title: "Adatıp Global — Uluslararası içerik", proposal_no: "RC-2026-003", status: "accepted", currency: "TRY", vat_rate: 20, created_at: "2026-03-10", updated_at: "2026-03-14" },
     { id: "pr4", client_id: "c3", title: "Mira Kozmetik — Aylık sosyal medya", proposal_no: "RC-2026-004", status: "accepted", currency: "TRY", vat_rate: 20, created_at: "2026-06-20", updated_at: "2026-06-25" },
+    // Yakın zamanda reddedilen teklif (bildirim zili demosu; göreli tarih)
+    { id: "pr5", client_id: "c1", title: "Aytaş Home — Kurumsal tanıtım filmi", proposal_no: "RC-2026-005", status: "rejected", currency: "TRY", vat_rate: 20, created_at: daysAgo(9), updated_at: daysAgo(2) },
   ],
   proposal_items: [...demoProposalItems, ...demoAcceptedItems],
   // İçerik onayları (0013): biri hekim onayı bekliyor, biri onaylandı.
@@ -220,5 +229,10 @@ export const seed: RastData = {
     { id: "al3", actor_name: "Berat", entity: "projects", entity_id: "p3", record_label: "Mira — Yaz Kampanyası", action: "update", diff: { status: { old: "on_hold", new: "planning" }, end_date: { old: "2026-08-31", new: "2026-09-05" } }, created_at: "2026-10-03T14:02:00+03:00" },
     { id: "al2", actor_name: "Berat", entity: "proposals", entity_id: "pr1", record_label: "Hekim İçerik Sistemi — Standart", action: "insert", diff: { title: { old: null, new: "Hekim İçerik Sistemi — Standart" }, proposal_no: { old: null, new: "RC-2026-001" }, status: { old: null, new: "draft" } }, created_at: "2026-10-01T12:15:00+03:00" },
     { id: "al1", actor_name: "Berat", entity: "clients", entity_id: "c3", record_label: "Mira Kozmetik", action: "update", diff: { monthly_fee: { old: 20000, new: 22000 } }, created_at: "2026-10-01T09:30:00+03:00" },
+  ],
+  // Ekip (0021): görev atama listesi.
+  profiles: [
+    { id: DEMO_MEMBERS.bewo, full_name: "Berat Değirmenci", role: "admin", is_active: true },
+    { id: DEMO_MEMBERS.mami, full_name: "Mohammed Akram Adnan", role: "editor", is_active: true },
   ],
 };

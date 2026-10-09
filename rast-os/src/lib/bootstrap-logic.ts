@@ -18,10 +18,18 @@ export const DASHBOARD_COLLECTIONS: Collection[] = [
 
 /**
  * İlk açılışta, hangi sayfa açılırsa açılsın TEK istekte çekilen çekirdek küme: dashboard + CRM'in küçük
- * referans tabloları. Böylece sayfalar arası gezinti çoğunlukla yeni istek açmaz. Müşteri Bulma, onay,
- * rapor ve portal tabloları yalnızca o sayfalar açılınca çekilir.
+ * referans tabloları + ekip (görev atama, 0021) + içerik onayları (bildirim zili: müşterinin kararı).
+ * Böylece sayfalar arası gezinti ve zil çoğunlukla yeni istek açmaz. Müşteri Bulma, rapor ve portal
+ * tabloları yalnızca o sayfalar açılınca çekilir.
  */
-export const CORE_COLLECTIONS: Collection[] = [...DASHBOARD_COLLECTIONS, "brands", "projects", "leads", "contacts"];
+export const CORE_COLLECTIONS: Collection[] = [
+  ...DASHBOARD_COLLECTIONS, "brands", "projects", "leads", "contacts", "profiles", "content_approvals",
+];
+
+/** Bildirim zilinin türetildiği koleksiyonlar (Topbar). Hepsi çekirdekte: zil açılış isteğiyle dolar. */
+export const NOTIFICATION_COLLECTIONS: Collection[] = [
+  "invoices", "expenses", "tasks", "contents", "leads", "content_approvals", "proposals",
+];
 
 /**
  * Sayfa (yol öneki) → `useHydrated` koleksiyonları. En uzun önek kazanır. Testte her sayfanın
@@ -41,7 +49,7 @@ const ROUTES: [prefix: string, collections: Collection[]][] = [
   ["/finance/expenses", ["expenses"]],
   ["/musteri-bulma", ["prospects", "outreach_sequences", "outreach_messages", "suppression_list", "leads", "tasks"]],
   ["/raporlar", ["clients", "brands", "contents", "shoots", "content_approvals", "client_reports"]],
-  ["/tasks", ["tasks", "projects"]],
+  ["/tasks", ["tasks", "projects", "profiles"]],
   ["/projects", ["projects", "clients", "tasks", "brands"]],
   ["/jobs", ["jobs"]],
   ["/shoots", ["shoots", "clients", "brands"]],
@@ -128,6 +136,15 @@ export function parseBootstrap(data: unknown, requested: readonly Collection[]):
     rows[c] = list.filter((r): r is Row => isObj(r) && typeof r.id === "string");
   }
   return { profile, organization, rows };
+}
+
+/**
+ * 0021 uygulanmamış (yalnız 0020): fonksiyon `profiles` koleksiyonunu bilmez → 22023 "bilinmeyen koleksiyon
+ * 'profiles'". İstemci bu sekmede `profiles`'ı RPC'den çıkarıp ekibi ayrı (paralel) sorguyla çeker.
+ */
+export function isProfilesRejected(error: { code?: string; message?: string } | null | undefined): boolean {
+  if (!error) return false;
+  return error.code === "22023" && /profiles/.test(error.message ?? "");
 }
 
 /** PostgREST "fonksiyon yok" (0020 henüz uygulanmadı): eski tablo-tablo yola düşülür. */

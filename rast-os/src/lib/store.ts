@@ -7,7 +7,7 @@ import { seed } from "./seed";
 import { isAuthRequired, isSupabaseConfigured } from "./env";
 import { createClient } from "./supabase/client";
 import { perfLog, perfStart } from "./perf";
-import { isRpcMissing, mergeRows, parseBootstrap } from "./bootstrap-logic";
+import { bootCollections, isRpcMissing, mergeRows, parseBootstrap, routeCollections } from "./bootstrap-logic";
 import type { BootstrapOrganization, BootstrapProfile } from "./bootstrap-logic";
 
 type Collections = keyof RastData;
@@ -99,6 +99,8 @@ const inflight = new Map<Collections, Promise<void>>();
 let initPromise: Promise<void> | null = null;
 let flushScheduled: Promise<void> | null = null;
 let activeFetches = 0;
+/** Oturum sıfırlanınca (çıkış / yeni giriş) artar: eski oturumun geç gelen yanıtları uygulanmaz. */
+let epoch = 0;
 
 /**
  * Yerel değişiklik sırası: add/update/remove/mergeLocal her kaydı `${koleksiyon}:${id}` → artan sayı ile
@@ -205,25 +207,32 @@ function applyRows(f: Fetched, extra: Partial<StoreState> = {}) {
 
 /** `fetchRemote` + uçuştaki istek kaydı (aynı koleksiyon iki kez istenmez). */
 async function runFetch(cols: Collections[], userId: string | null, onDone: (f: Fetched) => void): Promise<void> {
+  const myEpoch = epoch;
   activeFetches++;
-  const job = fetchRemote(cols, userId).then(onDone);
+  const job = fetchRemote(cols, userId).then((f) => {
+    if (myEpoch === epoch) onDone(f);
+  });
   const tracked = job.catch(() => undefined);
   for (const c of cols) inflight.set(c, tracked);
   try {
     await job;
   } finally {
-    for (const c of cols) if (inflight.get(c) === tracked) inflight.delete(c);
-    activeFetches--;
-    // Uçuşta çekim yoksa eski işaretler artık hiçbir birleştirmeyi etkilemez.
-    if (activeFetches === 0) touched.clear();
+    if (myEpoch === epoch) {
+      for (const c of cols) if (inflight.get(c) === tracked) inflight.delete(c);
+      activeFetches--;
+      // Uçuşta çekim yoksa eski işaretler artık hiçbir birleştirmeyi etkilemez.
+      if (activeFetches === 0) touched.clear();
+    }
   }
 }
 
 async function runInit(): Promise<void> {
   const tInit = perfStart();
+  const myEpoch = epoch;
   const sb = createClient();
   const { data: { session } } = await sb.auth.getSession();
   perfLog("init: getSession (yerel; süresi dolmuşsa yenileme ağ çağrısı)", tInit);
+  if (myEpoch !== epoch) return;
   const user = session?.user;
 
   // Supabase yapılandırılmış ama oturum yok. Giriş zorunluyken (varsayılan) proxy bu
@@ -296,13 +305,58 @@ function requestCollections(cols: readonly Collections[]): Promise<void> {
     else pending.add(c);
   }
   if (pending.size || !st.loaded) {
-    flushScheduled ??= Promise.resolve().then(() => {
-      flushScheduled = null;
-      return flushPending();
-    });
+    if (!flushScheduled) {
+      const p: Promise<void> = Promise.resolve().then(() => {
+        if (flushScheduled === p) flushScheduled = null;
+        return flushPending();
+      });
+      flushScheduled = p;
+    }
     waits.push(flushScheduled);
   }
   return Promise.all(waits).then(() => undefined);
+}
+
+/**
+ * Açılış isteğini sayfa bileşenleri mount olmadan, olabildiğince erken başlatır (AppShell modülü
+ * yüklenirken, giriş başarılı olunca). İstenen küme: çekirdek (dashboard + CRM) + açılan sayfa —
+ * böylece sayfalar arası gezinti çoğunlukla yeni istek açmaz. Demo modunda hiçbir şey yapmaz.
+ */
+export function prefetchBootstrap(pathname: string): void {
+  if (!isSupabaseConfigured) return;
+  void requestCollections(bootCollections(pathname));
+}
+
+/**
+ * Bağlantı üzerine gelinince / odaklanınca hedef sayfanın eksik koleksiyonlarını önceden ister
+ * (tıklamadan önce tek RPC). Açılış bitmeden ya da demo modunda hiçbir şey yapmaz.
+ */
+export function prefetchRoute(pathname: string): void {
+  const st = useStore.getState();
+  if (!isSupabaseConfigured || !st.loaded || !st.supabase || !st.orgId) return;
+  const missing = routeCollections(pathname).filter((c) => !st.loadedCollections[c] && !inflight.has(c));
+  if (missing.length) void requestCollections(missing);
+}
+
+/** Oturum değişti (çıkış / giriş sayfası): bellekteki veriyi ve bekleyen istekleri sıfırlar. */
+export function resetSession(): void {
+  epoch++;
+  pending.clear();
+  inflight.clear();
+  touched.clear();
+  initPromise = null;
+  flushScheduled = null;
+  activeFetches = 0;
+  useStore.setState({
+    ...emptyData,
+    loaded: false,
+    supabase: false,
+    orgId: null,
+    profile: null,
+    orgTargets: null,
+    orgTargetsKnown: false,
+    loadedCollections: noneLoaded(),
+  });
 }
 
 export const useStore = create<StoreState>()((set, get) => ({
@@ -326,9 +380,12 @@ export const useStore = create<StoreState>()((set, get) => ({
       return;
     }
 
-    initPromise ??= runInit().finally(() => {
-      initPromise = null;
-    });
+    if (!initPromise) {
+      const p: Promise<void> = runInit().finally(() => {
+        if (initPromise === p) initPromise = null;
+      });
+      initPromise = p;
+    }
     return initPromise;
   },
 

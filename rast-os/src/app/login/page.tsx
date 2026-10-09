@@ -1,15 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/env";
+import { prefetchBootstrap, resetSession } from "@/lib/store";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
+
+  // Giriş sayfası = oturum yok: önceki oturumdan bellekte kalan veri (istemci tarafı yönlendirmeyle
+  // gelindiyse) yeni girişe sızmasın.
+  useEffect(() => {
+    resetSession();
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,14 +34,18 @@ export default function LoginPage() {
     setLoading(true);
     const supabase = createClient();
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    setLoading(false);
 
     if (error) {
+      setLoading(false);
       setError("Giriş başarısız: " + error.message);
       return;
     }
-    // Tam yeniden yükleme — store, oturumla birlikte Supabase'den veriyi çeker
-    window.location.assign("/");
+    // Açılış verisini HEMEN başlat (dashboard + çekirdek koleksiyonlar, tek RPC) ve istemci tarafında
+    // yönlen: sayfa (RSC) ve veri istekleri paralel gider, store korunur. Store bu sayfada sıfırlandığı
+    // için önceki oturumun verisi taşınmaz.
+    resetSession();
+    prefetchBootstrap("/");
+    router.replace("/");
   }
 
   return (

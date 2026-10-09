@@ -79,3 +79,18 @@ Notlar:
   (RLS org'u zaten bilir) → 2 tur yerine 1 tur (+ ilk RPC denemesi; sekme başına bir kez).
 - Yenileme sırasında yapılan yerel değişiklikler (ekle/güncelle/sil) ezilmez: `mergeRows` + değişiklik sırası.
 - Demo modu (Supabase env yok) aynı: bellek içi örnek veri, ağ yok.
+
+### 2) Erken ve toplu ön yükleme
+
+- **AppShell modülü yüklenir yüklenmez** (sayfa bileşenleri mount olmadan, hydration sürerken) açılış
+  isteği başlar: `prefetchBootstrap(location.pathname)`.
+- İstenen küme = **çekirdek** (dashboard'un 12 koleksiyonu + brands, projects, leads, contacts) ∪ açılan
+  sayfanınkiler (`bootstrap-logic.ts → routeCollections`; birim testi her sayfanın `useHydrated`
+  listesinin kapsandığını doğrular). Böylece Dashboard, Teklifler, CRM, Finans, Görevler, Projeler,
+  Çekimler, İşler, Ekipman arasında gezinti **0 tur**.
+- Çekirdek dışı sayfalar (İçerik onayları, Müşteri portalı, Raporlar, Müşteri Bulma, İşlem geçmişi):
+  bağlantının üzerinde ~120 ms durunca / klavye odağında eksik koleksiyonlar tek RPC ile önceden istenir
+  → çoğu zaman tıklama anında hazır.
+- **Giriş:** şifre doğrulanınca açılış RPC'si hemen başlar ve `router.replace("/")` ile istemci tarafı
+  yönlendirme yapılır → sayfa (RSC) ve veri paralel gelir (önceden: tam sayfa yükleme + JS + sonra veri).
+  Giriş sayfası açılınca bellekteki önceki oturum verisi sıfırlanır (`resetSession`).

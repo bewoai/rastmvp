@@ -6,6 +6,45 @@ import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import QuickAddHost from "./QuickAddTask";
 import Toaster from "./Toaster";
+import { prefetchBootstrap, prefetchRoute } from "@/lib/store";
+
+// Açılış verisi: bu modül tarayıcıda yüklenir yüklenmez (sayfa bileşenleri mount olmadan, hydration
+// sürerken) tek `app_bootstrap` isteği başlar — çekirdek koleksiyonlar + açılan sayfanınkiler.
+// Store'a yanıt gelince yazılır (zustand/useSyncExternalStore hydration sırasında güvenli). Demo modunda no-op.
+if (typeof window !== "undefined") prefetchBootstrap(window.location.pathname);
+
+/**
+ * İç bağlantının üzerinde ~120 ms durulunca / klavyeyle odaklanınca hedef sayfanın eksik koleksiyonları
+ * önceden istenir (tıklamadan önce tek RPC). Yüklü olan için istek yok; Next prefetch'i (kapalı) değil.
+ */
+function useRouteDataPrefetch() {
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const target = (e: Event) => {
+      const a = (e.target as HTMLElement | null)?.closest?.("a");
+      if (!a || a.target === "_blank") return null;
+      const url = new URL(a.href, window.location.href);
+      return url.origin === window.location.origin && url.pathname !== window.location.pathname ? url.pathname : null;
+    };
+    function onOver(e: Event) {
+      const path = target(e);
+      clearTimeout(timer);
+      if (path) timer = setTimeout(() => prefetchRoute(path), e.type === "focusin" ? 0 : 120);
+    }
+    function onOut() {
+      clearTimeout(timer);
+    }
+    document.addEventListener("pointerover", onOver, true);
+    document.addEventListener("focusin", onOver, true);
+    document.addEventListener("pointerout", onOut, true);
+    return () => {
+      document.removeEventListener("pointerover", onOver, true);
+      document.removeEventListener("focusin", onOver, true);
+      document.removeEventListener("pointerout", onOut, true);
+      clearTimeout(timer);
+    };
+  }, []);
+}
 
 /**
  * Prefetch kapalı olduğundan bir bağlantıya tıklayınca yeni sayfa gelene kadar ağ beklemesi olur.
@@ -82,6 +121,7 @@ export default function AppShell({
 }) {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
+  useRouteDataPrefetch();
 
   return (
     <div className="relative flex h-dvh overflow-hidden bg-background print:block print:h-auto print:overflow-visible print:bg-white">

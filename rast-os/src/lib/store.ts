@@ -147,6 +147,10 @@ interface Fetched {
   /** undefined: bilinmiyor (eski yol). */
   organization?: BootstrapOrganization | null;
   startSeq: number;
+  /** Eski yolda hata veren tablolar (rows'ta boş dizi). Tazelemede uygulanmaz — eldeki veri silinmez. */
+  failed?: Collections[];
+  /** Eski yolda profil sorgusu hata verdi (ağ vb.; "satır yok" değil). */
+  profileFailed?: boolean;
 }
 
 /** Eski yol: tablo başına `select *` (paralel). Profil istenirse o da aynı turda. */
@@ -154,26 +158,32 @@ async function fetchLegacy(cols: Collections[], userId: string | null, startSeq:
   const sb = createClient();
   const t0 = perfStart();
   const rows: Partial<Record<Collections, Row[]>> = {};
+  const failed: Collections[] = [];
+  // Sorgu oluşturucu tembeldir (await'e kadar istek gitmez): `.then` ile HEMEN başlatılır → tablolarla aynı turda.
   const profileQuery = userId
-    ? sb.from("profiles").select("organization_id, role, full_name").eq("id", userId).single()
+    ? sb.from("profiles").select("organization_id, role, full_name").eq("id", userId).single().then((r) => r)
     : null;
   await Promise.all(
     cols.map(async (c) => {
       const tTable = perfStart();
       const query = sb.from(c).select("*").order("created_at", { ascending: false });
-      const { data } = await (c === "activity_logs" ? query.limit(ACTIVITY_LOG_LIMIT) : query);
+      const { data, error } = await (c === "activity_logs" ? query.limit(ACTIVITY_LOG_LIMIT) : query);
+      if (error) failed.push(c);
       rows[c] = (data ?? []) as Row[];
       perfLog(`load: ${c}`, tTable, { rows: rows[c]!.length });
     }),
   );
   let profile: BootstrapProfile | null | undefined;
+  let profileFailed = false;
   if (profileQuery) {
-    const { data } = await profileQuery;
+    const { data, error } = await profileQuery;
+    // PGRST116 = profil satırı yok (geçerli durum: org'suz say); diğer hatalar = alınamadı.
+    profileFailed = Boolean(error) && error?.code !== "PGRST116";
     const p = data as { organization_id?: string | null; role?: string | null; full_name?: string | null } | null;
     profile = p ? { organization_id: p.organization_id ?? null, role: p.role ?? null, full_name: p.full_name ?? null } : null;
   }
   perfLog("load: eski yol toplam (paralel)", t0, { requests: cols.length + (userId ? 1 : 0), collections: cols });
-  return { rows, profile, startSeq };
+  return { rows, profile, startSeq, failed, profileFailed };
 }
 
 /** Koleksiyonları (ve istenirse profili) çeker: önce 0020 RPC (1 istek), olmazsa eski yol. */
@@ -216,8 +226,16 @@ function applyRows(f: Fetched, extra: Partial<StoreState> = {}) {
  * Açılış / yenileme yanıtını uygular. Profil geldiyse org değişmiş olabilir (anlık görüntü başka org'a
  * aitse): o durumda yerel veri tamamen atılır, yalnızca gelen koleksiyonlar yüklü sayılır.
  */
-function applyBootstrap(f: Fetched) {
+function applyBootstrap(input: Fetched) {
   const cur = useStore.getState();
+  let f = input;
+  // Tazeleme (veri zaten ekranda) sırasında hata veren parçalar uygulanmaz: geçici ağ hatası ekrandaki
+  // (ör. anlık görüntüden gelen) veriyi silmesin. İlk açılışta eski davranış: boş liste.
+  if (cur.loaded && (f.failed?.length || f.profileFailed)) {
+    const rows = { ...f.rows };
+    for (const c of f.failed ?? []) delete rows[c];
+    f = { ...f, rows, profile: f.profileFailed ? undefined : f.profile };
+  }
   const orgId = f.profile === undefined ? cur.orgId : (f.profile?.organization_id ?? null);
   const meta: Partial<StoreState> = { loaded: true, supabase: true, orgId };
   if (f.profile !== undefined) meta.profile = f.profile;
@@ -328,6 +346,8 @@ async function flushPending(): Promise<void> {
   }
   const asked = [...pending];
   pending.clear();
+  // Oturumsuz (supabase: false — boş ya da açıkça istenmiş örnek veri): yüklenecek bir şey yok.
+  if (!st.supabase) return;
   // Uçuştaki (ör. arka plan tazelemesi) koleksiyonlar yeniden istenmez; onların bitişi beklenir.
   const waits = asked.map((c) => inflight.get(c)).filter((p): p is Promise<void> => Boolean(p));
   const cols = asked.filter((c) => !useStore.getState().loadedCollections[c] && !inflight.has(c));
@@ -335,7 +355,7 @@ async function flushPending(): Promise<void> {
     await Promise.all(waits);
     return;
   }
-  if (!st.supabase || !st.orgId) {
+  if (!st.orgId) {
     // Org'a bağlı olmayan oturum: RLS hiçbir satır döndürmez — boş ama "yüklendi" say (sonsuz iskelet olmasın).
     applyRows({ rows: Object.fromEntries(cols.map((c) => [c, []])), startSeq: changeSeq });
     return;

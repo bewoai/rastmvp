@@ -10,9 +10,9 @@
 // anon/authenticated/service_role rolleri, "extensions" şemasında pgcrypto,
 // Supabase'in public şeması varsayılan yetkileri) ve sonra:
 //
-//   1) supabase/migrations/0001…0019'u numara sırasıyla, her dosyayı kendi
+//   1) supabase/migrations/0001…0020'yi numara sırasıyla, her dosyayı kendi
 //      transaction'ında uygular; ilk hatada durur ve hatalı ifadeyi yazar.
-//   2) Idempotency: 0008…0019'u İKİNCİ kez uygular.
+//   2) Idempotency: 0008…0020'yi İKİNCİ kez uygular.
 //   3) Yapısal kontroller (tablo / kolon / fonksiyon / trigger / yetki).
 //   4) Davranış kontrolleri: SET ROLE anon|authenticated + request.jwt.claims
 //      ile (PostgREST'in yaptığı gibi) RLS, guard trigger'lar ve RPC'ler.
@@ -304,6 +304,7 @@ async function structuralChecks() {
     "outreach_is_suppressed(uuid,text,text)", "outreach_messages_guard()", "outreach_messages_touch_prospect()",
     "outreach_unsub_token(uuid,text)", "outreach_unsubscribe(text)", "outreach_cron_claim(text,integer,integer)",
     "outreach_cron_result(text,uuid,text,text,text,jsonb)", "outreach_places_purge(text)",
+    "app_bootstrap(text[],date)", // 0020
   ];
   for (const f of fns) {
     await check(G, `fonksiyon ${f}`, async () => (await val("select to_regprocedure($1) is not null", [`public.${f}`])) || "yok");
@@ -388,6 +389,7 @@ async function structuralChecks() {
     "log_activity()", "handle_new_user()", "apply_invite_to_existing_user()", "set_updated_at()",
     "content_approvals_guard()", "client_portal_tokens_guard()", "current_org_id()", "current_role_name()",
     "outreach_unsub_token(uuid,text)", "outreach_messages_guard()", "outreach_messages_touch_prospect()",
+    "app_bootstrap(text[],date)", // 0020
   ]) {
     await check(G, `anon execute ${f} = false`, async () => eq(await fnPriv("anon", f), false));
   }
@@ -399,12 +401,31 @@ async function structuralChecks() {
     ["outreach_unsubscribe(text)", false], ["outreach_cron_claim(text,integer,integer)", false],
     ["outreach_cron_result(text,uuid,text,text,text,jsonb)", false], ["outreach_places_purge(text)", false],
     ["outreach_unsub_token(uuid,text)", false],
+    ["app_bootstrap(text[],date)", true], // 0020
   ]) {
     await check(G, `authenticated execute ${f} = ${want}`, async () => eq(await fnPriv("authenticated", f), want));
   }
   for (const f of ["current_org_id()", "current_role_name()"]) {
     await check(G, `service_role execute ${f} = true`, async () => eq(await fnPriv("service_role", f), true));
   }
+
+  // 0020: app_bootstrap SECURITY INVOKER (RLS uygulanır), search_path sabit, izin listesi = store COLLECTIONS.
+  await check(G, "app_bootstrap: SECURITY INVOKER + search_path=public + stable", async () =>
+    eq(await one(
+      `select p.prosecdef as definer, p.provolatile as volatility, p.proconfig as config
+         from pg_proc p where p.oid = 'public.app_bootstrap(text[],date)'::regprocedure`,
+    ), { definer: false, volatility: "s", config: ["search_path=public"] }));
+  await check(G, "app_bootstrap izin listesi = store.ts COLLECTIONS", async () => {
+    const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "src", "lib", "store.ts"), "utf8");
+    const block = src.match(/export const COLLECTIONS[^=]*=\s*\[([\s\S]*?)\];/);
+    if (!block) return "store.ts COLLECTIONS bulunamadı";
+    const want = [...block[1].replace(/\/\/.*$/gm, "").matchAll(/"([a-z_]+)"/g)].map((m) => m[1]).sort();
+    const def = await val("select pg_get_functiondef('public.app_bootstrap(text[],date)'::regprocedure)");
+    const arr = def.match(/v_allowed constant text\[\] := array\[([\s\S]*?)\];/);
+    if (!arr) return "v_allowed bulunamadı";
+    const got = [...arr[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort();
+    return eq(got, want, "izin listesi");
+  });
 
   // anon'un çalıştırabildiği SECURITY DEFINER fonksiyonlar tam olarak public RPC listesi olmalı.
   await check(G, "anon'a açık SECURITY DEFINER fonksiyonlar = public RPC listesi", async () => {
@@ -896,6 +917,125 @@ async function behaviouralChecks() {
     as("authenticated", U.A, () => expectError(() => db.query("select import_rows('{}'::jsonb)"), "42501")));
   await check(IM, "anon çağıramaz → 42501", () =>
     as("anon", null, () => expectError(() => db.query("select import_rows('{}'::jsonb)"), "42501")));
+
+  // --- 0020: app_bootstrap (tek turda açılış verisi) ---
+  const BS = "0020";
+  // org2 kullanıcısı (davetli, onaylı) + org2'ye ait bir fatura
+  const U_E = "00000000-0000-4000-8000-00000000000e";
+  await db.query("insert into organization_invites (organization_id, email, role) values ($1, 'e@ornek.com', 'editor')", [ORG2]);
+  await db.query(
+    "insert into auth.users (id, email, email_confirmed_at, raw_user_meta_data) values ($1, 'e@ornek.com', now(), '{\"full_name\":\"Ece Başka\"}')",
+    [U_E],
+  );
+  await db.query("insert into invoices (organization_id, invoice_no, amount, status) values ($1, 'ORG2-1', 10, 'issued')", [ORG2]);
+  // org1 zaman penceresi örnekleri (süper kullanıcı; created_at geçmişe çekilir)
+  const OLD = "now() - interval '3 years'";
+  const oldPaid = await val(`insert into invoices (organization_id, invoice_no, amount, status, issue_date, created_at)
+    values ($1, 'ESKI-ODENDI', 100, 'paid', current_date - 1000, ${OLD}) returning id`, [ORG1]);
+  const oldOpen = await val(`insert into invoices (organization_id, invoice_no, amount, status, issue_date, created_at)
+    values ($1, 'ESKI-ACIK', 200, 'overdue', current_date - 1000, ${OLD}) returning id`, [ORG1]);
+  const oldOpenPay = await val(`insert into payments (organization_id, invoice_id, amount, paid_at, created_at)
+    values ($1, $2, 50, current_date - 990, ${OLD}) returning id`, [ORG1, oldOpen]);
+  const oldPaidPay = await val(`insert into payments (organization_id, invoice_id, amount, paid_at, created_at)
+    values ($1, $2, 100, current_date - 990, ${OLD}) returning id`, [ORG1, oldPaid]);
+  const oldRecurring = await val(`insert into expenses (organization_id, amount, is_recurring, paid_at, created_at)
+    values ($1, 500, true, current_date - 1000, ${OLD}) returning id`, [ORG1]);
+  const oldExpense = await val(`insert into expenses (organization_id, amount, is_recurring, paid_at, created_at)
+    values ($1, 70, false, current_date - 1000, ${OLD}) returning id`, [ORG1]);
+  const oldDoneTask = await val(`insert into tasks (organization_id, title, status, due_date, created_at)
+    values ($1, 'Eski bitmiş', 'done', current_date - 1000, ${OLD}) returning id`, [ORG1]);
+  const oldOpenTask = await val(`insert into tasks (organization_id, title, status, due_date, created_at)
+    values ($1, 'Eski açık', 'todo', current_date - 1000, ${OLD}) returning id`, [ORG1]);
+
+  const boot = (sub, cols, since = null) =>
+    as("authenticated", sub, () => val("select app_bootstrap($1::text[], $2::date)", [cols, since]));
+  const ids = (rows) => (rows ?? []).map((r) => r.id);
+
+  await check(BS, "anon app_bootstrap çağıramaz (42501)", () =>
+    as("anon", null, () => expectError(() => db.query("select app_bootstrap(array['clients'])"), "42501")));
+  await check(BS, "geçersiz koleksiyon adı → 22023", () =>
+    as("authenticated", U.B, () => expectError(() => db.query("select app_bootstrap(array['clients','profiles'])"), "22023")));
+  await check(BS, "SQL enjeksiyonu denemesi → 22023", () =>
+    as("authenticated", U.B, () =>
+      expectError(() => db.query("select app_bootstrap(array['clients; drop table clients'])"), "22023")));
+  await check(BS, "null eleman → 22023", () =>
+    as("authenticated", U.B, () => expectError(() => db.query("select app_bootstrap(array[null]::text[])"), "22023")));
+  await check(BS, "profil (org, rol, ad) + org hedefleri + yalnız istenen anahtarlar", async () => {
+    const r = await boot(U.B, ["clients", "clients"]);
+    return eq(
+      [r?.profile?.organization_id, r?.profile?.role, r?.profile?.full_name, r?.organization?.mrr_target != null, Object.keys(r ?? {}).sort()],
+      [ORG1, "admin", "Bora Admin", true, ["clients", "organization", "profile", "since"]],
+    );
+  });
+  await check(BS, "RLS: org1 kullanıcısı org2 satırlarını görmez", async () => {
+    const r = await boot(U.B, ["clients", "invoices"]);
+    const names = (r?.clients ?? []).map((c) => c.name);
+    const nos = (r?.invoices ?? []).map((i) => i.invoice_no);
+    const leak = (r?.clients ?? []).concat(r?.invoices ?? []).filter((x) => x.organization_id !== ORG1);
+    return eq(
+      [names.includes("Başka Org Müşterisi"), nos.includes("ORG2-1"), leak.length, names.includes("Dr. Test Kliniği")],
+      [false, false, 0, true],
+    );
+  });
+  await check(BS, "RLS: org2 kullanıcısı yalnız kendi org satırlarını görür", async () => {
+    const r = await boot(U_E, ["clients", "invoices", "proposals"]);
+    return eq(
+      [r?.profile?.organization_id, (r?.clients ?? []).map((c) => c.name), (r?.invoices ?? []).map((i) => i.invoice_no), r?.proposals],
+      [ORG2, ["Başka Org Müşterisi"], ["ORG2-1"], []],
+    );
+  });
+  await check(BS, "org'suz kullanıcı → profil org null, boş listeler", async () => {
+    const r = await boot(U.A, ["clients", "activity_logs"]);
+    return eq([r?.profile?.organization_id, r?.clients, r?.activity_logs, r?.organization], [null, [], [], null]);
+  });
+  await check(BS, "satırlar select * ile aynı alanlar + created_at desc", async () => {
+    const r = await boot(U.B, ["clients"]);
+    const direct = await as("authenticated", U.B, async () =>
+      (await db.query("select to_jsonb(c) as j from clients c order by created_at desc")).rows.map((x) => x.j));
+    return eq(r?.clients, direct, "clients");
+  });
+  await check(BS, "18 ay: eski ödenmiş fatura/ödeme yok; eski açık fatura + ödemesi var", async () => {
+    const r = await boot(U.B, ["invoices", "payments"]);
+    const inv = ids(r?.invoices);
+    const pay = ids(r?.payments);
+    return eq(
+      [inv.includes(oldPaid), inv.includes(oldOpen), pay.includes(oldOpenPay), pay.includes(oldPaidPay)],
+      [false, true, true, false],
+    );
+  });
+  await check(BS, "18 ay: tekrarlayan gider şablonu her zaman var, eski tek seferlik gider yok", async () => {
+    const r = await boot(U.B, ["expenses"]);
+    return eq([ids(r?.expenses).includes(oldRecurring), ids(r?.expenses).includes(oldExpense)], [true, false]);
+  });
+  await check(BS, "18 ay: eski açık görev var, eski bitmiş görev yok", async () => {
+    const r = await boot(U.B, ["tasks"]);
+    return eq([ids(r?.tasks).includes(oldOpenTask), ids(r?.tasks).includes(oldDoneTask)], [true, false]);
+  });
+  await check(BS, "p_since verilince eski kayıtlar da döner", async () => {
+    const r = await boot(U.B, ["invoices", "expenses", "tasks"], "2000-01-01");
+    return eq(
+      [ids(r?.invoices).includes(oldPaid), ids(r?.expenses).includes(oldExpense), ids(r?.tasks).includes(oldDoneTask), r?.since],
+      [true, true, true, "2000-01-01"],
+    );
+  });
+  await check(BS, "tüm izinli koleksiyonlar tek çağrıda çalışır (kolon adları doğru)", async () => {
+    const all = await val(
+      "select (regexp_match(pg_get_functiondef('public.app_bootstrap(text[],date)'::regprocedure), 'v_allowed constant text\\[\\] := array\\[([^\\]]*)\\]'))[1]",
+    );
+    const cols = [...all.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+    const r = await boot(U.B, cols);
+    const missing = cols.filter((c) => !Array.isArray(r?.[c]));
+    return missing.length === 0 ? true : `eksik: ${missing.join(", ")}`;
+  });
+  await check(BS, "activity_logs en fazla 500 satır", async () => {
+    await db.query(
+      `insert into activity_logs (organization_id, entity, action, created_at)
+       select $1, 'test', 'insert', now() - (g || ' seconds')::interval from generate_series(1, 520) g`,
+      [ORG1],
+    );
+    const r = await boot(U.B, ["activity_logs"]);
+    return eq(r?.activity_logs?.length, 500, "satır");
+  });
 
   // --- 0006: storage politikası (current_org_id authenticated'da çalışıyor mu) ---
   await check("storage", "content-files: kendi org klasörüne yazılır, başka org klasörüne yazılamaz", async () => {

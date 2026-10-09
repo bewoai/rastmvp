@@ -6,6 +6,12 @@ import type { RastData, WritableCollection } from "./types";
 import { seed } from "./seed";
 import { isAuthRequired, isSupabaseConfigured } from "./env";
 import { createClient } from "./supabase/client";
+import { perfLog, perfStart } from "./perf";
+import {
+  bootCollections, isRpcMissing, mergeRows, parseBootstrap, routeCollections, shouldRefreshOnFocus, unionCollections,
+} from "./bootstrap-logic";
+import { clearSnapshots, readSnapshot, writeSnapshot } from "./snapshot";
+import type { BootstrapOrganization, BootstrapProfile } from "./bootstrap-logic";
 
 type Collections = keyof RastData;
 type Row = { id: string } & Record<string, unknown>;
@@ -31,7 +37,7 @@ export const COLLECTIONS: Collections[] = [
 /** seedToSupabase'in atladığı koleksiyonlar (demo Müşteri Bulma verisi sahte Places kimlikleri içerir). */
 const SEED_SKIP = new Set<Collections>(["activity_logs", "content_approvals", "client_portal_tokens", "prospects", "outreach_sequences", "outreach_messages", "suppression_list"]);
 
-/** Tek seferde çekilecek en fazla işlem geçmişi satırı (en yeniler). */
+/** Tek seferde çekilecek en fazla işlem geçmişi satırı (en yeniler). 0020 app_bootstrap ile aynı. */
 const ACTIVITY_LOG_LIMIT = 500;
 
 const emptyData: RastData = {
@@ -40,6 +46,8 @@ const emptyData: RastData = {
   proposals: [], proposal_items: [], content_approvals: [], client_reports: [], client_portal_tokens: [], activity_logs: [],
   prospects: [], outreach_sequences: [], outreach_messages: [], suppression_list: [],
 };
+
+const noneLoaded = () => COLLECTIONS.reduce((acc, c) => ({ ...acc, [c]: false }), {} as Record<Collections, boolean>);
 
 export const uid = () =>
   typeof crypto !== "undefined" && crypto.randomUUID
@@ -62,7 +70,11 @@ interface StoreState extends RastData {
   loaded: boolean;
   supabase: boolean;
   orgId: string | null;
-  initStarted: boolean;
+  /** Oturumdaki kullanıcının profili (rol, görünen ad) — açılış isteğinden gelir. */
+  profile: BootstrapProfile | null;
+  /** Org hedefleri (0014); `orgTargetsKnown` false ise bilinmiyor (orgSettings kendisi çeker). */
+  orgTargets: BootstrapOrganization | null;
+  orgTargetsKnown: boolean;
   loadedCollections: Record<Collections, boolean>;
   init: () => Promise<void>;
   load: (collections: Collections[]) => Promise<void>;
@@ -75,15 +87,386 @@ interface StoreState extends RastData {
   seedToSupabase: () => Promise<{ ok: boolean; error?: string }>;
 }
 
+// ---------------------------------------------------------------------------
+// Veri yükleme (Supabase modu) — bkz. docs/performans.md
+//
+// Açılış: getSession (yerel) → TEK istek `app_bootstrap` (0020): profil + org hedefleri + o ana kadar
+// istenen tüm koleksiyonlar. Sonradan istenen koleksiyonlar aynı mikro-görevde toplanıp yine tek istekle
+// çekilir. 0020 uygulanmadıysa (PGRST202) eski yola düşülür: profil + tablolar paralel `select *`.
+// ---------------------------------------------------------------------------
+
+/** İstenmiş ama henüz istek atılmamış koleksiyonlar (aynı commit'teki tüm sayfa/bileşen istekleri birleşir). */
+const pending = new Set<Collections>();
+/** Uçuştaki istekler: aynı koleksiyon ikinci kez istenmez, bekleyen çağıran aynı promise'i bekler. */
+const inflight = new Map<Collections, Promise<void>>();
+let initPromise: Promise<void> | null = null;
+let flushScheduled: Promise<void> | null = null;
+let activeFetches = 0;
+/** Son başarılı çekimin zamanı (pencereye dönüş yenilemesi için; 0 = henüz yok). */
+let lastFetchAt = 0;
+/** Oturum sıfırlanınca (çıkış / yeni giriş) artar: eski oturumun geç gelen yanıtları uygulanmaz. */
+let epoch = 0;
+/** Oturumdaki kullanıcı (anlık görüntü anahtarı). */
+let currentUserId: string | null = null;
+
+/**
+ * Yerel değişiklik sırası: add/update/remove/mergeLocal her kaydı `${koleksiyon}:${id}` → artan sayı ile
+ * işaretler. Bir çekim başladığında o anki sayı saklanır; çekimden SONRA değişen kayıtlar birleştirmede
+ * yerel haliyle korunur (bkz. bootstrap-logic.ts → mergeRows).
+ */
+let changeSeq = 0;
+const touched = new Map<string, number>();
+const touch = (c: Collections, id: string) => {
+  touched.set(`${c}:${id}`, ++changeSeq);
+};
+
+const RPC_MISSING_KEY = "rast-os:bootstrap-rpc-missing";
+let rpcAvailable = true;
+function rpcEnabled(): boolean {
+  if (!rpcAvailable) return false;
+  try {
+    if (sessionStorage.getItem(RPC_MISSING_KEY) === "1") rpcAvailable = false;
+  } catch {
+    /* depolama kapalı: her açılışta denenir */
+  }
+  return rpcAvailable;
+}
+function markRpcMissing() {
+  rpcAvailable = false;
+  try {
+    sessionStorage.setItem(RPC_MISSING_KEY, "1");
+  } catch {
+    /* yok say */
+  }
+}
+
+interface Fetched {
+  rows: Partial<Record<Collections, Row[]>>;
+  /** undefined: bu çekimde profil istenmedi. */
+  profile?: BootstrapProfile | null;
+  /** undefined: bilinmiyor (eski yol). */
+  organization?: BootstrapOrganization | null;
+  startSeq: number;
+  /** Eski yolda hata veren tablolar (rows'ta boş dizi). Tazelemede uygulanmaz — eldeki veri silinmez. */
+  failed?: Collections[];
+  /** Eski yolda profil sorgusu hata verdi (ağ vb.; "satır yok" değil). */
+  profileFailed?: boolean;
+}
+
+/** Eski yol: tablo başına `select *` (paralel). Profil istenirse o da aynı turda. */
+async function fetchLegacy(cols: Collections[], userId: string | null, startSeq: number): Promise<Fetched> {
+  const sb = createClient();
+  const t0 = perfStart();
+  const rows: Partial<Record<Collections, Row[]>> = {};
+  const failed: Collections[] = [];
+  // Sorgu oluşturucu tembeldir (await'e kadar istek gitmez): `.then` ile HEMEN başlatılır → tablolarla aynı turda.
+  const profileQuery = userId
+    ? sb.from("profiles").select("organization_id, role, full_name").eq("id", userId).single().then((r) => r)
+    : null;
+  await Promise.all(
+    cols.map(async (c) => {
+      const tTable = perfStart();
+      const query = sb.from(c).select("*").order("created_at", { ascending: false });
+      const { data, error } = await (c === "activity_logs" ? query.limit(ACTIVITY_LOG_LIMIT) : query);
+      if (error) failed.push(c);
+      rows[c] = (data ?? []) as Row[];
+      perfLog(`load: ${c}`, tTable, { rows: rows[c]!.length });
+    }),
+  );
+  let profile: BootstrapProfile | null | undefined;
+  let profileFailed = false;
+  if (profileQuery) {
+    const { data, error } = await profileQuery;
+    // PGRST116 = profil satırı yok (geçerli durum: org'suz say); diğer hatalar = alınamadı.
+    profileFailed = Boolean(error) && error?.code !== "PGRST116";
+    const p = data as { organization_id?: string | null; role?: string | null; full_name?: string | null } | null;
+    profile = p ? { organization_id: p.organization_id ?? null, role: p.role ?? null, full_name: p.full_name ?? null } : null;
+  }
+  perfLog("load: eski yol toplam (paralel)", t0, { requests: cols.length + (userId ? 1 : 0), collections: cols });
+  return { rows, profile, startSeq, failed, profileFailed };
+}
+
+/** Koleksiyonları (ve istenirse profili) çeker: önce 0020 RPC (1 istek), olmazsa eski yol. */
+async function fetchRemote(cols: Collections[], userId: string | null): Promise<Fetched> {
+  const startSeq = changeSeq;
+  if (rpcEnabled()) {
+    const t0 = perfStart();
+    const { data, error } = await createClient().rpc("app_bootstrap", { p_collections: cols });
+    if (!error) {
+      const parsed = parseBootstrap(data, cols);
+      if (parsed) {
+        perfLog("bootstrap: app_bootstrap (1 istek)", t0, { collections: cols });
+        return { rows: parsed.rows, profile: parsed.profile, organization: parsed.organization, startSeq };
+      }
+      console.error("[bootstrap] app_bootstrap beklenmeyen yanıt döndü; tablo tablo yükleniyor.");
+    } else if (isRpcMissing(error)) {
+      // 0020 henüz uygulanmadı: bu sekmede bir daha denenmez.
+      markRpcMissing();
+      perfLog("bootstrap: app_bootstrap yok (PGRST202) → eski yol", t0);
+    } else {
+      console.error("[bootstrap] app_bootstrap hatası:", error.message);
+    }
+  }
+  return fetchLegacy(cols, userId, startSeq);
+}
+
+/** Çekilen satırları store'a yazar (yerel değişiklikler korunur). */
+function applyRows(f: Fetched, extra: Partial<StoreState> = {}) {
+  const cur = useStore.getState();
+  const next: Record<string, unknown> = {};
+  const nextLoaded = { ...cur.loadedCollections };
+  for (const [c, rows] of Object.entries(f.rows) as [Collections, Row[]][]) {
+    next[c] = mergeRows(cur[c] as unknown as Row[], rows, (id) => (touched.get(`${c}:${id}`) ?? 0) > f.startSeq);
+    nextLoaded[c] = true;
+  }
+  useStore.setState({ ...(next as Partial<RastData>), ...extra, loadedCollections: nextLoaded });
+}
+
+/**
+ * Açılış / yenileme yanıtını uygular. Profil geldiyse org değişmiş olabilir (anlık görüntü başka org'a
+ * aitse): o durumda yerel veri tamamen atılır, yalnızca gelen koleksiyonlar yüklü sayılır.
+ */
+function applyBootstrap(input: Fetched) {
+  const cur = useStore.getState();
+  let f = input;
+  // Tazeleme (veri zaten ekranda) sırasında hata veren parçalar uygulanmaz: geçici ağ hatası ekrandaki
+  // (ör. anlık görüntüden gelen) veriyi silmesin. İlk açılışta eski davranış: boş liste.
+  if (cur.loaded && (f.failed?.length || f.profileFailed)) {
+    const rows = { ...f.rows };
+    for (const c of f.failed ?? []) delete rows[c];
+    f = { ...f, rows, profile: f.profileFailed ? undefined : f.profile };
+  }
+  const orgId = f.profile === undefined ? cur.orgId : (f.profile?.organization_id ?? null);
+  const meta: Partial<StoreState> = { loaded: true, supabase: true, orgId };
+  if (f.profile !== undefined) meta.profile = f.profile;
+  if (f.organization !== undefined) {
+    meta.orgTargets = f.organization;
+    meta.orgTargetsKnown = true;
+  }
+  if (cur.loaded && cur.orgId !== orgId) {
+    const flags = noneLoaded();
+    for (const c of Object.keys(f.rows) as Collections[]) flags[c] = true;
+    useStore.setState({ ...emptyData, ...(f.rows as Partial<RastData>), ...meta, loadedCollections: flags });
+    return;
+  }
+  applyRows(f, meta);
+}
+
+/** `fetchRemote` + uçuştaki istek kaydı (aynı koleksiyon iki kez istenmez). */
+async function runFetch(cols: Collections[], userId: string | null, onDone: (f: Fetched) => void): Promise<void> {
+  const myEpoch = epoch;
+  activeFetches++;
+  const job = fetchRemote(cols, userId).then((f) => {
+    if (myEpoch !== epoch) return;
+    onDone(f);
+    lastFetchAt = Date.now();
+  });
+  const tracked = job.catch(() => undefined);
+  for (const c of cols) inflight.set(c, tracked);
+  try {
+    await job;
+  } finally {
+    if (myEpoch === epoch) {
+      for (const c of cols) if (inflight.get(c) === tracked) inflight.delete(c);
+      activeFetches--;
+      // Uçuşta çekim yoksa eski işaretler artık hiçbir birleştirmeyi etkilemez.
+      if (activeFetches === 0) touched.clear();
+    }
+  }
+}
+
+async function runInit(): Promise<void> {
+  const tInit = perfStart();
+  const myEpoch = epoch;
+  const sb = createClient();
+  const { data: { session } } = await sb.auth.getSession();
+  perfLog("init: getSession (yerel; süresi dolmuşsa yenileme ağ çağrısı)", tInit);
+  if (myEpoch !== epoch) return;
+  const user = session?.user;
+
+  // Supabase yapılandırılmış ama oturum yok. Giriş zorunluyken (varsayılan) proxy bu
+  // sayfalara oturumsuz erişime izin vermez; buraya yalnızca istemci tarafında oturum
+  // düşerse gelinir — gerçek veri gibi görünen örnek veriyi göstermek yerine boş kal.
+  // Örnek (demo) veri yalnızca açıkça NEXT_PUBLIC_REQUIRE_AUTH=false iken gösterilir.
+  if (!user) {
+    pending.clear();
+    currentUserId = null;
+    clearSnapshots();
+    useStore.setState({ ...(isAuthRequired ? emptyData : seed), loaded: true, supabase: false, orgId: null });
+    return;
+  }
+  currentUserId = user.id;
+
+  // Stale-while-revalidate: bu sekmede son görülen veri varsa HEMEN göster, arka planda tek istekle tazele.
+  const snap = readSnapshot(user.id, COLLECTIONS);
+  if (snap) {
+    const flags = noneLoaded();
+    for (const c of Object.keys(snap.collections) as Collections[]) flags[c] = true;
+    useStore.setState({
+      ...(snap.collections as Partial<RastData>),
+      loaded: true,
+      supabase: true,
+      orgId: snap.orgId,
+      profile: snap.profile,
+      orgTargets: snap.organization,
+      orgTargetsKnown: snap.organization !== null,
+      loadedCollections: flags,
+    });
+    perfLog("init: anlık görüntü gösterildi (0 istek)", tInit, { collections: Object.keys(snap.collections).length });
+    const cols = unionCollections(Object.keys(snap.collections) as Collections[], [...pending]);
+    pending.clear();
+    const tRefresh = perfStart();
+    void runFetch(cols, user.id, applyBootstrap).then(() => {
+      perfLog("init: arka plan tazeleme", tRefresh, { collections: cols.length });
+      if (pending.size) void flushPending();
+    });
+    return;
+  }
+
+  // O ana kadar sayfaların istediği tüm koleksiyonlar + profil: TEK istek.
+  const cols = [...pending];
+  pending.clear();
+  await runFetch(cols, user.id, applyBootstrap);
+  perfLog("init: toplam (profil + ilk koleksiyonlar)", tInit, { collections: cols.length });
+
+  // İstek uçarken istenen koleksiyonlar (ör. sonradan açılan bileşen) → bir tur daha.
+  if (pending.size) await flushPending();
+}
+
+async function flushPending(): Promise<void> {
+  if (!isSupabaseConfigured) {
+    pending.clear();
+    return;
+  }
+  const st = useStore.getState();
+  if (!st.loaded) {
+    // Açılış henüz bitmedi: init bekleyen koleksiyonları kendisi çeker.
+    await st.init();
+    return;
+  }
+  const asked = [...pending];
+  pending.clear();
+  // Oturumsuz (supabase: false — boş ya da açıkça istenmiş örnek veri): yüklenecek bir şey yok.
+  if (!st.supabase) return;
+  // Uçuştaki (ör. arka plan tazelemesi) koleksiyonlar yeniden istenmez; onların bitişi beklenir.
+  const waits = asked.map((c) => inflight.get(c)).filter((p): p is Promise<void> => Boolean(p));
+  const cols = asked.filter((c) => !useStore.getState().loadedCollections[c] && !inflight.has(c));
+  if (cols.length === 0) {
+    await Promise.all(waits);
+    return;
+  }
+  if (!st.orgId) {
+    // Org'a bağlı olmayan oturum: RLS hiçbir satır döndürmez — boş ama "yüklendi" say (sonsuz iskelet olmasın).
+    applyRows({ rows: Object.fromEntries(cols.map((c) => [c, []])), startSeq: changeSeq });
+    return;
+  }
+  await Promise.all([...waits, runFetch(cols, null, (f) => applyRows(f))]);
+}
+
+/**
+ * Koleksiyonları ister; hepsi yüklendiğinde (ya da yüklenemeyeceği anlaşıldığında) çözülür.
+ * Aynı mikro-görevdeki tüm istekler tek `app_bootstrap` çağrısında birleşir.
+ */
+function requestCollections(cols: readonly Collections[]): Promise<void> {
+  if (!isSupabaseConfigured) {
+    if (!useStore.getState().loaded) void useStore.getState().init();
+    return Promise.resolve();
+  }
+  const st = useStore.getState();
+  const waits: Promise<void>[] = [];
+  for (const c of cols) {
+    if (st.loadedCollections[c]) continue;
+    const running = inflight.get(c);
+    if (running) waits.push(running);
+    else pending.add(c);
+  }
+  if (pending.size || !st.loaded) {
+    if (!flushScheduled) {
+      const p: Promise<void> = Promise.resolve().then(() => {
+        if (flushScheduled === p) flushScheduled = null;
+        return flushPending();
+      });
+      flushScheduled = p;
+    }
+    waits.push(flushScheduled);
+  }
+  return Promise.all(waits).then(() => undefined);
+}
+
+/**
+ * Açılış isteğini sayfa bileşenleri mount olmadan, olabildiğince erken başlatır (AppShell modülü
+ * yüklenirken, giriş başarılı olunca). İstenen küme: çekirdek (dashboard + CRM) + açılan sayfa —
+ * böylece sayfalar arası gezinti çoğunlukla yeni istek açmaz. Demo modunda hiçbir şey yapmaz.
+ */
+export function prefetchBootstrap(pathname: string): void {
+  if (!isSupabaseConfigured) return;
+  void requestCollections(bootCollections(pathname));
+}
+
+/**
+ * Bağlantı üzerine gelinince / odaklanınca hedef sayfanın eksik koleksiyonlarını önceden ister
+ * (tıklamadan önce tek RPC). Açılış bitmeden ya da demo modunda hiçbir şey yapmaz.
+ */
+export function prefetchRoute(pathname: string): void {
+  const st = useStore.getState();
+  if (!isSupabaseConfigured || !st.loaded || !st.supabase || !st.orgId) return;
+  const missing = routeCollections(pathname).filter((c) => !st.loadedCollections[c] && !inflight.has(c));
+  if (missing.length) void requestCollections(missing);
+}
+
+/**
+ * Pencereye / sekmeye dönüşte: son çekimden 60 sn'den fazla geçtiyse yüklü TÜM koleksiyonları tek
+ * `app_bootstrap` ile tazeler (profil + org hedefleri dahil). Çekim sürerken ya da açılış bitmeden no-op.
+ * Yerel değişiklikler korunur (mergeRows); başka kullanıcıların ekleme / güncelleme / silmeleri gelir.
+ */
+export function refreshIfStale(): void {
+  const st = useStore.getState();
+  if (!isSupabaseConfigured || !st.loaded || !st.supabase || !st.orgId) return;
+  if (!shouldRefreshOnFocus(lastFetchAt, Date.now(), activeFetches > 0 || initPromise !== null)) return;
+  const cols = COLLECTIONS.filter((c) => st.loadedCollections[c]);
+  if (cols.length === 0) return;
+  const t0 = perfStart();
+  void runFetch(cols, currentUserId, applyBootstrap).then(() =>
+    perfLog("odak: yüklü koleksiyonlar tazelendi", t0, { collections: cols.length }),
+  );
+}
+
+/** Oturum değişti (çıkış / giriş sayfası): bellekteki veriyi, bekleyen istekleri ve anlık görüntüyü sıfırlar. */
+export function resetSession(): void {
+  epoch++;
+  currentUserId = null;
+  cancelSnapshotSave();
+  clearSnapshots();
+  pending.clear();
+  inflight.clear();
+  touched.clear();
+  initPromise = null;
+  flushScheduled = null;
+  activeFetches = 0;
+  lastFetchAt = 0;
+  useStore.setState({
+    ...emptyData,
+    loaded: false,
+    supabase: false,
+    orgId: null,
+    profile: null,
+    orgTargets: null,
+    orgTargetsKnown: false,
+    loadedCollections: noneLoaded(),
+  });
+}
+
 export const useStore = create<StoreState>()((set, get) => ({
   ...emptyData,
   loaded: false,
   supabase: false,
   orgId: null,
-  initStarted: false,
-  loadedCollections: COLLECTIONS.reduce((acc, c) => ({ ...acc, [c]: false }), {} as Record<Collections, boolean>),
+  profile: null,
+  orgTargets: null,
+  orgTargetsKnown: false,
+  loadedCollections: noneLoaded(),
 
-    init: async () => {
+  init: async () => {
     // Supabase yoksa: bellek içi örnek verilerle çalış (demo modu)
     if (!isSupabaseConfigured) {
       set({ ...seed, loaded: true, supabase: false });
@@ -94,76 +477,33 @@ export const useStore = create<StoreState>()((set, get) => ({
       return;
     }
 
-    const sb = createClient();
-    const { data: { session } } = await sb.auth.getSession();
-    const user = session?.user;
-
-    // Supabase yapılandırılmış ama oturum yok. Giriş zorunluyken (varsayılan) proxy bu
-    // sayfalara oturumsuz erişime izin vermez; buraya yalnızca istemci tarafında oturum
-    // düşerse gelinir — gerçek veri gibi görünen örnek veriyi göstermek yerine boş kal.
-    // Örnek (demo) veri yalnızca açıkça NEXT_PUBLIC_REQUIRE_AUTH=false iken gösterilir.
-    if (!user) {
-      set({ ...(isAuthRequired ? emptyData : seed), loaded: true, supabase: false, orgId: null });
-      return;
+    if (!initPromise) {
+      const p: Promise<void> = runInit().finally(() => {
+        if (initPromise === p) initPromise = null;
+      });
+      initPromise = p;
     }
-
-    const { data: profile } = await sb
-      .from("profiles")
-      .select("organization_id")
-      .eq("id", user.id)
-      .single();
-    const orgId = profile?.organization_id ?? null;
-
-    set({ loaded: true, supabase: true, orgId });
+    return initPromise;
   },
 
-  load: async (collections) => {
-    const s = get();
-    if (!s.supabase || !s.orgId) return;
-
-    const sb = createClient();
-    const fetched: Partial<Record<Collections, Row[]>> = {};
-
-    await Promise.all(
-      collections.map(async (c) => {
-        if (s.loadedCollections[c]) return; // Zaten yüklüyse geç
-        const query = sb.from(c).select("*").order("created_at", { ascending: false });
-        const { data } = await (c === "activity_logs" ? query.limit(ACTIVITY_LOG_LIMIT) : query);
-        fetched[c] = (data ?? []) as Row[];
-      }),
-    );
-
-    const keys = Object.keys(fetched) as Collections[];
-    if (keys.length === 0) return;
-
-    // Yükleme sürerken eklenen (iyimser) kayıtlar — ör. başka sayfadan global Hızlı Ekle —
-    // gelen listeyle ezilmesin; state en güncel haliyle okunur.
-    const cur = get();
-    const next: Partial<RastData> = {};
-    const nextLoaded = { ...cur.loadedCollections };
-    for (const c of keys) {
-      const rows = fetched[c]!;
-      const ids = new Set(rows.map((r) => r.id));
-      const pending = (cur[c] as unknown as Row[]).filter((r) => !ids.has(r.id));
-      (next as Record<string, unknown>)[c] = [...pending, ...rows];
-      nextLoaded[c] = true;
-    }
-    set({ ...(next as RastData), loadedCollections: nextLoaded });
-  },
+  load: (collections) => requestCollections(collections),
 
   add: async (key, item) => {
     const current = get();
     if (current.supabase && !current.orgId) {
       return { ok: false, error: "Hesabınız bir organizasyona bağlı değil. Lütfen yöneticiyle iletişime geçin." };
     }
+    const itemId = (item as unknown as Row).id;
+    touch(key, itemId);
     set((s) => ({ [key]: [item, ...(s[key] as unknown[])] } as Partial<StoreState>));
     const { supabase, orgId } = get();
     if (supabase) {
       const sb = createClient();
       const row = clean({ ...(item as unknown as Row), organization_id: orgId });
       const { error } = await sb.from(key).insert(row);
+      touch(key, itemId);
       if (error) {
-        set((s) => ({ [key]: (s[key] as unknown as Row[]).filter((it) => it.id !== (item as unknown as Row).id) } as Partial<StoreState>));
+        set((s) => ({ [key]: (s[key] as unknown as Row[]).filter((it) => it.id !== itemId) } as Partial<StoreState>));
         console.error(`[${key}] insert hatası:`, error.message);
         return { ok: false, error: error.message };
       }
@@ -177,6 +517,7 @@ export const useStore = create<StoreState>()((set, get) => ({
       return { ok: false, error: "Hesabınız bir organizasyona bağlı değil. Lütfen yöneticiyle iletişime geçin." };
     }
     const previous = (get()[key] as unknown as Row[]).find((item) => item.id === id);
+    touch(key, id);
     set((s) => ({
       [key]: (s[key] as unknown as Row[]).map((it) => (it.id === id ? { ...it, ...patch } : it)),
     } as Partial<StoreState>));
@@ -184,6 +525,7 @@ export const useStore = create<StoreState>()((set, get) => ({
     if (supabase) {
       const sb = createClient();
       const { error } = await sb.from(key).update(clean(patch as Record<string, unknown>)).eq("id", id);
+      touch(key, id);
       if (error) {
         if (previous) {
           set((s) => ({
@@ -199,11 +541,13 @@ export const useStore = create<StoreState>()((set, get) => ({
 
   remove: async (key, id) => {
     const previous = (get()[key] as unknown as Row[]).find((it) => it.id === id);
+    touch(key, id);
     set((s) => ({ [key]: (s[key] as unknown as Row[]).filter((it) => it.id !== id) } as Partial<StoreState>));
     const { supabase } = get();
     if (supabase) {
       const sb = createClient();
       const { error } = await sb.from(key).delete().eq("id", id);
+      touch(key, id);
       if (error) {
         // Silme başarısız: kayıt listeye geri konur (iyimser silmenin geri alınması)
         if (previous) {
@@ -217,6 +561,7 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 
   mergeLocal: (key, rows) => {
+    for (const r of rows as unknown as Row[]) touch(key, r.id);
     set((s) => {
       const incoming = rows as unknown as Row[];
       const byId = new Map(incoming.map((r) => [r.id, r]));
@@ -249,6 +594,59 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 }));
 
+// ---------------------------------------------------------------------------
+// Anlık görüntü yazımı: store değiştikçe (yükleme / ekleme / güncelleme) ~1 sn sonra sessionStorage'a.
+// Yalnızca Supabase modunda, oturum + org varken; yalnız yüklenmiş koleksiyonlar. Sayfa kapanırken
+// (pagehide) bekleyen yazım hemen yapılır. 2 MB üstü yazılmaz (snapshot.ts).
+// ---------------------------------------------------------------------------
+
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+
+function cancelSnapshotSave() {
+  clearTimeout(saveTimer);
+  saveTimer = undefined;
+}
+
+/**
+ * Çıkış yapılırken (form gönderilmeden hemen önce): anlık görüntüyü siler ve bu sayfa kapanana kadar
+ * yeniden yazılmasını engeller. Ekrandaki veri yönlendirmeye kadar görünür kalır.
+ */
+export function forgetSessionSnapshot(): void {
+  currentUserId = null;
+  cancelSnapshotSave();
+  clearSnapshots();
+}
+
+function saveSnapshotNow() {
+  cancelSnapshotSave();
+  const st = useStore.getState();
+  if (!st.loaded || !st.supabase || !st.orgId || !currentUserId) return;
+  const collections: Partial<Record<Collections, Row[]>> = {};
+  for (const c of COLLECTIONS) if (st.loadedCollections[c]) collections[c] = st[c] as unknown as Row[];
+  const tSave = perfStart();
+  const ok = writeSnapshot({
+    v: 1,
+    userId: currentUserId,
+    orgId: st.orgId,
+    savedAt: Date.now(),
+    profile: st.profile,
+    organization: st.orgTargetsKnown ? st.orgTargets : null,
+    collections,
+  });
+  perfLog(ok ? "snapshot: yazıldı" : "snapshot: atlandı (> 2 MB / depolama kapalı)", tSave);
+}
+
+if (typeof window !== "undefined" && isSupabaseConfigured) {
+  useStore.subscribe((st) => {
+    if (!st.loaded || !st.supabase || !st.orgId || !currentUserId) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveSnapshotNow, 1000);
+  });
+  window.addEventListener("pagehide", () => {
+    if (saveTimer !== undefined) saveSnapshotNow();
+  });
+}
+
 /**
  * Veriyi yükler (Supabase veya demo) ve oturum değişiminde yeniler.
  * Sayfalar `loaded` true olana kadar iskelet/boş gösterir.
@@ -256,19 +654,15 @@ export const useStore = create<StoreState>()((set, get) => ({
 export function useHydrated(requiredCollections?: Collections[]) {
   const loaded = useStore((s) => s.loaded);
   const loadedCollections = useStore((s) => s.loadedCollections);
-  const load = useStore((s) => s.load);
   const isSupabase = useStore((s) => s.supabase);
 
   useEffect(() => {
-    const st = useStore.getState();
-    if (!st.initStarted) {
-      useStore.setState({ initStarted: true });
-      st.init();
-    }
     if (isSupabaseConfigured) {
       const sb = createClient();
-      const { data: sub } = sb.auth.onAuthStateChange(() => {
-        useStore.getState().init();
+      const { data: sub } = sb.auth.onAuthStateChange((event) => {
+        // Çıkış (bu ya da başka sekmede): bellekteki veri ve sekme anlık görüntüsü silinir.
+        if (event === "SIGNED_OUT") resetSession();
+        void useStore.getState().init();
       });
       return () => sub.subscription.unsubscribe();
     }
@@ -282,14 +676,11 @@ export function useHydrated(requiredCollections?: Collections[]) {
     [reqStr],
   );
 
+  // Açılışı başlatır ve eksik koleksiyonları ister. Aynı commit'teki tüm istekler (sayfa + bileşenler)
+  // tek açılış isteğinde birleşir; yüklü olanlar için istek atılmaz.
   useEffect(() => {
-    if (loaded && isSupabase && reqCols) {
-      const missing = reqCols.filter((c) => !useStore.getState().loadedCollections[c]);
-      if (missing.length > 0) {
-        load(missing);
-      }
-    }
-  }, [loaded, isSupabase, reqCols, load]);
+    void requestCollections(reqCols ?? []);
+  }, [reqCols]);
 
   if (!loaded) return false;
   if (!isSupabase) return true; // demo mode

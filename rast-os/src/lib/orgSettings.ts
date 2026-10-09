@@ -46,9 +46,19 @@ export const useOrgSettings = create<OrgSettingsState>()((set) => ({
   canEdit: false,
 
   load: async () => {
-    const { supabase, orgId } = useStore.getState();
+    const { supabase, orgId, profile, orgTargets, orgTargetsKnown } = useStore.getState();
     if (!supabase || !orgId) {
       set({ ...readDemo(), canEdit: true, loaded: true });
+      return;
+    }
+    // Açılış isteği (0020 app_bootstrap) hedefleri ve rolü zaten getirdiyse ek istek yok.
+    if (orgTargetsKnown) {
+      set({
+        target: orgTargets?.mrr_target ?? null,
+        label: orgTargets?.mrr_target_label?.trim() || DEFAULT_MRR_LABEL,
+        canEdit: profile?.role === "admin",
+        loaded: true,
+      });
       return;
     }
     const sb = createClient();
@@ -86,6 +96,8 @@ export const useOrgSettings = create<OrgSettingsState>()((set) => ({
       .eq("id", orgId);
     if (error) return { ok: false, error: error.message };
     set({ target, label: clean });
+    // Store'daki açılış kopyası da güncellenir (sayfa yeniden açılınca eski değer görünmesin).
+    useStore.setState({ orgTargets: { mrr_target: target, mrr_target_label: clean } });
     return { ok: true };
   },
 }));
@@ -94,9 +106,10 @@ export const useOrgSettings = create<OrgSettingsState>()((set) => ({
 export function useOrgTargets(hydrated: boolean) {
   const supabase = useStore((s) => s.supabase);
   const orgId = useStore((s) => s.orgId);
+  const orgTargets = useStore((s) => s.orgTargets);
   const load = useOrgSettings((s) => s.load);
   useEffect(() => {
     if (hydrated) void load();
-  }, [hydrated, supabase, orgId, load]);
+  }, [hydrated, supabase, orgId, orgTargets, load]);
   return useOrgSettings();
 }

@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
-import { CalendarDays, Flag, FolderKanban } from "lucide-react";
+import { CalendarDays, Flag, FolderKanban, UserRound } from "lucide-react";
 import { Button } from "@/components/form";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
 import { useQuickAdd } from "@/lib/quickAdd";
@@ -10,6 +10,7 @@ import { useToasts } from "@/lib/toast";
 import { createTask } from "@/lib/taskActions";
 import { addDaysKey, todayKey } from "@/lib/taskLogic";
 import { priority as prioMap } from "@/lib/labels";
+import { assignPatch, assignableMembers, memberName } from "@/lib/assignee-logic";
 import type { Priority, Task } from "@/lib/types";
 
 const PRIORITIES: Priority[] = ["urgent", "high", "medium", "low"];
@@ -30,9 +31,11 @@ function isTypingTarget(target: EventTarget | null) {
 function Composer() {
   const close = useQuickAdd((s) => s.closeComposer);
   const projects = useStore((s) => s.projects);
+  const team = useStore((s) => s.profiles);
+  const members = useMemo(() => assignableMembers(team), [team]);
   const pathname = usePathname();
-  // Yalnızca "projects" istenir (oturum init + tek koleksiyon); global hydration yok.
-  useHydrated(["projects"]);
+  // Yalnızca proje + ekip istenir (ikisi de açılış isteğinin çekirdek kümesinde); global hydration yok.
+  useHydrated(["projects", "profiles"]);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const [today] = useState(() => todayKey());
@@ -40,6 +43,7 @@ function Composer() {
   const [due, setDue] = useState(() => useQuickAdd.getState().defaultDue);
   const [prio, setPrio] = useState<Priority>("medium");
   const [projectId, setProjectId] = useState("");
+  const [assigneeId, setAssigneeId] = useState(() => useQuickAdd.getState().defaultAssignee);
 
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null;
@@ -75,6 +79,7 @@ function Composer() {
       priority: prio,
       status: "todo",
       created_at: nowISO(),
+      ...(assigneeId ? assignPatch(assigneeId, team) : {}),
     };
     // store.add görevi anında state'e yazar (liste hemen güncellenir); insert arkadan gider.
     createTask(task).then((r) => {
@@ -172,6 +177,23 @@ function Composer() {
                 <option value="" className="bg-surface">Proje yok</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id} className="bg-surface">{p.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+
+          {members.length > 0 && (
+            <label className={`${chipCls} max-w-full`}>
+              <UserRound className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              <select
+                aria-label="Sorumlu"
+                value={assigneeId}
+                onChange={(e) => setAssigneeId(e.target.value)}
+                className="min-w-0 max-w-[12rem] cursor-pointer truncate bg-transparent text-xs text-foreground outline-none"
+              >
+                <option value="" className="bg-surface">Atanmamış</option>
+                {members.map((m) => (
+                  <option key={m.id} value={m.id} className="bg-surface">{memberName(m)}</option>
                 ))}
               </select>
             </label>

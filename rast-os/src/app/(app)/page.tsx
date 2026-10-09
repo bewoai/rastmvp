@@ -19,6 +19,12 @@ import { useToday } from "@/lib/useToday";
 import { useQuickAdd } from "@/lib/quickAdd";
 import { addDaysKey, bucketTasks, dateKey, formatDue, sortTasks } from "@/lib/taskLogic";
 import { TRY, priority as prioMap, shootStatus } from "@/lib/labels";
+import { FilterChips, usePersistentState } from "@/components/list";
+import { assigneeView, filterByOwner } from "@/lib/assignee-logic";
+import { recordHref } from "@/lib/search-logic";
+
+type TaskScope = "mine" | "all";
+const TASK_SCOPES: readonly TaskScope[] = ["mine", "all"];
 
 /** Başlık üstündeki tarih: "9 Ekim, Perşembe". */
 function dayLabel(today: string) {
@@ -174,10 +180,17 @@ export default function DashboardPage() {
   const activityLogs = useStore((s) => s.activity_logs);
   const proposals = useStore((s) => s.proposals);
   const proposalItems = useStore((s) => s.proposal_items);
+  // Ekip (görev atama): açılış isteğinin çekirdek kümesinde — dashboard onu beklemez; yoksa yalnız assignee_id'ye bakılır.
+  const team = useStore((s) => s.profiles);
+  const userId = useStore((s) => s.userId);
 
   const { usd, eur } = useFx();
   const today = useToday();
   const orgTargets = useOrgTargets(hydrated);
+  // Yapılacaklar: varsayılan bana atanan + atanmamış görevler; anahtarla herkesinki (tarayıcıda hatırlanır).
+  const [taskScope, setTaskScope] = usePersistentState<TaskScope>("today-task-scope", "mine", TASK_SCOPES);
+  const scopeOn = Boolean(userId) && team.length > 1;
+  const ownerMode = scopeOn && taskScope === "mine" ? "mine_or_unassigned" : "all";
 
   const stats = useMemo(() => {
     if (!hydrated) return null;
@@ -224,7 +237,7 @@ export default function DashboardPage() {
       .slice(0, 4);
 
     // Açık görevler: tarih → öncelik sıralı; gecikenler / bugün / önümüzdeki 7 gün
-    const open = sortTasks("all", bucketTasks(tasks, today).all);
+    const open = sortTasks("all", bucketTasks(filterByOwner(tasks, ownerMode, userId, team), today).all);
     const weekEnd = addDaysKey(today, 7);
     const due = (t: (typeof open)[number]) => t.due_date?.slice(0, 10);
     const overdueTasks = open.filter((t) => { const d = due(t); return d !== undefined && d < today; });
@@ -244,7 +257,7 @@ export default function DashboardPage() {
       mrr, income, expense, net, expected, overdue, activeClients, idleEquipment,
       upcomingShoots, overdueTasks, todayTasks, weekTasks, awaiting, month,
     };
-  }, [hydrated, jobs, invoices, payments, expenses, clients, equipment, shoots, tasks, contents, proposals, proposalItems, usd, eur, today]);
+  }, [hydrated, jobs, invoices, payments, expenses, clients, equipment, shoots, tasks, contents, proposals, proposalItems, usd, eur, today, ownerMode, userId, team]);
 
   if (!hydrated || !stats) {
     return <DashboardSkeleton subtitle={dayLabel(today)} />;
@@ -255,12 +268,14 @@ export default function DashboardPage() {
   const taskRow = (task: (typeof stats.overdueTasks)[number], tone: AgendaRow["whenTone"]): AgendaRow => {
     const d = task.due_date?.slice(0, 10);
     const p = prioMap[task.priority as keyof typeof prioMap];
+    // Başkasına atanmış görevde sorumlunun adı (kendi görevlerinde gürültü olmasın)
+    const who = assigneeView(task, team);
     return {
       key: `t-${task.id}`,
-      href: "/tasks",
+      href: recordHref("tasks", task.id),
       kind: "task",
       title: task.title,
-      meta: task.assignee || undefined,
+      meta: who && who.id !== userId ? who.name : undefined,
       when: d ? formatDue(d, today) : undefined,
       whenTone: tone,
       // Yalnızca öne çıkması gereken öncelikler rozetle gösterilir (Orta/Düşük gürültü yapmasın)
@@ -274,7 +289,7 @@ export default function DashboardPage() {
     const st = shootStatus[shoot.status as keyof typeof shootStatus];
     return {
       key: `s-${shoot.id}`,
-      href: "/shoots",
+      href: recordHref("shoots", shoot.id),
       kind: "shoot",
       title: shoot.title,
       meta: ["Çekim", shoot.location].filter(Boolean).join(" · "),
@@ -295,7 +310,7 @@ export default function DashboardPage() {
   const upcomingRows = upcomingAll.slice(0, UPCOMING_LIMIT);
   const awaitingRows: AgendaRow[] = stats.awaiting.slice(0, 5).map((content) => ({
     key: `c-${content.id}`,
-    href: "/content",
+    href: recordHref("contents", content.id),
     kind: "content",
     title: content.title,
     meta: [content.platform, content.content_type].filter(Boolean).join(" · "),
@@ -339,14 +354,32 @@ export default function DashboardPage() {
       </div>
 
       <section aria-labelledby="yapilacaklar" className="card mt-5 overflow-hidden">
-        <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-border px-4 py-2.5">
           <h2 id="yapilacaklar" className="text-[15px] font-semibold tracking-tight text-foreground">Yapılacaklar</h2>
-          <Link prefetch={false} href="/tasks" className="flex items-center gap-1 text-[13px] text-muted transition-colors hover:text-foreground">
-            Tüm görevler <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-          </Link>
+          <div className="ml-auto flex items-center gap-3">
+            {scopeOn && (
+              <FilterChips
+                label="Yapılacaklar: kimin görevleri"
+                value={taskScope}
+                onChange={setTaskScope}
+                options={[
+                  { id: "mine", label: "Benim" },
+                  { id: "all", label: "Herkes" },
+                ]}
+              />
+            )}
+            <Link prefetch={false} href="/tasks" className="flex items-center gap-1 text-[13px] text-muted transition-colors hover:text-foreground">
+              Tüm görevler <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </Link>
+          </div>
         </div>
+        {scopeOn && taskScope === "mine" && !agendaEmpty && (
+          <p className="px-4 pt-2 text-xs text-faint">Sana atanan ve atanmamış görevler; çekim ve onay bekleyen içerikler herkes için.</p>
+        )}
         {agendaEmpty ? (
-          <p className="px-4 py-10 text-center text-sm text-muted">Geciken ya da yaklaşan iş yok. Yeni görev için <kbd className="rounded border border-border px-1.5 font-sans text-xs">Q</kbd></p>
+          <p className="px-4 py-10 text-center text-sm text-muted">
+            {scopeOn && taskScope === "mine" ? "Sana atanmış ya da atanmamış geciken / yaklaşan iş yok." : "Geciken ya da yaklaşan iş yok."} Yeni görev için <kbd className="rounded border border-border px-1.5 font-sans text-xs">Q</kbd>
+          </p>
         ) : (
           <div className="divide-y divide-border pb-2">
             <AgendaSection

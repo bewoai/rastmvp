@@ -1,11 +1,12 @@
 "use client";
 
 import { memo, useEffect, useRef, useState } from "react";
-import { Calendar, Check, Flag, X } from "lucide-react";
+import { Calendar, Check, Flag, UserRound, X } from "lucide-react";
 import { patchTask } from "@/lib/taskActions";
 import { formatDue } from "@/lib/taskLogic";
 import { priority as prioMap, taskStatus, taskBoard } from "@/lib/labels";
-import type { Priority, Task, TaskStatus } from "@/lib/types";
+import { assignPatch, memberName, type AssigneeView } from "@/lib/assignee-logic";
+import type { Priority, Task, TaskStatus, TeamMember } from "@/lib/types";
 
 const PRIORITIES: Priority[] = ["urgent", "high", "medium", "low"];
 
@@ -33,18 +34,70 @@ const chipCls =
 // Masaüstünde ikincil chip'ler hover/focus'ta belirir; dokunmatikte (mobil) hep görünür.
 const revealCls = "md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100";
 
+const NO_MEMBERS: TeamMember[] = [];
+
+/**
+ * Sorumlu çipi: baş harf avatarı + şeffaf yerel <select> (diğer çiplerle aynı desen; klavye/mobil uyumlu).
+ * Atanmamışsa boş daire (masaüstünde hover'da belirir). Ekip listesi yoksa (ör. 0021 öncesi, yüklenemedi)
+ * yalnız mevcut sorumlu gösterilir.
+ */
+function AssigneeChip({ task, assignee, members }: { task: Task; assignee: AssigneeView | null; members: TeamMember[] }) {
+  const label = assignee ? `Sorumlu: ${assignee.name}${assignee.member ? "" : " (ekip üyesi değil)"}` : "Sorumlu ata";
+  const avatar = assignee ? (
+    <span
+      aria-hidden
+      className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-semibold leading-none ${
+        assignee.member ? "bg-surface-2 text-foreground ring-1 ring-border" : "border border-dashed border-faint/60 text-muted"
+      }`}
+    >
+      {assignee.initials}
+    </span>
+  ) : (
+    <UserRound className="h-3.5 w-3.5" aria-hidden />
+  );
+  if (!members.length) {
+    return assignee ? <span className={`${chipCls} text-muted`} title={label}>{avatar}<span className="sr-only">{label}</span></span> : null;
+  }
+  const value = assignee?.id && members.some((m) => m.id === assignee.id) ? assignee.id : "";
+  return (
+    <label className={`${chipCls} text-muted ${assignee ? "" : revealCls}`} title={label}>
+      {avatar}
+      <span className="max-w-[6rem] truncate max-sm:hidden">{assignee ? assignee.name.split(" ")[0] : ""}</span>
+      <select
+        aria-label={label}
+        value={value}
+        onChange={(e) => patchTask(task.id, assignPatch(e.target.value || null, members))}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      >
+        <option value="">Atanmamış</option>
+        {members.map((m) => (
+          <option key={m.id} value={m.id}>{memberName(m)}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 /**
  * Kompakt görev satırı. Düzenleme durumu (başlık düzenleme) satırın kendisinde tutulur;
  * `task` referansı değişmedikçe memo sayesinde başka görevlerin değişikliği bu satırı render etmez.
+ * `assignee` / `members` sayfada hesaplanır (members: seçicide gösterilecek ekip; referansı sabit).
  */
 const TaskRow = memo(function TaskRow({
   task,
   projectName,
   today,
+  assignee = null,
+  members = NO_MEMBERS,
+  highlight = false,
 }: {
   task: Task;
   projectName?: string;
   today: string;
+  assignee?: AssigneeView | null;
+  members?: TeamMember[];
+  /** Arama / bağlantıdan gelinen görev: kısa süre vurgulanır. */
+  highlight?: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
@@ -89,7 +142,12 @@ const TaskRow = memo(function TaskRow({
   }
 
   return (
-    <li className="group flex min-h-10 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg px-2 py-1.5 transition-colors focus-within:bg-surface-2/50 hover:bg-surface-2/50">
+    <li
+      id={`task-${task.id}`}
+      className={`group flex min-h-10 flex-wrap items-center gap-x-2 gap-y-0.5 rounded-lg px-2 py-1.5 transition-colors focus-within:bg-surface-2/50 hover:bg-surface-2/50 ${
+        highlight ? "bg-surface-2/70 ring-1 ring-accent/60" : ""
+      }`}
+    >
       <button
         type="button"
         role="checkbox"
@@ -198,6 +256,8 @@ const TaskRow = memo(function TaskRow({
             </button>
           )}
         </span>
+
+        <AssigneeChip task={task} assignee={assignee} members={members} />
 
         <label className={`${chipCls} ${toneText[prio.tone]}`}>
           <Flag className="h-3.5 w-3.5" aria-hidden />

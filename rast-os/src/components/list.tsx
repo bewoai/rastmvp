@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useSearchParams } from "next/navigation";
 import { ArrowDown, ArrowUp, ChevronDown, Pencil, Search, Trash2, X } from "lucide-react";
 import { Badge, PageHeader } from "./ui";
 
@@ -61,6 +62,28 @@ export function useNewIntent(): boolean {
     window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
   }, [wanted]);
   return wanted;
+}
+
+/**
+ * `?ac=<kayıt id>` ile gelinen sayfada o kaydı aç (Ctrl/⌘K kayıt araması, bildirim zili, teklif → proje).
+ * `target`: id'si eşleşen satır (henüz yüklenmediyse / yoksa undefined). `dismiss`: parametreyi adres
+ * çubuğundan siler (history.replaceState → useSearchParams güncellenir). Aynı sayfadayken yeni bir `?ac=`
+ * gelirse (arama) yine açılır. useSearchParams kullandığı için sayfa bileşeni <Suspense> ile sarılmalı.
+ */
+export function useOpenIntent<T extends { id: string }>(rows: readonly T[]): { target: T | undefined; openId: string | null; dismiss: () => void } {
+  const openId = useSearchParams().get("ac");
+  const [dismissedId, setDismissedId] = useState<string | null>(null);
+  // Parametre gittiyse "kapatıldı" işareti sıfırlanır: aynı kayıt yeniden aranıp açılabilsin.
+  if (openId === null && dismissedId !== null) setDismissedId(null);
+  const target = openId && openId !== dismissedId ? rows.find((r) => r.id === openId) : undefined;
+  const dismiss = useCallback(() => {
+    if (!openId) return;
+    setDismissedId(openId);
+    const url = new URL(window.location.href);
+    url.searchParams.delete("ac");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }, [openId]);
+  return { target, openId: openId && openId !== dismissedId ? openId : null, dismiss };
 }
 
 /* ------------------------------------------------------------------ */

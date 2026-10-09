@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { PageHeader, Badge, EmptyState } from "@/components/ui";
 import { FormModal, Field, Input, Select, Button, useFormState } from "@/components/form";
-import { DataTable, PageLoading, RowActions, SearchBox, Toolbar, useListSearch, useNewIntent } from "@/components/list";
+import { DataTable, PageLoading, RowActions, SearchBox, Toolbar, useListSearch, useNewIntent, useOpenIntent } from "@/components/list";
 import type { Column } from "@/components/list";
 import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
@@ -57,13 +57,29 @@ function ContactModal({ initial, clients, onClose }: { initial: Contact | null; 
 
 const linkCls = "rounded outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-accent/60";
 
+// `?ac=<id>` (Ctrl/⌘K kayıt araması, bildirim zili) için useSearchParams → statik sayfada Suspense sınırı gerekir.
 export default function ContactsPage() {
+  return (
+    <Suspense fallback={<PageLoading title="İletişim Kişileri" />}>
+      <ContactsList />
+    </Suspense>
+  );
+}
+
+function ContactsList() {
   const hydrated = useHydrated(["contacts", "clients", "brands"]);
   const contacts = useStore((s) => s.contacts);
   const clients = useStore((s) => s.clients);
 
   const wantNew = useNewIntent();
   const [modal, setModal] = useState<{ initial: Contact | null } | null>(() => (wantNew ? { initial: null } : null));
+  // `?ac=<id>`: kayıt araması / bildirimden gelinince düzenleme penceresi açılır.
+  const intent = useOpenIntent(contacts);
+  const shown = modal ?? (intent.target ? { initial: intent.target } : null);
+  function closeModal() {
+    setModal(null);
+    intent.dismiss();
+  }
   const [query, setQuery] = useState("");
   const del = useDeleteConfirm();
 
@@ -128,7 +144,7 @@ export default function ContactsPage() {
         }
       />
 
-      {modal && <ContactModal initial={modal.initial} clients={clients} onClose={() => setModal(null)} />}
+      {shown && <ContactModal initial={shown.initial} clients={clients} onClose={closeModal} />}
       {del.dialog}
     </>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import {
   ArrowRight, CalendarDays, Download, Eye, FileText, Lightbulb, LoaderCircle,
   Paperclip, Plus, Trash2, Upload,
@@ -9,7 +9,7 @@ import { PageHeader, EmptyState, Badge } from "@/components/ui";
 import { ContentApprovalPanel } from "@/components/ContentApprovalPanel";
 import { ScriptImportPanel } from "@/components/ScriptImportPanel";
 import { FormModal, Modal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
-import { FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Tabs, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
+import { FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Tabs, Toolbar, useListSearch, useNewIntent, useOpenIntent, usePersistentState } from "@/components/list";
 import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
 import type { MutationResult } from "@/lib/store";
@@ -64,6 +64,19 @@ const monthTitle = (key: string) => {
   return new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(new Date(y, m - 1, 1));
 };
 const dayLabel = (d: string) => new Date(`${d.slice(0, 10)}T12:00:00`).toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+
+/**
+ * İçerik satırı silindikten SONRA ekleri Storage'dan siler (`content-files`, yol: `<org>/<içerik id>/<dosya>`,
+ * ContentModal yüklemesiyle aynı). Dosya silme hatası satır silmeyi geri almaz; uyarı metni döner.
+ * Demo modunda (Supabase yok) dosya yoktur.
+ */
+async function removeContentFiles(item: Content): Promise<string | null> {
+  if (!useStore.getState().supabase) return null;
+  const paths = [...new Set((item.attachments ?? []).map((a) => a.storage_path).filter((p): p is string => Boolean(p)))];
+  if (!paths.length) return null;
+  const { error } = await createClient().storage.from("content-files").remove(paths);
+  return error ? `İçerik silindi ama ${paths.length} dosya depodan silinemedi: ${error.message}` : null;
+}
 
 async function downloadAttachment(attachment: ContentAttachment) {
   if (attachment.storage_path) {
@@ -312,7 +325,16 @@ function ContentModal({ initial, mode, brands, onRead, onClose }: {
   );
 }
 
+// `?ac=<id>` (Ctrl/⌘K kayıt araması, bildirim zili) için useSearchParams → statik sayfada Suspense sınırı gerekir.
 export default function ContentPage() {
+  return (
+    <Suspense fallback={<PageLoading title="İçerik Merkezi" />}>
+      <ContentList />
+    </Suspense>
+  );
+}
+
+function ContentList() {
   const hydrated = useHydrated(["contents", "clients", "brands", "content_approvals"]);
   const contents = useStore((s) => s.contents);
   const brands = useStore((s) => s.brands);
@@ -326,6 +348,13 @@ export default function ContentPage() {
   const [view, setView] = usePersistentState<ContentView>("content-view", "calendar", VIEWS);
   const [scope, setScope] = usePersistentState<Scope>("content-scope", "active", SCOPES);
   const [modal, setModal] = useState<{ initial: Content | null; mode: FormMode } | null>(() => (wantNew ? { initial: null, mode: "content" } : null));
+  // `?ac=<id>`: kayıt araması / bildirimden gelinince düzenleme penceresi açılır.
+  const intent = useOpenIntent(contents);
+  const shown = modal ?? (intent.target ? { initial: intent.target, mode: intent.target.status === "idea" ? "idea" as const : "content" as const } : null);
+  function closeModal() {
+    setModal(null);
+    intent.dismiss();
+  }
   const [reading, setReading] = useState<ContentAttachment | null>(null);
   const [query, setQuery] = useState("");
   const del = useDeleteConfirm();
@@ -377,6 +406,15 @@ export default function ContentPage() {
   const openNew = (mode: FormMode) => setModal({ initial: null, mode });
   const openEdit = (item: Content, mode: FormMode = item.status === "idea" ? "idea" : "content") => setModal({ initial: item, mode });
   const label = (c: Content) => c.title;
+  // Silme: önce satır, sonra Storage'daki ekleri (dosya hatası satır silmeyi engellemez, uyarı verir).
+  const askDelete = (c: Content) => {
+    const files = (c.attachments ?? []).filter((a) => a.storage_path).length;
+    del.ask({
+      key: "contents", id: c.id, label: c.title,
+      warning: files ? `Bağlı ${files} dosya da depodan silinir.` : undefined,
+      afterDelete: () => removeContentFiles(c),
+    });
+  };
 
   return (
     <>
@@ -450,7 +488,7 @@ export default function ContentPage() {
                         </span>
                       )}
                       <StatusSelect value={item.status} options={calendarStatusOptions} label={`Durum: ${item.title}`} onChange={(status) => patchRecord("contents", item.id, { status }, "Durum güncellenemedi")} />
-                      <RowActions label={item.title} onEdit={() => openEdit(item)} onDelete={() => del.ask({ key: "contents", id: item.id, label: item.title })} />
+                      <RowActions label={item.title} onEdit={() => openEdit(item)} onDelete={() => askDelete(item)} />
                     </li>
                   );
                 })}
@@ -484,7 +522,7 @@ export default function ContentPage() {
               <AttachmentChips attachments={idea.attachments} onRead={setReading} />
               <div className="mt-4 flex items-center justify-end gap-1 border-t border-border pt-2">
                 <button type="button" onClick={() => openEdit(idea, "content")} className="mr-auto flex min-h-10 items-center gap-1 rounded-md px-2 text-xs text-accent hover:bg-accent/10"><ArrowRight className="h-4 w-4" aria-hidden /> Takvime planla</button>
-                <RowActions label={idea.title} onEdit={() => openEdit(idea)} onDelete={() => del.ask({ key: "contents", id: idea.id, label: idea.title })} />
+                <RowActions label={idea.title} onEdit={() => openEdit(idea)} onDelete={() => askDelete(idea)} />
               </div>
             </div>
           ))}
@@ -500,7 +538,7 @@ export default function ContentPage() {
         </div>
       )}
 
-      {modal && <ContentModal initial={modal.initial} mode={modal.mode} brands={brands} onRead={setReading} onClose={() => setModal(null)} />}
+      {shown && <ContentModal initial={shown.initial} mode={shown.mode} brands={brands} onRead={setReading} onClose={closeModal} />}
 
       <Modal
         open={Boolean(reading)}

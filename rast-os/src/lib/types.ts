@@ -108,7 +108,10 @@ export interface Task {
   project_id?: ID;
   lead_id?: ID | null;     // 0017: lead girişinden doğan arama görevi
   title: string;
-  assignee?: string;
+  /** Sorumlu ekip üyesi (profiles.id, 0001). Boş string/null = atanmamış. */
+  assignee_id?: ID | null;
+  /** Eski serbest metin sorumlu (0002); atamada üyenin görünen adıyla birlikte yazılır. */
+  assignee?: string | null;
   due_date?: string;
   priority: Priority;
   status: TaskStatus;
@@ -473,6 +476,18 @@ export interface SuppressionEntry {
   created_at: string;
 }
 
+// Ekip üyesi (profiles, 0021 app_bootstrap): yalnızca görev atama için; salt okunur.
+// Telefon / avatar gibi alanlar istemciye gelmez (id, ad, rol, aktiflik).
+export type MemberRole = "admin" | "manager" | "editor" | "accountant" | "client";
+
+export interface TeamMember {
+  id: ID;
+  /** Ad soyad; kayıtta ad verilmediyse e-posta (handle_new_user). */
+  full_name?: string | null;
+  role?: MemberRole | string | null;
+  is_active?: boolean | null;
+}
+
 export interface RastData {
   leads: Lead[];
   jobs: Job[];
@@ -498,7 +513,9 @@ export interface RastData {
   outreach_sequences: OutreachSequence[];
   outreach_messages: OutreachMessage[];
   suppression_list: SuppressionEntry[];
+  // Ekip (0021): görev atama listesi — salt okunur.
+  profiles: TeamMember[];
 }
 
-/** Uygulamanın yazabildiği koleksiyonlar (activity_logs salt okunur — trigger yazar). */
-export type WritableCollection = Exclude<keyof RastData, "activity_logs">;
+/** Uygulamanın yazabildiği koleksiyonlar (activity_logs: trigger yazar; profiles: ekip listesi, salt okunur). */
+export type WritableCollection = Exclude<keyof RastData, "activity_logs" | "profiles">;

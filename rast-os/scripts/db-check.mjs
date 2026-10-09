@@ -10,9 +10,9 @@
 // anon/authenticated/service_role rolleri, "extensions" şemasında pgcrypto,
 // Supabase'in public şeması varsayılan yetkileri) ve sonra:
 //
-//   1) supabase/migrations/0001…0020'yi numara sırasıyla, her dosyayı kendi
+//   1) supabase/migrations/0001…0021'i numara sırasıyla, her dosyayı kendi
 //      transaction'ında uygular; ilk hatada durur ve hatalı ifadeyi yazar.
-//   2) Idempotency: 0008…0020'yi İKİNCİ kez uygular.
+//   2) Idempotency: 0008…0021'i İKİNCİ kez uygular.
 //   3) Yapısal kontroller (tablo / kolon / fonksiyon / trigger / yetki).
 //   4) Davranış kontrolleri: SET ROLE anon|authenticated + request.jwt.claims
 //      ile (PostgREST'in yaptığı gibi) RLS, guard trigger'lar ve RPC'ler.
@@ -409,7 +409,8 @@ async function structuralChecks() {
     await check(G, `service_role execute ${f} = true`, async () => eq(await fnPriv("service_role", f), true));
   }
 
-  // 0020: app_bootstrap SECURITY INVOKER (RLS uygulanır), search_path sabit, izin listesi = store COLLECTIONS.
+  // 0020/0021: app_bootstrap SECURITY INVOKER (RLS uygulanır), search_path sabit, izin listesi = store COLLECTIONS
+  // (zincir sonunda geçerli tanım 0021'inkidir: izin listesinde `profiles` da var).
   await check(G, "app_bootstrap: SECURITY INVOKER + search_path=public + stable", async () =>
     eq(await one(
       `select p.prosecdef as definer, p.provolatile as volatility, p.proconfig as config
@@ -425,6 +426,10 @@ async function structuralChecks() {
     if (!arr) return "v_allowed bulunamadı";
     const got = [...arr[1].matchAll(/'([a-z_]+)'/g)].map((m) => m[1]).sort();
     return eq(got, want, "izin listesi");
+  });
+  await check(G, "app_bootstrap izin listesinde profiles var (0021)", async () => {
+    const def = await val("select pg_get_functiondef('public.app_bootstrap(text[],date)'::regprocedure)");
+    return /'profiles'/.test(def.match(/v_allowed constant text\[\] := array\[([\s\S]*?)\];/)?.[1] ?? "") || "profiles yok";
   });
 
   // anon'un çalıştırabildiği SECURITY DEFINER fonksiyonlar tam olarak public RPC listesi olmalı.
@@ -954,7 +959,7 @@ async function behaviouralChecks() {
   await check(BS, "anon app_bootstrap çağıramaz (42501)", () =>
     as("anon", null, () => expectError(() => db.query("select app_bootstrap(array['clients'])"), "42501")));
   await check(BS, "geçersiz koleksiyon adı → 22023", () =>
-    as("authenticated", U.B, () => expectError(() => db.query("select app_bootstrap(array['clients','profiles'])"), "22023")));
+    as("authenticated", U.B, () => expectError(() => db.query("select app_bootstrap(array['clients','organization_invites'])"), "22023")));
   await check(BS, "SQL enjeksiyonu denemesi → 22023", () =>
     as("authenticated", U.B, () =>
       expectError(() => db.query("select app_bootstrap(array['clients; drop table clients'])"), "22023")));
@@ -1035,6 +1040,59 @@ async function behaviouralChecks() {
     );
     const r = await boot(U.B, ["activity_logs"]);
     return eq(r?.activity_logs?.length, 500, "satır");
+  });
+
+  // --- 0021: app_bootstrap + ekip listesi (profiles) ---
+  const PF = "0021";
+  // Telefon gibi alanlar istemciye gitmemeli: org1 adminine telefon yaz (süper kullanıcı).
+  await db.query("update profiles set phone = '0532 000 00 00' where id = $1", [U.B]);
+  const org1Ids = (await db.query("select id from profiles where organization_id = $1 order by created_at, id", [ORG1])).rows.map((r) => r.id);
+  await check(PF, "aynı org: org1 kullanıcısı org1 üyelerini görür (kendisi dahil)", async () => {
+    const r = await boot(U.B, ["profiles"]);
+    const got = ids(r?.profiles);
+    return eq([got, got.includes(U.B), got.includes(U.C), got.includes(U.D)], [org1Ids, true, true, true]);
+  });
+  await check(PF, "başka org görülmez: org1 kullanıcısı org2 üyesini görmez, org2 yalnız kendi org'unu", async () => {
+    const r1 = await boot(U.B, ["profiles"]);
+    const r2 = await boot(U_E, ["profiles"]);
+    return eq([ids(r1?.profiles).includes(U_E), ids(r2?.profiles)], [false, [U_E]]);
+  });
+  await check(PF, "yalnız id, full_name, role, is_active döner (telefon yok); ad yoksa e-posta", async () => {
+    const r = await boot(U.B, ["profiles"]);
+    const keys = [...new Set((r?.profiles ?? []).flatMap((p) => Object.keys(p)))].sort();
+    const b = (r?.profiles ?? []).find((p) => p.id === U.B);
+    const d = (r?.profiles ?? []).find((p) => p.id === U.D);
+    return eq([keys, b?.full_name, b?.role, d?.full_name], [["full_name", "id", "is_active", "role"], "Bora Admin", "admin", "d@ornek.com"]);
+  });
+  await check(PF, "org'suz kullanıcı → profiles []", async () => eq((await boot(U.A, ["profiles"]))?.profiles, []));
+  await check(PF, "anon profiles isteyemez (42501)", () =>
+    as("anon", null, () => expectError(() => db.query("select app_bootstrap(array['profiles'])"), "42501")));
+  await check(PF, "diğer koleksiyonlarla birlikte tek çağrı (profil + clients + profiles)", async () => {
+    const r = await boot(U.B, ["clients", "profiles"]);
+    return eq([Object.keys(r ?? {}).sort(), r?.profile?.organization_id], [["clients", "organization", "profile", "profiles", "since"], ORG1]);
+  });
+  // Geri uyumluluk: yalnız 0020 varken fonksiyon profiles'ı 22023 + "profiles" mesajıyla reddeder — istemci
+  // (store.ts → isProfilesRejected) buna bakıp ekibi ayrı sorguyla çeker. 0020 transaction içinde yeniden
+  // uygulanır, sınanır, geri alınır.
+  await check(PF, "yalnız 0020: profiles → 22023 + mesajda 'profiles' (istemci geri düşer)", async () => {
+    const f0020 = migrationFiles.find((f) => f.startsWith("0020_"));
+    await db.exec("begin");
+    try {
+      for (const s of splitSql(readFileSync(join(MIGRATIONS_DIR, f0020), "utf8"))) await db.exec(s.text);
+      await db.exec("savepoint pf");
+      await db.query("select set_config('request.jwt.claims', $1, true)", [JSON.stringify({ sub: U.B, role: "authenticated" })]);
+      await db.exec("set local role authenticated");
+      try {
+        await db.query("select app_bootstrap(array['clients','profiles'])");
+        return "hata bekleniyordu";
+      } catch (e) {
+        return e?.code === "22023" && /profiles/.test(e?.message ?? "") ? true : `beklenen 22023/profiles, gelen ${errText(e)}`;
+      }
+    } finally {
+      await db.exec("rollback");
+      await db.exec("reset role");
+      await db.query("select set_config('request.jwt.claims', '', false)");
+    }
   });
 
   // --- 0006: storage politikası (current_org_id authenticated'da çalışıyor mu) ---

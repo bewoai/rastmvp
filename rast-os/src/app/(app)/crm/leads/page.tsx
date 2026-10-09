@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { PageHeader, EmptyState, Badge } from "@/components/ui";
 import { Button } from "@/components/form";
-import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
+import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, useOpenIntent, usePersistentState } from "@/components/list";
 import type { Column } from "@/components/list";
 import LeadModal from "@/components/LeadModal";
 import { useDeleteConfirm } from "@/components/confirm";
@@ -23,7 +23,16 @@ const SCOPES: readonly Scope[] = ["all", "open", "won", "lost"];
 type KindFilter = "all" | LeadSourceKind;
 const KIND_FILTERS: readonly KindFilter[] = ["all", "hekim", "site", "manuel"];
 
+// `?ac=<id>` (Ctrl/⌘K kayıt araması, bildirim zili) için useSearchParams → statik sayfada Suspense sınırı gerekir.
 export default function LeadsPage() {
+  return (
+    <Suspense fallback={<PageLoading title="Potansiyel Müşteriler" />}>
+      <LeadsList />
+    </Suspense>
+  );
+}
+
+function LeadsList() {
   const hydrated = useHydrated(["leads", "tasks"]);
   const leads = useStore((s) => s.leads);
   const tasks = useStore((s) => s.tasks);
@@ -32,6 +41,13 @@ export default function LeadsPage() {
 
   const wantNew = useNewIntent();
   const [modal, setModal] = useState<{ initial: Lead | null } | null>(() => (wantNew ? { initial: null } : null));
+  // `?ac=<id>`: kayıt araması / bildirimden gelinince düzenleme penceresi açılır.
+  const intent = useOpenIntent(leads);
+  const shown = modal ?? (intent.target ? { initial: intent.target } : null);
+  function closeModal() {
+    setModal(null);
+    intent.dismiss();
+  }
   const [scope, setScope] = usePersistentState<Scope>("leads-scope", "all", SCOPES);
   const [kind, setKind] = usePersistentState<KindFilter>("leads-kind", "all", KIND_FILTERS);
   const [query, setQuery] = useState("");
@@ -168,7 +184,7 @@ export default function LeadsPage() {
         }
       />
 
-      {modal && <LeadModal initial={modal.initial} onClose={() => setModal(null)} />}
+      {shown && <LeadModal initial={shown.initial} onClose={closeModal} />}
       {del.dialog}
     </>
   );

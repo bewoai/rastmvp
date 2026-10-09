@@ -4,9 +4,10 @@ import type { LucideIcon } from "lucide-react";
 import {
   House, Users, Building2, Palette, FolderKanban,
   ListTodo, CalendarDays, Camera, Wallet, Receipt, Boxes,
-  FolderOpen, Settings, Contact, TrendingUp, Briefcase, Upload, ShoppingCart, Megaphone,
+  Settings, Contact, TrendingUp, Briefcase, Upload, ShoppingCart, Megaphone,
   FileSignature, FileChartColumn, Radar,
 } from "lucide-react";
+import { normalizeSearch } from "./search-logic";
 
 export type NavItem = {
   label: string;
@@ -77,7 +78,7 @@ export const NAV: NavGroup[] = [
       { label: "Reklam Merkezi", href: "/ads", icon: Megaphone, keywords: "reklamlar meta google ads" },
       { label: "Aktif Ekipmanlar", href: "/equipment", icon: Boxes },
       { label: "Alınacak Ekipmanlar", href: "/equipment/planned", icon: ShoppingCart },
-      { label: "Dosyalar", href: "/files", icon: FolderOpen },
+      // "Dosyalar" (/files) hâlâ "yakında" yer tutucusu: menüden kaldırıldı, rota duruyor (UX-AUDIT §5 #6).
       { label: "İçe Aktar", href: "/import", icon: Upload, keywords: "import csv excel" },
     ],
   },
@@ -99,11 +100,11 @@ export function activeNavItem(pathname: string): NavItem | undefined {
     .sort((a, b) => b.href.length - a.href.length)[0];
 }
 
-/** "Ekrana git" araması: etiket + anahtar sözcükler, Türkçe büyük/küçük harf duyarsız. */
+/** "Ekrana git" araması: etiket + anahtar sözcükler; Türkçe büyük/küçük harf ve aksan duyarsız ("gorev" → Görevler). */
 export function searchNav(term: string, limit = 7): NavItem[] {
-  const q = term.trim().toLocaleLowerCase("tr-TR");
+  const q = normalizeSearch(term);
   if (!q) return [];
   return FLAT
-    .filter((item) => `${item.label} ${item.keywords ?? ""}`.toLocaleLowerCase("tr-TR").includes(q))
+    .filter((item) => normalizeSearch(`${item.label} ${item.keywords ?? ""}`).includes(q))
     .slice(0, limit);
 }

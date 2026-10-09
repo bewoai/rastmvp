@@ -17,6 +17,9 @@ import {
 
 const CHANGE_EVENT = "rast-backup-changed";
 
+/** Yedeklenen tablolar: ekip listesi (profiles) auth.users'a bağlı, yedekten geri yüklenemez — dışarıda. */
+const BACKUP_COLLECTIONS = COLLECTIONS.filter((c) => c !== "profiles");
+
 function readLastBackup(): string | null {
   try {
     return localStorage.getItem(LAST_BACKUP_KEY);
@@ -67,10 +70,10 @@ export async function downloadBackup(onProgress?: (done: number, total: number, 
   try {
     const client = createClient() as unknown as BackupClient;
     const now = new Date();
-    const payload = await buildBackup(client, COLLECTIONS, orgId, now, onProgress);
+    const payload = await buildBackup(client, BACKUP_COLLECTIONS, orgId, now, onProgress);
     const failed = Object.keys(payload.errors ?? {});
     // Hiçbir tablo çekilemediyse (ör. ağ yok) boş bir dosya indirmeyelim.
-    if (failed.length === COLLECTIONS.length) {
+    if (failed.length === BACKUP_COLLECTIONS.length) {
       return { ok: false, failed, rowCount: 0, error: "Veriler okunamadı. Bağlantını ve yetkini kontrol edip tekrar dene." };
     }
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });

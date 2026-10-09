@@ -20,29 +20,8 @@ const empty: Client = {
   contract_end: "", payment_day: undefined, is_active: true, notes: "", created_at: "",
 };
 
-function formatDateInput(value?: string) {
-  const raw = value?.slice(0, 10) ?? "";
-  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
-  return match ? `${match[3]}.${match[2]}.${match[1]}` : raw;
-}
-
-function normalizeDateInput(value?: string): string | null {
-  const raw = value?.trim() ?? "";
-  if (!raw) return "";
-
-  const parts = raw.split(/[./-]/).map((part) => Number(part));
-  if (parts.length !== 3 || parts.some((part) => !Number.isInteger(part))) return null;
-
-  const [first, second, third] = parts;
-  const year = first > 31 ? first : third;
-  const month = second;
-  const day = first > 31 ? third : first;
-  if (year < 1900 || month < 1 || month > 12 || day < 1 || day > 31) return null;
-
-  const date = new Date(Date.UTC(year, month - 1, day));
-  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return null;
-  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
+/** Native date input "YYYY-MM-DD" ister; DB'den gelen değer zaman damgalı olabilir. */
+const dateOnly = (value?: string) => value?.slice(0, 10) ?? "";
 
 const activeOptions = [
   { value: "1", label: "Aktif", tone: "success" as const },
@@ -55,7 +34,7 @@ const SCOPES: readonly Scope[] = ["all", "active", "passive"];
 function ClientModal({ initial, onClose }: { initial: Client | null; onClose: () => void }) {
   const f = useFormState<Client>(
     initial
-      ? { ...initial, contract_start: formatDateInput(initial.contract_start), contract_end: formatDateInput(initial.contract_end) }
+      ? { ...initial, contract_start: dateOnly(initial.contract_start), contract_end: dateOnly(initial.contract_end) }
       : empty,
   );
   const editing = Boolean(initial?.id);
@@ -64,11 +43,9 @@ function ClientModal({ initial, onClose }: { initial: Client | null; onClose: ()
   async function submit() {
     if (!form.name.trim()) return { ok: false, error: "Müşteri / firma adı zorunludur." };
 
-    const contractStart = normalizeDateInput(form.contract_start);
-    const contractEnd = normalizeDateInput(form.contract_end);
-    if (contractStart === null || contractEnd === null) {
-      return { ok: false, error: "Tarihleri GG.AA.YYYY veya YYYY-AA-GG formatında girin." };
-    }
+    // Native date input: değer "" ya da geçerli "YYYY-MM-DD" (tarayıcı doğrular).
+    const contractStart = dateOnly(form.contract_start);
+    const contractEnd = dateOnly(form.contract_end);
     if (form.payment_day !== undefined && (form.payment_day < 1 || form.payment_day > 31)) {
       return { ok: false, error: "Ödeme günü 1 ile 31 arasında olmalıdır." };
     }
@@ -100,8 +77,8 @@ function ClientModal({ initial, onClose }: { initial: Client | null; onClose: ()
             }}
           />
         </Field>
-        <Field label="Sözleşme başlangıç"><Input type="text" inputMode="numeric" placeholder="GG.AA.YYYY" {...f.text("contract_start")} /></Field>
-        <Field label="Sözleşme bitiş"><Input type="text" inputMode="numeric" placeholder="GG.AA.YYYY" {...f.text("contract_end")} /></Field>
+        <Field label="Sözleşme başlangıç"><Input type="date" {...f.text("contract_start")} /></Field>
+        <Field label="Sözleşme bitiş"><Input type="date" {...f.text("contract_end")} /></Field>
         <MoreFields label="Ek alanlar (vergi no, durum, not)" defaultOpen={editing}>
           <Field label="Vergi no"><Input {...f.text("tax_id")} /></Field>
           <Field label="Durum">

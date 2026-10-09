@@ -46,6 +46,11 @@ export interface DeleteTarget {
   label: string;
   /** Bağlı kayıtlarla ilgili uyarı (ör. "Bağlı görevler de silinir"). */
   warning?: string;
+  /**
+   * Satır silindikten SONRA çalışan temizlik (ör. içeriğin Storage dosyaları). Satır silme başarısızsa
+   * çalışmaz; kendisi başarısız olursa satır silinmiş kalır, döndürdüğü metin uyarı olarak gösterilir.
+   */
+  afterDelete?: () => Promise<string | null>;
 }
 
 /**
@@ -66,10 +71,16 @@ export function useDeleteConfirm() {
       .getState()
       .remove(t.key, t.id)
       .catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) }))
-      .then((r) => {
+      .then(async (r) => {
         const toasts = useToasts.getState();
-        if (r.ok) toasts.push({ message: `“${t.label}” silindi` });
-        else toasts.push({ message: `“${t.label}” silinemedi${r.error ? `: ${r.error}` : ""}`, tone: "danger" });
+        if (!r.ok) {
+          toasts.push({ message: `“${t.label}” silinemedi${r.error ? `: ${r.error}` : ""}`, tone: "danger" });
+          return;
+        }
+        toasts.push({ message: `“${t.label}” silindi` });
+        if (!t.afterDelete) return;
+        const warning = await t.afterDelete().catch((e: unknown) => (e instanceof Error ? e.message : String(e)));
+        if (warning) toasts.push({ message: warning, tone: "danger" });
       });
   }, [target]);
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { PageHeader, Badge, EmptyState, StatStrip } from "@/components/ui";
 import { FormModal, Field, Input, Select, Textarea, MoreFields, Button, useFormState } from "@/components/form";
-import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, usePersistentState } from "@/components/list";
+import { DataTable, FilterChips, PageLoading, RowActions, SearchBox, StatusSelect, Toolbar, useListSearch, useNewIntent, useOpenIntent, usePersistentState } from "@/components/list";
 import type { Column } from "@/components/list";
 import { useDeleteConfirm } from "@/components/confirm";
 import { useStore, useHydrated, uid, nowISO } from "@/lib/store";
@@ -75,12 +75,28 @@ function JobModal({ initial, onClose }: { initial: Job | null; onClose: () => vo
   );
 }
 
+// `?ac=<id>` (Ctrl/⌘K kayıt araması, bildirim zili) için useSearchParams → statik sayfada Suspense sınırı gerekir.
 export default function JobsPage() {
+  return (
+    <Suspense fallback={<PageLoading title="Tekil İşler" />}>
+      <JobsList />
+    </Suspense>
+  );
+}
+
+function JobsList() {
   const hydrated = useHydrated(["jobs"]);
   const jobs = useStore((s) => s.jobs);
 
   const wantNew = useNewIntent();
   const [modal, setModal] = useState<{ initial: Job | null } | null>(() => (wantNew ? { initial: null } : null));
+  // `?ac=<id>`: kayıt araması / bildirimden gelinince düzenleme penceresi açılır.
+  const intent = useOpenIntent(jobs);
+  const shown = modal ?? (intent.target ? { initial: intent.target } : null);
+  function closeModal() {
+    setModal(null);
+    intent.dismiss();
+  }
   const [scope, setScope] = usePersistentState<Scope>("jobs-scope", "all", SCOPES);
   const [query, setQuery] = useState("");
   const del = useDeleteConfirm();
@@ -195,7 +211,7 @@ export default function JobsPage() {
         }
       />
 
-      {modal && <JobModal initial={modal.initial} onClose={() => setModal(null)} />}
+      {shown && <JobModal initial={shown.initial} onClose={closeModal} />}
       {del.dialog}
     </>
   );

@@ -6,6 +6,7 @@ import type { RastData, WritableCollection } from "./types";
 import { seed } from "./seed";
 import { isAuthRequired, isSupabaseConfigured } from "./env";
 import { createClient } from "./supabase/client";
+import { perfLog, perfStart } from "./perf";
 
 type Collections = keyof RastData;
 type Row = { id: string } & Record<string, unknown>;
@@ -94,8 +95,10 @@ export const useStore = create<StoreState>()((set, get) => ({
       return;
     }
 
+    const tInit = perfStart();
     const sb = createClient();
     const { data: { session } } = await sb.auth.getSession();
+    perfLog("init: getSession (yerel; süresi dolmuşsa yenileme ağ çağrısı)", tInit);
     const user = session?.user;
 
     // Supabase yapılandırılmış ama oturum yok. Giriş zorunluyken (varsayılan) proxy bu
@@ -107,31 +110,38 @@ export const useStore = create<StoreState>()((set, get) => ({
       return;
     }
 
+    const tProfile = perfStart();
     const { data: profile } = await sb
       .from("profiles")
       .select("organization_id")
       .eq("id", user.id)
       .single();
     const orgId = profile?.organization_id ?? null;
+    perfLog("init: profiles (1 istek)", tProfile);
 
     set({ loaded: true, supabase: true, orgId });
+    perfLog("init: toplam", tInit, { requests: 1 });
   },
 
   load: async (collections) => {
     const s = get();
     if (!s.supabase || !s.orgId) return;
 
+    const tLoad = perfStart();
     const sb = createClient();
     const fetched: Partial<Record<Collections, Row[]>> = {};
 
     await Promise.all(
       collections.map(async (c) => {
         if (s.loadedCollections[c]) return; // Zaten yüklüyse geç
+        const tTable = perfStart();
         const query = sb.from(c).select("*").order("created_at", { ascending: false });
         const { data } = await (c === "activity_logs" ? query.limit(ACTIVITY_LOG_LIMIT) : query);
         fetched[c] = (data ?? []) as Row[];
+        perfLog(`load: ${c}`, tTable, { rows: fetched[c]!.length });
       }),
     );
+    perfLog("load: toplam (paralel)", tLoad, { requests: Object.keys(fetched).length, collections: Object.keys(fetched) });
 
     const keys = Object.keys(fetched) as Collections[];
     if (keys.length === 0) return;

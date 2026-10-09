@@ -7,7 +7,8 @@ import { seed } from "./seed";
 import { isAuthRequired, isSupabaseConfigured } from "./env";
 import { createClient } from "./supabase/client";
 import { perfLog, perfStart } from "./perf";
-import { bootCollections, isRpcMissing, mergeRows, parseBootstrap, routeCollections } from "./bootstrap-logic";
+import { bootCollections, isRpcMissing, mergeRows, parseBootstrap, routeCollections, unionCollections } from "./bootstrap-logic";
+import { clearSnapshots, readSnapshot, writeSnapshot } from "./snapshot";
 import type { BootstrapOrganization, BootstrapProfile } from "./bootstrap-logic";
 
 type Collections = keyof RastData;
@@ -101,6 +102,8 @@ let flushScheduled: Promise<void> | null = null;
 let activeFetches = 0;
 /** Oturum sıfırlanınca (çıkış / yeni giriş) artar: eski oturumun geç gelen yanıtları uygulanmaz. */
 let epoch = 0;
+/** Oturumdaki kullanıcı (anlık görüntü anahtarı). */
+let currentUserId: string | null = null;
 
 /**
  * Yerel değişiklik sırası: add/update/remove/mergeLocal her kaydı `${koleksiyon}:${id}` → artan sayı ile
@@ -205,6 +208,28 @@ function applyRows(f: Fetched, extra: Partial<StoreState> = {}) {
   useStore.setState({ ...(next as Partial<RastData>), ...extra, loadedCollections: nextLoaded });
 }
 
+/**
+ * Açılış / yenileme yanıtını uygular. Profil geldiyse org değişmiş olabilir (anlık görüntü başka org'a
+ * aitse): o durumda yerel veri tamamen atılır, yalnızca gelen koleksiyonlar yüklü sayılır.
+ */
+function applyBootstrap(f: Fetched) {
+  const cur = useStore.getState();
+  const orgId = f.profile === undefined ? cur.orgId : (f.profile?.organization_id ?? null);
+  const meta: Partial<StoreState> = { loaded: true, supabase: true, orgId };
+  if (f.profile !== undefined) meta.profile = f.profile;
+  if (f.organization !== undefined) {
+    meta.orgTargets = f.organization;
+    meta.orgTargetsKnown = true;
+  }
+  if (cur.loaded && cur.orgId !== orgId) {
+    const flags = noneLoaded();
+    for (const c of Object.keys(f.rows) as Collections[]) flags[c] = true;
+    useStore.setState({ ...emptyData, ...(f.rows as Partial<RastData>), ...meta, loadedCollections: flags });
+    return;
+  }
+  applyRows(f, meta);
+}
+
 /** `fetchRemote` + uçuştaki istek kaydı (aynı koleksiyon iki kez istenmez). */
 async function runFetch(cols: Collections[], userId: string | null, onDone: (f: Fetched) => void): Promise<void> {
   const myEpoch = epoch;
@@ -241,24 +266,43 @@ async function runInit(): Promise<void> {
   // Örnek (demo) veri yalnızca açıkça NEXT_PUBLIC_REQUIRE_AUTH=false iken gösterilir.
   if (!user) {
     pending.clear();
+    currentUserId = null;
+    clearSnapshots();
     useStore.setState({ ...(isAuthRequired ? emptyData : seed), loaded: true, supabase: false, orgId: null });
+    return;
+  }
+  currentUserId = user.id;
+
+  // Stale-while-revalidate: bu sekmede son görülen veri varsa HEMEN göster, arka planda tek istekle tazele.
+  const snap = readSnapshot(user.id, COLLECTIONS);
+  if (snap) {
+    const flags = noneLoaded();
+    for (const c of Object.keys(snap.collections) as Collections[]) flags[c] = true;
+    useStore.setState({
+      ...(snap.collections as Partial<RastData>),
+      loaded: true,
+      supabase: true,
+      orgId: snap.orgId,
+      profile: snap.profile,
+      orgTargets: snap.organization,
+      orgTargetsKnown: snap.organization !== null,
+      loadedCollections: flags,
+    });
+    perfLog("init: anlık görüntü gösterildi (0 istek)", tInit, { collections: Object.keys(snap.collections).length });
+    const cols = unionCollections(Object.keys(snap.collections) as Collections[], [...pending]);
+    pending.clear();
+    const tRefresh = perfStart();
+    void runFetch(cols, user.id, applyBootstrap).then(() => {
+      perfLog("init: arka plan tazeleme", tRefresh, { collections: cols.length });
+      if (pending.size) void flushPending();
+    });
     return;
   }
 
   // O ana kadar sayfaların istediği tüm koleksiyonlar + profil: TEK istek.
   const cols = [...pending];
   pending.clear();
-  await runFetch(cols, user.id, (f) => {
-    const orgId = f.profile?.organization_id ?? null;
-    applyRows(f, {
-      loaded: true,
-      supabase: true,
-      orgId,
-      profile: f.profile ?? null,
-      orgTargets: f.organization ?? null,
-      orgTargetsKnown: f.organization !== undefined,
-    });
-  });
+  await runFetch(cols, user.id, applyBootstrap);
   perfLog("init: toplam (profil + ilk koleksiyonlar)", tInit, { collections: cols.length });
 
   // İstek uçarken istenen koleksiyonlar (ör. sonradan açılan bileşen) → bir tur daha.
@@ -276,15 +320,21 @@ async function flushPending(): Promise<void> {
     await st.init();
     return;
   }
-  const cols = [...pending].filter((c) => !useStore.getState().loadedCollections[c] && !inflight.has(c));
+  const asked = [...pending];
   pending.clear();
-  if (cols.length === 0) return;
+  // Uçuştaki (ör. arka plan tazelemesi) koleksiyonlar yeniden istenmez; onların bitişi beklenir.
+  const waits = asked.map((c) => inflight.get(c)).filter((p): p is Promise<void> => Boolean(p));
+  const cols = asked.filter((c) => !useStore.getState().loadedCollections[c] && !inflight.has(c));
+  if (cols.length === 0) {
+    await Promise.all(waits);
+    return;
+  }
   if (!st.supabase || !st.orgId) {
     // Org'a bağlı olmayan oturum: RLS hiçbir satır döndürmez — boş ama "yüklendi" say (sonsuz iskelet olmasın).
     applyRows({ rows: Object.fromEntries(cols.map((c) => [c, []])), startSeq: changeSeq });
     return;
   }
-  await runFetch(cols, null, (f) => applyRows(f));
+  await Promise.all([...waits, runFetch(cols, null, (f) => applyRows(f))]);
 }
 
 /**
@@ -338,9 +388,12 @@ export function prefetchRoute(pathname: string): void {
   if (missing.length) void requestCollections(missing);
 }
 
-/** Oturum değişti (çıkış / giriş sayfası): bellekteki veriyi ve bekleyen istekleri sıfırlar. */
+/** Oturum değişti (çıkış / giriş sayfası): bellekteki veriyi, bekleyen istekleri ve anlık görüntüyü sıfırlar. */
 export function resetSession(): void {
   epoch++;
+  currentUserId = null;
+  cancelSnapshotSave();
+  clearSnapshots();
   pending.clear();
   inflight.clear();
   touched.clear();
@@ -497,6 +550,59 @@ export const useStore = create<StoreState>()((set, get) => ({
   },
 }));
 
+// ---------------------------------------------------------------------------
+// Anlık görüntü yazımı: store değiştikçe (yükleme / ekleme / güncelleme) ~1 sn sonra sessionStorage'a.
+// Yalnızca Supabase modunda, oturum + org varken; yalnız yüklenmiş koleksiyonlar. Sayfa kapanırken
+// (pagehide) bekleyen yazım hemen yapılır. 2 MB üstü yazılmaz (snapshot.ts).
+// ---------------------------------------------------------------------------
+
+let saveTimer: ReturnType<typeof setTimeout> | undefined;
+
+function cancelSnapshotSave() {
+  clearTimeout(saveTimer);
+  saveTimer = undefined;
+}
+
+/**
+ * Çıkış yapılırken (form gönderilmeden hemen önce): anlık görüntüyü siler ve bu sayfa kapanana kadar
+ * yeniden yazılmasını engeller. Ekrandaki veri yönlendirmeye kadar görünür kalır.
+ */
+export function forgetSessionSnapshot(): void {
+  currentUserId = null;
+  cancelSnapshotSave();
+  clearSnapshots();
+}
+
+function saveSnapshotNow() {
+  cancelSnapshotSave();
+  const st = useStore.getState();
+  if (!st.loaded || !st.supabase || !st.orgId || !currentUserId) return;
+  const collections: Partial<Record<Collections, Row[]>> = {};
+  for (const c of COLLECTIONS) if (st.loadedCollections[c]) collections[c] = st[c] as unknown as Row[];
+  const tSave = perfStart();
+  const ok = writeSnapshot({
+    v: 1,
+    userId: currentUserId,
+    orgId: st.orgId,
+    savedAt: Date.now(),
+    profile: st.profile,
+    organization: st.orgTargetsKnown ? st.orgTargets : null,
+    collections,
+  });
+  perfLog(ok ? "snapshot: yazıldı" : "snapshot: atlandı (> 2 MB / depolama kapalı)", tSave);
+}
+
+if (typeof window !== "undefined" && isSupabaseConfigured) {
+  useStore.subscribe((st) => {
+    if (!st.loaded || !st.supabase || !st.orgId || !currentUserId) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveSnapshotNow, 1000);
+  });
+  window.addEventListener("pagehide", () => {
+    if (saveTimer !== undefined) saveSnapshotNow();
+  });
+}
+
 /**
  * Veriyi yükler (Supabase veya demo) ve oturum değişiminde yeniler.
  * Sayfalar `loaded` true olana kadar iskelet/boş gösterir.
@@ -509,7 +615,9 @@ export function useHydrated(requiredCollections?: Collections[]) {
   useEffect(() => {
     if (isSupabaseConfigured) {
       const sb = createClient();
-      const { data: sub } = sb.auth.onAuthStateChange(() => {
+      const { data: sub } = sb.auth.onAuthStateChange((event) => {
+        // Çıkış (bu ya da başka sekmede): bellekteki veri ve sekme anlık görüntüsü silinir.
+        if (event === "SIGNED_OUT") resetSession();
         void useStore.getState().init();
       });
       return () => sub.subscription.unsubscribe();

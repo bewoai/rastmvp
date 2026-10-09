@@ -164,3 +164,74 @@ export function mergeRows<R extends Row>(local: readonly R[], fetched: readonly 
   }
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// sessionStorage anlık görüntüsü (stale-while-revalidate)
+// ---------------------------------------------------------------------------
+
+export const SNAPSHOT_VERSION = 1;
+/** 2 MB üstü anlık görüntü yazılmaz (sessionStorage kotası ~5 MB; JSON.stringify ana iş parçacığını da bekletir). */
+export const SNAPSHOT_MAX_BYTES = 2 * 1024 * 1024;
+/** Bu süreden eski anlık görüntü gösterilmez (aynı sekmede uzun ara → doğrudan taze veri). */
+export const SNAPSHOT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+export interface Snapshot {
+  v: number;
+  userId: string;
+  orgId: string;
+  savedAt: number;
+  profile: BootstrapProfile | null;
+  organization: BootstrapOrganization | null;
+  collections: Partial<Record<Collection, Row[]>>;
+}
+
+/** UTF-8 bayt sayısı ≤ maxBytes ise JSON, değilse (veya serileştirilemezse) null. */
+export function serializeSnapshot(snap: Snapshot, maxBytes: number = SNAPSHOT_MAX_BYTES): string | null {
+  let json: string;
+  try {
+    json = JSON.stringify(snap);
+  } catch {
+    return null;
+  }
+  // Her UTF-16 birimi en az 1, en çok 3 UTF-8 baytı: ucuz alt/üst sınırlar, gerekirse tam sayım.
+  if (json.length > maxBytes) return null;
+  if (json.length * 3 <= maxBytes) return json;
+  return new TextEncoder().encode(json).length <= maxBytes ? json : null;
+}
+
+/**
+ * Ham değeri doğrular: sürüm, kullanıcı, yaş, biçim. Uymayan her şey → null (gösterilmez).
+ * `allowed` dışındaki koleksiyon anahtarları atlanır (eski sürümden kalan / bilinmeyen anahtar store'a girmez).
+ */
+export function parseSnapshot(
+  raw: string | null | undefined,
+  userId: string,
+  now: number,
+  allowed: readonly Collection[],
+  maxAgeMs: number = SNAPSHOT_MAX_AGE_MS,
+): Snapshot | null {
+  if (!raw) return null;
+  let d: unknown;
+  try {
+    d = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!isObj(d) || d.v !== SNAPSHOT_VERSION || d.userId !== userId || typeof d.orgId !== "string" || !d.orgId) return null;
+  if (typeof d.savedAt !== "number" || now - d.savedAt > maxAgeMs || d.savedAt - now > 60_000) return null;
+  if (!isObj(d.collections)) return null;
+  const collections: Partial<Record<Collection, Row[]>> = {};
+  for (const [k, v] of Object.entries(d.collections)) {
+    if (!Array.isArray(v)) return null;
+    if (allowed.includes(k as Collection)) collections[k as Collection] = v as Row[];
+  }
+  return {
+    v: SNAPSHOT_VERSION,
+    userId,
+    orgId: d.orgId,
+    savedAt: d.savedAt,
+    profile: isObj(d.profile) ? (d.profile as unknown as BootstrapProfile) : null,
+    organization: isObj(d.organization) ? (d.organization as unknown as BootstrapOrganization) : null,
+    collections,
+  };
+}

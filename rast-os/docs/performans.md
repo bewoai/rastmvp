@@ -94,3 +94,16 @@ Notlar:
 - **Giriş:** şifre doğrulanınca açılış RPC'si hemen başlar ve `router.replace("/")` ile istemci tarafı
   yönlendirme yapılır → sayfa (RSC) ve veri paralel gelir (önceden: tam sayfa yükleme + JS + sonra veri).
   Giriş sayfası açılınca bellekteki önceki oturum verisi sıfırlanır (`resetSession`).
+
+### 3) Stale-while-revalidate (sessionStorage)
+
+- Store her değiştiğinde (~1 sn sonra, sayfa kapanırken hemen) yüklenmiş koleksiyonlar + profil + org
+  hedefleri **sekme oturumuna** (`sessionStorage`, anahtar kullanıcıya göre, içinde org) yazılır.
+  `localStorage` kullanılmaz: veri sekme kapanınca gider.
+- Sayfa yenilenince / yeni sekmede değil aynı sekmede tekrar açılınca: `getSession()` (yerel) → anlık görüntü
+  **0 istekle** hemen ekranda; arka planda tek `app_bootstrap` ile tazelenir (yerel değişiklikler korunur,
+  başka yerde silinen kayıtlar düşer, org değiştiyse her şey atılır).
+- Koruma: 2 MB üstü yazılmaz (varsa eskisi silinir); 12 saatten eski, başka kullanıcıya ait, sürümü farklı
+  ya da bozuk kayıt gösterilmez; bilinmeyen koleksiyon anahtarı store'a alınmaz.
+- Silinir: **Çıkış yap** (form gönderilirken), giriş sayfası açılınca, oturum düşünce (`SIGNED_OUT` /
+  getSession boş).

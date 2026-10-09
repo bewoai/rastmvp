@@ -5,8 +5,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  CORE_COLLECTIONS, DASHBOARD_COLLECTIONS, bootCollections, isRpcMissing, mergeRows, parseBootstrap,
-  routeCollections, unionCollections,
+  CORE_COLLECTIONS, DASHBOARD_COLLECTIONS, SNAPSHOT_MAX_AGE_MS, SNAPSHOT_MAX_BYTES, SNAPSHOT_VERSION, bootCollections,
+  isRpcMissing, mergeRows, parseBootstrap, parseSnapshot, routeCollections, serializeSnapshot, unionCollections,
 } from "../src/lib/bootstrap-logic.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -167,4 +167,65 @@ test("mergeRows: çekimden sonra yerelde güncellenen / silinen kayıt ezilmez",
   const fetched = [{ id: "a", v: "sunucu-eski" }, { id: "b", v: 1 }, { id: "deleted", v: 1 }];
   const changed = new Set(["a", "deleted"]);
   assert.deepEqual(mergeRows(local, fetched, (id) => changed.has(id)), [{ id: "a", v: "yerel" }, { id: "b", v: 1 }]);
+});
+
+// ---------------------------------------------------------------------------
+// sessionStorage anlık görüntüsü (stale-while-revalidate)
+// ---------------------------------------------------------------------------
+
+const snap = (over = {}) => ({
+  v: SNAPSHOT_VERSION,
+  userId: "u1",
+  orgId: "org-1",
+  savedAt: 1_000_000,
+  profile: { organization_id: "org-1", role: "admin", full_name: "Bora" },
+  organization: { mrr_target: 90000, mrr_target_label: "Eşik" },
+  collections: { clients: [{ id: "c1", name: "Klinik" }], tasks: [] },
+  ...over,
+});
+const ALL = ["clients", "tasks", "invoices"];
+
+test("serializeSnapshot: sınırın altı yazılır, üstü atlanır (2 MB varsayılan)", () => {
+  const small = snap();
+  const json = serializeSnapshot(small);
+  assert.equal(typeof json, "string");
+  assert.deepEqual(JSON.parse(json), small);
+  assert.equal(SNAPSHOT_MAX_BYTES, 2 * 1024 * 1024);
+  const big = snap({ collections: { clients: [{ id: "c1", notes: "x".repeat(SNAPSHOT_MAX_BYTES) }] } });
+  assert.equal(serializeSnapshot(big), null);
+});
+
+test("serializeSnapshot: UTF-8 bayt sayısına göre (Türkçe karakter 2 bayt)", () => {
+  const s = snap({ collections: { clients: [{ id: "c1", notes: "ş".repeat(600) }] } });
+  const json = serializeSnapshot(s, 10_000);
+  assert.ok(json && json.length < 1000, "karakter sayısı sınırın altında");
+  const bytes = new TextEncoder().encode(json).length;
+  assert.equal(serializeSnapshot(s, bytes), json, "tam sınırda yazılır");
+  assert.equal(serializeSnapshot(s, bytes - 1), null, "bir bayt eksik → atlanır");
+});
+
+test("serializeSnapshot: döngüsel / serileştirilemeyen → null", () => {
+  const cyc = snap();
+  cyc.collections.clients[0].self = cyc;
+  assert.equal(serializeSnapshot(cyc), null);
+});
+
+test("parseSnapshot: geçerli kayıt geri okunur; bilinmeyen koleksiyon anahtarı atlanır", () => {
+  const raw = JSON.stringify(snap({ collections: { clients: [{ id: "c1" }], hacked: [{ id: "x" }] } }));
+  const r = parseSnapshot(raw, "u1", 1_000_500, ALL);
+  assert.deepEqual(r.collections, { clients: [{ id: "c1" }] });
+  assert.equal(r.orgId, "org-1");
+  assert.deepEqual(r.organization, { mrr_target: 90000, mrr_target_label: "Eşik" });
+});
+
+test("parseSnapshot: başka kullanıcı / eski sürüm / bozuk / org'suz / süresi geçmiş → null", () => {
+  const raw = JSON.stringify(snap());
+  assert.equal(parseSnapshot(raw, "u2", 1_000_500, ALL), null, "başka kullanıcı");
+  assert.equal(parseSnapshot(JSON.stringify(snap({ v: 0 })), "u1", 1_000_500, ALL), null, "sürüm");
+  assert.equal(parseSnapshot("{bozuk", "u1", 1_000_500, ALL), null, "JSON");
+  assert.equal(parseSnapshot(null, "u1", 1_000_500, ALL), null, "yok");
+  assert.equal(parseSnapshot(JSON.stringify(snap({ orgId: "" })), "u1", 1_000_500, ALL), null, "org yok");
+  assert.equal(parseSnapshot(JSON.stringify(snap({ collections: { clients: {} } })), "u1", 1_000_500, ALL), null, "dizi değil");
+  assert.equal(parseSnapshot(raw, "u1", 1_000_000 + SNAPSHOT_MAX_AGE_MS + 1, ALL), null, "süresi geçmiş");
+  assert.equal(parseSnapshot(raw, "u1", 1_000_000 - 120_000, ALL), null, "gelecekten (saat kayması)");
 });

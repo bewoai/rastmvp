@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, Bell, Check, ChevronDown, CircleAlert, FileText, LogOut, Menu, Search, Settings, Wallet } from "lucide-react";
-import { useStore } from "@/lib/store";
+import { forgetSessionSnapshot, useStore } from "@/lib/store";
 import { NAV, activeNavItem } from "@/lib/nav";
 
 type Notice = {
@@ -176,7 +176,7 @@ export default function Topbar({
             <div className="border-b border-border/80 px-4 py-4"><p className="text-sm font-semibold text-foreground">{userName || "Rast kullanıcısı"}</p><p className="mt-0.5 text-xs text-muted">Rast Creative hesabı</p></div>
             <div className="p-2">
               <Link prefetch={false} href="/settings" onClick={() => setAccountOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted hover:bg-surface-2 hover:text-foreground"><Settings className="h-4 w-4" /> Hesap ve ayarlar</Link>
-              <form action="/auth/signout" method="post"><button type="submit" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted hover:bg-danger/10 hover:text-danger"><LogOut className="h-4 w-4" aria-hidden /> Çıkış yap</button></form>
+              <form action="/auth/signout" method="post" onSubmit={() => forgetSessionSnapshot()}><button type="submit" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted hover:bg-danger/10 hover:text-danger"><LogOut className="h-4 w-4" aria-hidden /> Çıkış yap</button></form>
             </div>
           </div>}
         </div>

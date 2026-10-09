@@ -8,6 +8,7 @@ export default async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|brand|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // manifest.webmanifest: oturumsuz (giriş sayfası dahil) isteklerde /login'e yönlendirilmesin, yoksa kurulum bozulur.
+    "/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|brand|icons|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

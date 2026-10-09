@@ -17,11 +17,16 @@ export const metadata: Metadata = {
   title: "Rast OS — Ajans Operasyon Sistemi",
   description:
     "Rast Creative ajans işletim sistemi — CRM, proje, içerik, prodüksiyon ve finans yönetimi.",
-  icons: { icon: "/brand/rast-white.svg" },
+  icons: {
+    icon: "/brand/rast-white.svg",
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+  // iOS "Ana Ekrana Ekle": tam ekran açılır, kısa ad ikonun altında görünür.
+  appleWebApp: { capable: true, title: "Rast OS", statusBarStyle: "black" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#00000b",
+  themeColor: "#080c0a", // globals.css --background (manifest.ts ile aynı)
 };
 
 export default function RootLayout({

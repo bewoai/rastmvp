@@ -5,27 +5,38 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { NAV, activeNavItem } from "@/lib/nav";
+import { useStore } from "@/lib/store";
+import { countNewLeads } from "@/lib/lead-logic";
 
 /**
  * Prefetch kapalı olduğundan tıklama ile yeni sayfa arasında ağ beklemesi olur; tıklanan öğede
  * anında dönen bir gösterge çıkar. Sabit boyutlu (layout kayması yok); çok hızlı geçişlerde
  * yanıp sönmesin diye 100 ms gecikmeyle görünür.
  */
-function PendingHint() {
+function PendingHint({ afterBadge = false }: { afterBadge?: boolean }) {
   const { pending } = useLinkStatus();
   return (
     <span
       aria-hidden
-      className={`ml-auto h-3.5 w-3.5 shrink-0 rounded-full border-2 border-amber/30 border-t-amber transition-opacity ${
+      className={`${afterBadge ? "ml-2" : "ml-auto"} h-3.5 w-3.5 shrink-0 rounded-full border-2 border-amber/30 border-t-amber transition-opacity ${
         pending ? "animate-spin opacity-100 delay-100" : "opacity-0"
       }`}
     />
   );
 }
 
+/**
+ * "Yeni" durumundaki lead sayısı — yalnızca store'dan okunur, ek istek atmaz. Supabase modunda leads
+ * koleksiyonu henüz yüklenmediyse (bir sayfa yükleyene dek) null döner: yanlış "0" yerine rozet çıkmaz.
+ */
+function useNewLeadCount(): number | null {
+  return useStore((s) => (s.loaded && (!s.supabase || s.loadedCollections.leads) ? countNewLeads(s.leads) : null));
+}
+
 export default function Sidebar({ onNavigate, onClose }: { onNavigate?: () => void; onClose?: () => void }) {
   const pathname = usePathname();
   const activeHref = activeNavItem(pathname)?.href;
+  const newLeads = useNewLeadCount();
 
   return (
     <aside className="flex h-full w-64 shrink-0 flex-col border-r border-border/80 bg-surface/90 backdrop-blur-xl">
@@ -58,6 +69,7 @@ export default function Sidebar({ onNavigate, onClose }: { onNavigate?: () => vo
               {group.items.map((item) => {
                 const active = item.href === activeHref;
                 const Icon = item.icon;
+                const badgeCount = item.badge === "new-leads" && newLeads ? newLeads : 0;
                 return (
                   <li key={item.href}>
                     <Link
@@ -76,7 +88,15 @@ export default function Sidebar({ onNavigate, onClose }: { onNavigate?: () => vo
                         strokeWidth={active ? 2.4 : 2}
                       />
                       {item.label}
-                      <PendingHint />
+                      {badgeCount > 0 && (
+                        <span
+                          className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber px-1.5 text-[11px] font-semibold leading-none text-background"
+                          aria-label={`${badgeCount} yeni potansiyel müşteri`}
+                        >
+                          {badgeCount > 99 ? "99+" : badgeCount}
+                        </span>
+                      )}
+                      <PendingHint afterBadge={badgeCount > 0} />
                     </Link>
                   </li>
                 );

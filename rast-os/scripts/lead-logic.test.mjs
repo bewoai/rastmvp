@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  CALL_TASK_PREFIX, MAX_BODY_BYTES, NEW_LEAD_WINDOW_MS, callTaskTitle, emailKey, isCallTask, isSameLead,
+  CALL_TASK_PREFIX, MAX_BODY_BYTES, NEW_LEAD_WINDOW_MS, callTaskTitle, countNewLeads, emailKey, isCallTask, isSameLead,
   leadDedupeKeys, leadNeedsFirstCall, leadSourceKind, leadsNeedingFirstCall, normalizeLeadPayload, phoneKey, sourceLabelFor,
 } from "../src/lib/lead-logic.ts";
 import {
@@ -235,6 +235,11 @@ test("leadsNeedingFirstCall returns the badged ids in one pass", () => {
   const leads = [lead("a", 2), lead("b", 5), lead("c", 100), lead("d", 3), lead("e", 1)];
   const tasks = [call("a"), call("b", "done"), call("c"), call("e", "todo", "Başka")];
   assert.deepEqual([...leadsNeedingFirstCall(leads, tasks, NOW)], ["a"]);
+});
+
+test("countNewLeads counts only status=new leads (sidebar badge)", () => {
+  assert.equal(countNewLeads([]), 0);
+  assert.equal(countNewLeads([{ status: "new" }, { status: "contacted" }, { status: "new" }, { status: "won" }, { status: "lost" }]), 2);
 });
 
 /* ---------------- SQL ile uyum ---------------- */

@@ -9,9 +9,9 @@ test.beforeEach(async ({ page }) => {
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) => route.abort());
 });
 
-test("dashboard: MRR kartı ve Son işlemler görünür", async ({ page }) => {
+test("dashboard (Bugün): MRR kartı ve Son işlemler görünür", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Bugün" })).toBeVisible();
   await expect(page.getByRole("heading", { name: /Aylık tekrarlayan gelir \(MRR\)/ })).toBeVisible();
   await expect(page.getByText("MRR · KDV hariç")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Son işlemler" })).toBeVisible();

@@ -9,6 +9,7 @@ import { useStore, useHydrated } from "@/lib/store";
 import { useFx } from "@/lib/fx";
 import { DEFAULT_MRR_LABEL, useOrgTargets } from "@/lib/orgSettings";
 import { useToasts } from "@/lib/toast";
+import BackupPanel from "@/components/BackupPanel";
 
 /**
  * Kur alanı: yazılan metin yerel taslakta tutulur, geçerli (>0) sayı olunca hemen kaydedilir.
@@ -151,6 +152,8 @@ export default function SettingsPage() {
         </Panel>
 
         <MrrTargetForm hydrated={hydrated} />
+
+        <BackupPanel />
 
         <Panel title="Döviz Kurları">
           <p className="text-sm text-muted">

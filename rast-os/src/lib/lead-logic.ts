@@ -199,6 +199,13 @@ export function leadNeedsFirstCall(
   return calls.length > 0 && !calls.some((t) => t.status === "done");
 }
 
+/** Kenar menü rozeti: `status` "new" olan (henüz ele alınmamış) lead sayısı. */
+export function countNewLeads(leads: readonly Pick<Lead, "status">[]): number {
+  let n = 0;
+  for (const l of leads) if (l.status === "new") n++;
+  return n;
+}
+
 /** Rozeti olan lead id'leri (tek geçiş: görevler lead'e göre indekslenir). */
 export function leadsNeedingFirstCall(
   leads: ReadonlyArray<Pick<Lead, "id" | "created_at" | "status">>,

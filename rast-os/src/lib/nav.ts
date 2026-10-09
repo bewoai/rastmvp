@@ -11,6 +11,8 @@ export type NavItem = {
   label: string;
   href: string;
   icon: LucideIcon;
+  /** Etiketin yanında küçük sayı rozeti gösterilecek veri kaynağı (Sidebar'da store'dan okunur). */
+  badge?: "new-leads";
 };
 
 export type NavGroup = {
@@ -29,7 +31,7 @@ export const NAV: NavGroup[] = [
     title: "CRM",
     items: [
       { label: "Satış Pipeline", href: "/crm/pipeline", icon: TrendingUp },
-      { label: "Potansiyel Müşteriler", href: "/crm/leads", icon: Users },
+      { label: "Potansiyel Müşteriler", href: "/crm/leads", icon: Users, badge: "new-leads" },
       { label: "Müşteri Bulma", href: "/musteri-bulma", icon: Radar },
       { label: "Müşteriler", href: "/crm/clients", icon: Building2 },
       { label: "Markalar", href: "/crm/brands", icon: Palette },

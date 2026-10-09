@@ -9,6 +9,7 @@ import {
 import { PageHeader, StatCard, Panel, Badge, EmptyState } from "@/components/ui";
 import ActivityFeed from "@/components/ActivityFeed";
 import MrrCard from "@/components/MrrCard";
+import { BackupReminder } from "@/components/BackupPanel";
 import { useStore, useHydrated } from "@/lib/store";
 import { useFx } from "@/lib/fx";
 import { computeMrr } from "@/lib/mrr";
@@ -148,6 +149,8 @@ export default function DashboardPage() {
   return (
     <div>
       <PageHeader title="Dashboard" subtitle={monthLabel} />
+
+      <BackupReminder />
 
       <div className="mb-5 grid gap-4 lg:grid-cols-[1.45fr_.55fr]">
         <Link prefetch={false} href="/finance/invoices" className="balance-panel card card-hover group relative overflow-hidden p-5 outline-none focus-visible:ring-2 focus-visible:ring-amber/70 md:p-6">

@@ -6,7 +6,7 @@ import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import QuickAddHost from "./QuickAddTask";
 import Toaster from "./Toaster";
-import { prefetchBootstrap, prefetchRoute } from "@/lib/store";
+import { prefetchBootstrap, prefetchRoute, refreshIfStale } from "@/lib/store";
 
 // Açılış verisi: bu modül tarayıcıda yüklenir yüklenmez (sayfa bileşenleri mount olmadan, hydration
 // sürerken) tek `app_bootstrap` isteği başlar — çekirdek koleksiyonlar + açılan sayfanınkiler.
@@ -83,6 +83,25 @@ function NavProgress() {
   );
 }
 
+/**
+ * Sekmeye / pencereye dönülünce: son çekimden 60 sn'den fazla geçtiyse yüklü koleksiyonlar tek istekle
+ * tazelenir (başka kullanıcıların değişiklikleri gelir). `focus` + `visibilitychange` aynı anda gelse de
+ * tek istek atılır (uçuştayken no-op).
+ */
+function useRefreshOnReturn() {
+  useEffect(() => {
+    function onReturn() {
+      if (document.visibilityState === "visible") refreshIfStale();
+    }
+    window.addEventListener("focus", onReturn);
+    document.addEventListener("visibilitychange", onReturn);
+    return () => {
+      window.removeEventListener("focus", onReturn);
+      document.removeEventListener("visibilitychange", onReturn);
+    };
+  }, []);
+}
+
 function MobileDrawer({ onClose }: { onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
 
@@ -122,6 +141,7 @@ export default function AppShell({
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   useRouteDataPrefetch();
+  useRefreshOnReturn();
 
   return (
     <div className="relative flex h-dvh overflow-hidden bg-background print:block print:h-auto print:overflow-visible print:bg-white">

@@ -235,3 +235,11 @@ export function parseSnapshot(
     collections,
   };
 }
+
+/** Pencereye dönüşte yenileme eşiği. */
+export const FOCUS_REFRESH_AFTER_MS = 60_000;
+
+/** Odak/görünürlük dönüşünde yenileme gerekli mi? */
+export function shouldRefreshOnFocus(lastFetchAt: number, now: number, inFlight: boolean, threshold: number = FOCUS_REFRESH_AFTER_MS): boolean {
+  return !inFlight && lastFetchAt > 0 && now - lastFetchAt > threshold;
+}

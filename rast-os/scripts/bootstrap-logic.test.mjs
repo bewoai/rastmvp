@@ -5,8 +5,8 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  CORE_COLLECTIONS, DASHBOARD_COLLECTIONS, SNAPSHOT_MAX_AGE_MS, SNAPSHOT_MAX_BYTES, SNAPSHOT_VERSION, bootCollections,
-  isRpcMissing, mergeRows, parseBootstrap, parseSnapshot, routeCollections, serializeSnapshot, unionCollections,
+  CORE_COLLECTIONS, DASHBOARD_COLLECTIONS, FOCUS_REFRESH_AFTER_MS, SNAPSHOT_MAX_AGE_MS, SNAPSHOT_MAX_BYTES, SNAPSHOT_VERSION, bootCollections,
+  isRpcMissing, mergeRows, parseBootstrap, parseSnapshot, routeCollections, serializeSnapshot, shouldRefreshOnFocus, unionCollections,
 } from "../src/lib/bootstrap-logic.ts";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -228,4 +228,16 @@ test("parseSnapshot: başka kullanıcı / eski sürüm / bozuk / org'suz / süre
   assert.equal(parseSnapshot(JSON.stringify(snap({ collections: { clients: {} } })), "u1", 1_000_500, ALL), null, "dizi değil");
   assert.equal(parseSnapshot(raw, "u1", 1_000_000 + SNAPSHOT_MAX_AGE_MS + 1, ALL), null, "süresi geçmiş");
   assert.equal(parseSnapshot(raw, "u1", 1_000_000 - 120_000, ALL), null, "gelecekten (saat kayması)");
+});
+
+// ---------------------------------------------------------------------------
+// Pencereye dönüş yenilemesi
+// ---------------------------------------------------------------------------
+
+test("shouldRefreshOnFocus: 60 sn eşiği, uçuştayken ve hiç çekim yokken hayır", () => {
+  assert.equal(FOCUS_REFRESH_AFTER_MS, 60_000);
+  assert.equal(shouldRefreshOnFocus(1_000, 1_000 + 60_000, false), false, "tam 60 sn: henüz değil");
+  assert.equal(shouldRefreshOnFocus(1_000, 1_000 + 60_001, false), true);
+  assert.equal(shouldRefreshOnFocus(1_000, 1_000 + 600_000, true), false, "çekim sürüyor");
+  assert.equal(shouldRefreshOnFocus(0, 600_000, false), false, "henüz çekim yok (açılış/anlık görüntü)");
 });

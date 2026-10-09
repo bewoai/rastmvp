@@ -107,3 +107,11 @@ Notlar:
   ya da bozuk kayıt gösterilmez; bilinmeyen koleksiyon anahtarı store'a alınmaz.
 - Silinir: **Çıkış yap** (form gönderilirken), giriş sayfası açılınca, oturum düşünce (`SIGNED_OUT` /
   getSession boş).
+
+### 4) Pencereye dönüşte tek istekle tazeleme
+
+- Sekmeye / pencereye dönülünce (`focus`, `visibilitychange`) son başarılı çekimden **> 60 sn** geçtiyse
+  yüklü TÜM koleksiyonlar + profil + org hedefleri **tek** `app_bootstrap` ile tazelenir (önceden: hiç
+  yenilenmiyordu; sayfa yenilenene kadar başkalarının değişiklikleri görünmüyordu).
+- Çekim sürerken / açılış bitmeden no-op; iki olay aynı anda gelse de tek istek.
+- Yerel değişiklikler korunur; başka yerde silinen kayıtlar düşer.

@@ -7,7 +7,9 @@ import { seed } from "./seed";
 import { isAuthRequired, isSupabaseConfigured } from "./env";
 import { createClient } from "./supabase/client";
 import { perfLog, perfStart } from "./perf";
-import { bootCollections, isRpcMissing, mergeRows, parseBootstrap, routeCollections, unionCollections } from "./bootstrap-logic";
+import {
+  bootCollections, isRpcMissing, mergeRows, parseBootstrap, routeCollections, shouldRefreshOnFocus, unionCollections,
+} from "./bootstrap-logic";
 import { clearSnapshots, readSnapshot, writeSnapshot } from "./snapshot";
 import type { BootstrapOrganization, BootstrapProfile } from "./bootstrap-logic";
 
@@ -100,6 +102,8 @@ const inflight = new Map<Collections, Promise<void>>();
 let initPromise: Promise<void> | null = null;
 let flushScheduled: Promise<void> | null = null;
 let activeFetches = 0;
+/** Son başarılı çekimin zamanı (pencereye dönüş yenilemesi için; 0 = henüz yok). */
+let lastFetchAt = 0;
 /** Oturum sıfırlanınca (çıkış / yeni giriş) artar: eski oturumun geç gelen yanıtları uygulanmaz. */
 let epoch = 0;
 /** Oturumdaki kullanıcı (anlık görüntü anahtarı). */
@@ -235,7 +239,9 @@ async function runFetch(cols: Collections[], userId: string | null, onDone: (f: 
   const myEpoch = epoch;
   activeFetches++;
   const job = fetchRemote(cols, userId).then((f) => {
-    if (myEpoch === epoch) onDone(f);
+    if (myEpoch !== epoch) return;
+    onDone(f);
+    lastFetchAt = Date.now();
   });
   const tracked = job.catch(() => undefined);
   for (const c of cols) inflight.set(c, tracked);
@@ -388,6 +394,23 @@ export function prefetchRoute(pathname: string): void {
   if (missing.length) void requestCollections(missing);
 }
 
+/**
+ * Pencereye / sekmeye dönüşte: son çekimden 60 sn'den fazla geçtiyse yüklü TÜM koleksiyonları tek
+ * `app_bootstrap` ile tazeler (profil + org hedefleri dahil). Çekim sürerken ya da açılış bitmeden no-op.
+ * Yerel değişiklikler korunur (mergeRows); başka kullanıcıların ekleme / güncelleme / silmeleri gelir.
+ */
+export function refreshIfStale(): void {
+  const st = useStore.getState();
+  if (!isSupabaseConfigured || !st.loaded || !st.supabase || !st.orgId) return;
+  if (!shouldRefreshOnFocus(lastFetchAt, Date.now(), activeFetches > 0 || initPromise !== null)) return;
+  const cols = COLLECTIONS.filter((c) => st.loadedCollections[c]);
+  if (cols.length === 0) return;
+  const t0 = perfStart();
+  void runFetch(cols, currentUserId, applyBootstrap).then(() =>
+    perfLog("odak: yüklü koleksiyonlar tazelendi", t0, { collections: cols.length }),
+  );
+}
+
 /** Oturum değişti (çıkış / giriş sayfası): bellekteki veriyi, bekleyen istekleri ve anlık görüntüyü sıfırlar. */
 export function resetSession(): void {
   epoch++;
@@ -400,6 +423,7 @@ export function resetSession(): void {
   initPromise = null;
   flushScheduled = null;
   activeFetches = 0;
+  lastFetchAt = 0;
   useStore.setState({
     ...emptyData,
     loaded: false,

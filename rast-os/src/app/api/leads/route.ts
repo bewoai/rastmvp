@@ -1,6 +1,9 @@
+import { after } from "next/server";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createAnonClient } from "@/lib/supabase/anon";
+import { leadNotifyConfig, sendLeadNotification } from "@/lib/lead-notify";
 import { MAX_BODY_BYTES, normalizeLeadPayload, sourceLabelFor } from "@/lib/lead-logic";
+import type { LeadIntake } from "@/lib/lead-logic";
 import { BodyTooLargeError, clientIp, createRateLimiter, parseLeadBody, readBodyLimited, secretsMatch } from "@/lib/lead-intake";
 
 // Web sitesi iletişim formundan (Web3Forms webhook'u / sunucudan sunucuya) gelen lead girişi.
@@ -15,6 +18,18 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 const json = (body: Record<string, unknown>, status: number, headers?: Record<string, string>) =>
   Response.json(body, { status, headers: { "Cache-Control": "no-store", ...headers } });
+
+// Ekibe iç e-posta bildirimi (docs/lead-bildirim.md). LEAD_NOTIFY_TO + SMTP_* yoksa sessizce no-op; Müşteri Bulma'nın
+// OUTREACH_EMAIL_ENABLED bayrağından bağımsızdır. `after()` ile yanıt gittikten sonra çalışır; sendLeadNotification
+// asla fırlatmaz (≤5 sn zaman aşımı, yalnızca kısa console.error). Burada da try/catch: kayıt yanıtı hiçbir koşulda bozulmaz.
+function notifyTeamAfterResponse(lead: LeadIntake, duplicate: boolean) {
+  try {
+    if (!leadNotifyConfig(process.env)) return;
+    after(() => sendLeadNotification(lead, { duplicate }));
+  } catch (e) {
+    console.error("[leads] bildirim zamanlanamadı:", e instanceof Error ? e.name : "bilinmiyor");
+  }
+}
 
 export async function POST(request: Request) {
   // 1) Hız sınırı (IP başına 30/dk) — sır denemelerini de kapsar.
@@ -71,6 +86,8 @@ export async function POST(request: Request) {
     }
     const out = (data ?? {}) as { lead_id?: string; task_id?: string; duplicate?: boolean };
     if (!out.lead_id) return json({ ok: false, error: "Kaydedilemedi." }, 502);
+    // 6) Kayıt başarılı → ekibe iç bildirim (yanıt döndükten sonra; hata kaydı etkilemez).
+    notifyTeamAfterResponse(lead, Boolean(out.duplicate));
     return json({ ok: true, leadId: out.lead_id, taskId: out.task_id ?? null, duplicate: Boolean(out.duplicate) }, 200);
   } catch (e) {
     console.error("[leads] bağlantı hatası:", e instanceof Error ? e.message : "bilinmiyor");

@@ -166,14 +166,24 @@ Gecikme ≥ 60 ms'e düştüğünde: Dashboard 180 ms → 60 ms; anlık görünt
 (Sunucu tarafındaki `auth/v1/user` istekleri sahte sunucunun HS256 jetonundan; üretimde ES256 ile `getClaims`
 yereldir. `(app)/layout.tsx`'teki görünen ad için `profiles` sorgusu sunucu tarafında kaldı — bkz. Kalan işler.)
 
+## `feat/gunluk-kullanim` sonrası
+
+- **Sunucu `profiles` turu kaldırıldı:** `(app)/layout.tsx` artık görünen ad için Supabase'e gitmiyor (her tam
+  yüklemede TTFB'den 1 tur düştü). İlk ad yerel doğrulanan JWT claims'ten (`user_metadata.full_name`, yoksa
+  e-posta); kesin ad açılış yanıtındaki profilden (Topbar → `store.profile.full_name`). Giriş koruması
+  değişmedi: proxy (`updateSession` → `getClaims`, oturumsuz → `/login`).
+- **Çekirdek küme 16 → 18 koleksiyon:** + `profiles` (ekip listesi, görev atama; 0021) ve `content_approvals`
+  (bildirim zili: müşterinin kararı). İkisi de **aynı** açılış isteğinde; yeni tur yok. Zil artık ilk açılışta
+  dolu (önceden yalnız ilgili sayfalar ziyaret edilince doluyordu). İçerik sayfasına geçiş de 0 tur oldu.
+- **0021 uygulanmadan önce:** RPC `profiles`'ı reddeder (22023) → o sekmede ilk açılışta +1 tur, sonra ekip
+  ayrı sorguyla RPC ile **paralel** (+1 istek, +0 tur). Ayrıntı README-0021.
+- **Kayıt araması (Ctrl/⌘K) ve bildirimler** store'daki yüklü veriden istemcide türetilir: ağ isteği yok.
+
 ## Kalan işler / riskler
 
-- **Sunucu `profiles` turu:** `(app)/layout.tsx` her tam yüklemede görünen ad için Supabase'e gidiyor (TTFB'yi
-  bekletir). Ad artık açılış yanıtında da var; layout'u claims'teki e-posta / `user_metadata.full_name` ile
-  açıp adı istemcide güncellemek bir tur daha kazandırır (görsel değişiklik olduğu için bu dalda yapılmadı).
 - **Supabase "Max rows" (varsayılan 1000):** eski `select *` yolu tablo başına 1000 satırda sessizce kesiliyordu;
   RPC tek jsonb döndürdüğü için bu sınıra takılmaz (18 ay penceresi yükü sınırlar).
 - **18 ay penceresi:** 18 aydan eski kapanmış kayıtlar listelerde / eski dönem raporlarında görünmez (README-0020).
-- **Çekirdek küme ilk yüklemeyi büyütür:** küçük bir sayfa ilk açılışta da 16 koleksiyonu çeker (tek tur, daha
+- **Çekirdek küme ilk yüklemeyi büyütür:** küçük bir sayfa ilk açılışta da 18 koleksiyonu çeker (tek tur, daha
   büyük yanıt). Veri büyüdükçe yanıt boyutu `[perf]` günlüğüyle izlenmeli.
 - **Anlık görüntü:** aynı sekmede ≤ 12 saat bayat veri kısa süre (1 tur) görünebilir; ardından tazelenir.

@@ -132,6 +132,13 @@ Real Chrome (1440 × ~790) against `next dev` in demo mode; mobile 375 / 390 / 4
 
 ## 5. Deferred / remaining UX debt
 
+> **Güncelleme (`feat/gunluk-kullanim`):** kapatılanlar — #1 zil açılış isteğiyle dolu gelir (+ yeni lead,
+> müşteri kararı, teklif sonucu; okundu localStorage'da; sekme başlığında "(n)"), #2 Ctrl/⌘K kayıt araması
+> (store'daki yüklü veriden, istemcide; sunucu uç noktası gerekmedi), #3 görev atama `assignee_id` (+ `assignee`
+> metni adla senkron), #4 içerik silinince Storage dosyaları da silinir (hata satır silmeyi engellemez, uyarı),
+> #6 Dosyalar menüden kaldırıldı (rota duruyor), #7 müşteri modalında native date input, #11 `useCollections.ts`
+> silindi (`AmbientScene.tsx` zaten yoktu), #12 "g + harf" gezinme ve "?" yardım. Açık kalanlar: #5, #8–#10, #13, #14.
+
 **High impact**
 1. **Notifications bell** (`Topbar`) derives from whichever collections happen to be loaded (invoices/expenses/tasks/contents), so it is empty until those pages have been visited. A real fix needs a lightweight server-side count/RPC — not a startup load, hence not done.
 2. **Global record search** (customers/projects/content) does not exist; only screen-jump. Needs a server search endpoint.

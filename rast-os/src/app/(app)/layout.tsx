@@ -14,17 +14,17 @@ export default async function AppGroupLayout({
 
   if (isSupabaseConfigured) {
     const supabase = await createClient();
-    // Proxy kimliği zaten doğruladı; burada imzası YEREL doğrulanmış claims okunur (ağ çağrısı yok,
-    // sunucuda güvenilmeyen getSession() kullanılmaz). Tek ağ çağrısı: görünen ad için profil.
+    // Giriş koruması proxy'de (src/proxy.ts → updateSession: getClaims, oturumsuz → /login); burada yalnız
+    // görünen ad okunur. İmzası YEREL doğrulanmış claims (ağ çağrısı yok; sunucuda güvenilmeyen getSession()
+    // kullanılmaz). Önceden ad için `profiles` sorgusu her tam yüklemede Supabase'e 1 tur atıp HTML'i (TTFB)
+    // bekletiyordu; artık ilk ad JWT'den (kayıttaki user_metadata.full_name, yoksa e-posta), kesin ad
+    // istemcide açılış isteğinin profilinden gelir (Topbar → store.profile.full_name).
     const { data } = await supabase.auth.getClaims();
     const claims = data?.claims;
     if (claims?.sub) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("full_name")
-        .eq("id", claims.sub)
-        .single();
-      userName = profile?.full_name ?? claims.email ?? null;
+      const meta = claims.user_metadata as { full_name?: unknown } | undefined;
+      const metaName = typeof meta?.full_name === "string" && meta.full_name.trim() ? meta.full_name.trim() : null;
+      userName = metaName ?? (typeof claims.email === "string" ? claims.email : null);
     }
   }
 

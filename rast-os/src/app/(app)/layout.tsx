@@ -3,7 +3,7 @@ import AppShell from "@/components/AppShell";
 import { isSupabaseConfigured } from "@/lib/env";
 import { createClient } from "@/lib/supabase/server";
 
-export const metadata: Metadata = { title: "Dashboard · Rast OS" };
+export const metadata: Metadata = { title: "Bugün · Rast OS" };
 
 export default async function AppGroupLayout({
   children,
@@ -31,8 +31,8 @@ export default async function AppGroupLayout({
   return (
     <AppShell userName={userName}>
       {!isSupabaseConfigured && (
-        <div className="mb-4 rounded-lg border border-amber/40 print:hidden bg-amber/10 px-4 py-3 text-sm text-foreground">
-          <strong className="text-amber">Kurulum bekliyor:</strong> Supabase
+        <div className="mb-5 rounded-lg border border-border bg-surface px-4 py-3 text-[13px] leading-relaxed text-muted print:hidden">
+          <strong className="font-medium text-foreground">Kurulum bekliyor:</strong> Supabase
           bağlantısı yapılandırılmadı. <code>.env.example</code> dosyasını{" "}
           <code>.env.local</code> olarak kopyalayıp Supabase anahtarlarını girin,
           ardından <code>supabase/migrations/0001_init.sql</code> dosyasını

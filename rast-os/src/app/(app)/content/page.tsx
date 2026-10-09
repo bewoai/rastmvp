@@ -84,7 +84,7 @@ function AttachmentChips({ attachments, onRead }: { attachments?: ContentAttachm
     <div className="mt-2 flex flex-wrap gap-1.5">
       {attachments.map((attachment) => (
         <div key={attachment.id} className="flex items-center gap-0.5 rounded-md border border-border bg-background pl-2 text-xs text-muted">
-          <FileText className="h-3.5 w-3.5 text-amber" aria-hidden />
+          <FileText className="h-3.5 w-3.5 text-muted" aria-hidden />
           <span className="ml-1 max-w-[180px] truncate">{attachment.name}</span>
           <button type="button" onClick={() => onRead(attachment)} title="İçeriği oku" aria-label={`İçeriği oku: ${attachment.name}`} className="flex h-8 w-8 items-center justify-center hover:text-foreground"><Eye className="h-3.5 w-3.5" aria-hidden /></button>
           {(attachment.storage_path || attachment.url) && (
@@ -249,7 +249,7 @@ function ContentModal({ initial, mode, brands, onRead, onClose }: {
               <Field label="Planlanan yayın"><Input type="date" {...f.text("planned_date")} /></Field>
             </>
           ) : (
-            <div className="flex items-end"><p className="rounded-lg bg-amber/10 px-3 py-2 text-xs text-amber">Tarih vermeden fikir havuzunda saklanır.</p></div>
+            <div className="flex items-end"><p className="rounded-lg bg-surface-2 px-3 py-2 text-xs text-muted">Tarih vermeden fikir havuzunda saklanır.</p></div>
           )}
           <div className="sm:col-span-2"><Field label="Hook / giriş cümlesi"><Textarea rows={2} {...f.text("hook")} /></Field></div>
           <div className="sm:col-span-2"><Field label={mode === "idea" ? "Fikir detayları" : "Senaryo / içerik notları"}><Textarea rows={5} {...f.text("script")} /></Field></div>
@@ -272,11 +272,11 @@ function ContentModal({ initial, mode, brands, onRead, onClose }: {
           {editing && mode === "content" && initial && (
             <ContentApprovalPanel content={initial} draftScript={form.script} draftTitle={form.title} />
           )}
-          <div className="rounded-xl border border-border bg-surface-2/40 p-4">
-            <div className="flex items-center gap-2"><Paperclip className="h-4 w-4 text-amber" aria-hidden /><h3 className="text-sm font-semibold text-foreground">Brief ve kaynak dosyaları</h3></div>
+          <div className="rounded-lg border border-border bg-surface-2/40 p-4">
+            <div className="flex items-center gap-2"><Paperclip className="h-4 w-4 text-muted" aria-hidden /><h3 className="text-sm font-semibold text-foreground">Brief ve kaynak dosyaları</h3></div>
             <p className="mt-1 text-xs text-muted">PDF, Excel, CSV veya TXT yükleyin. Sistem içindeki metni ve tabloyu okuyarak bu kayıtta saklar.</p>
-            <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border px-4 py-6 text-center focus-within:border-amber/60 hover:border-amber/50 hover:bg-amber/5">
-              <Upload className="h-6 w-6 text-amber" aria-hidden />
+            <label className="mt-4 flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border px-4 py-6 text-center focus-within:border-accent/60 hover:border-accent/50 hover:bg-accent/5">
+              <Upload className="h-6 w-6 text-muted" aria-hidden />
               <span className="mt-2 text-sm font-medium text-foreground">Dosya seç</span>
               <span className="mt-1 text-xs text-muted">PDF / XLSX / XLS / CSV / TXT · en fazla 20 MB</span>
               <input type="file" multiple accept={acceptedFiles} className="sr-only" onChange={(event) => { extractFiles(event.target.files); event.currentTarget.value = ""; }} />
@@ -286,7 +286,7 @@ function ContentModal({ initial, mode, brands, onRead, onClose }: {
               {(form.attachments ?? []).map((attachment) => (
                 <div key={attachment.id} className="rounded-lg border border-border bg-background p-3">
                   <div className="flex items-start gap-2">
-                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden />
+                    <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden />
                     <div className="min-w-0 flex-1"><p className="truncate text-xs font-medium text-foreground">{attachment.name}</p><p className="text-[11px] text-muted">{readableSize(attachment.size)}{attachment.page_count ? ` · ${attachment.page_count} sayfa` : ""}{attachment.sheet_names?.length ? ` · ${attachment.sheet_names.length} çalışma sayfası` : ""}</p></div>
                     <button onClick={() => onRead(attachment)} type="button" title="İçeriği oku" aria-label={`İçeriği oku: ${attachment.name}`} className="p-1 text-muted hover:text-foreground"><Eye className="h-4 w-4" aria-hidden /></button>
                     <button onClick={() => removeExistingAttachment(attachment)} type="button" title="Kaldır" aria-label={`Kaldır: ${attachment.name}`} className="p-1 text-muted hover:text-danger"><Trash2 className="h-4 w-4" aria-hidden /></button>
@@ -296,7 +296,7 @@ function ContentModal({ initial, mode, brands, onRead, onClose }: {
               {pendingFiles.map((pending) => (
                 <div key={pending.id} className="rounded-lg border border-border bg-background p-3">
                   <div className="flex items-start gap-2">
-                    {pending.loading ? <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-amber" aria-hidden /> : <FileText className="mt-0.5 h-4 w-4 shrink-0 text-amber" aria-hidden />}
+                    {pending.loading ? <LoaderCircle className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-accent" aria-hidden /> : <FileText className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden />}
                     <div className="min-w-0 flex-1"><p className="truncate text-xs font-medium text-foreground">{pending.file.name}</p><p className={`text-[11px] ${pending.error ? "text-danger" : "text-muted"}`}>{pending.loading ? "Dosya okunuyor…" : pending.error || `${readableSize(pending.file.size)} · Okundu`}</p></div>
                     {pending.attachment && <button onClick={() => onRead(pending.attachment!)} type="button" title="İçeriği oku" aria-label={`İçeriği oku: ${pending.file.name}`} className="p-1 text-muted hover:text-foreground"><Eye className="h-4 w-4" aria-hidden /></button>}
                     <button onClick={() => setPendingFiles((current) => current.filter((item) => item.id !== pending.id))} type="button" title="Kaldır" aria-label={`Kaldır: ${pending.file.name}`} className="p-1 text-muted hover:text-danger"><Trash2 className="h-4 w-4" aria-hidden /></button>
@@ -436,10 +436,10 @@ export default function ContentPage() {
                     <li key={item.id} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-3 py-2.5 hover:bg-surface-2/40">
                       <div className="w-14 shrink-0 text-xs">
                         {item.planned_date ? <span className={late ? "font-medium text-danger" : "text-muted"}>{dayLabel(item.planned_date)}</span> : <span className="text-muted">—</span>}
-                        {late && <span className="block text-[10px] text-danger">gecikti</span>}
+                        {late && <span className="block text-[11px] text-danger">gecikti</span>}
                       </div>
                       <div className="min-w-0 flex-1 basis-56">
-                        <button type="button" onClick={() => openEdit(item)} aria-label={`Düzenle: ${label(item)}`} className="block max-w-full truncate rounded text-left text-sm font-medium text-foreground outline-none hover:text-amber focus-visible:ring-2 focus-visible:ring-amber/60">{item.title}</button>
+                        <button type="button" onClick={() => openEdit(item)} aria-label={`Düzenle: ${label(item)}`} className="block max-w-full truncate rounded text-left text-sm font-medium text-foreground outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-accent/60">{item.title}</button>
                         <p className="truncate text-xs text-muted">{brandMap.get(item.brand_id ?? "") || "Markasız"} · {item.platform} · {item.content_type}</p>
                         {item.hook && <p className="mt-0.5 line-clamp-1 text-xs text-muted"><span className="text-foreground/80">Hook:</span> {item.hook}</p>}
                         <AttachmentChips attachments={item.attachments} onRead={setReading} />
@@ -473,17 +473,17 @@ export default function ContentPage() {
             <div key={idea.id} className="card flex flex-col p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <button type="button" onClick={() => openEdit(idea)} aria-label={`Düzenle: ${idea.title}`} className="block max-w-full truncate rounded text-left font-medium text-foreground outline-none hover:text-amber focus-visible:ring-2 focus-visible:ring-amber/60">{idea.title}</button>
+                  <button type="button" onClick={() => openEdit(idea)} aria-label={`Düzenle: ${idea.title}`} className="block max-w-full truncate rounded text-left font-medium text-foreground outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-accent/60">{idea.title}</button>
                   <p className="mt-1 text-xs text-muted">{brandMap.get(idea.brand_id ?? "") || "Markasız"} · {idea.platform || "Platform yok"} · {idea.content_type || "Tür yok"}</p>
                 </div>
-                <Lightbulb className="h-5 w-5 shrink-0 text-amber" aria-hidden />
+                <Lightbulb className="h-5 w-5 shrink-0 text-faint" aria-hidden />
               </div>
               {idea.goal && <p className="mt-3 text-xs text-muted"><span className="font-medium text-foreground">Amaç:</span> {idea.goal}</p>}
               {idea.hook && <p className="mt-2 text-xs text-muted"><span className="font-medium text-foreground">Hook:</span> {idea.hook}</p>}
               {idea.script && <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm text-muted">{idea.script}</p>}
               <AttachmentChips attachments={idea.attachments} onRead={setReading} />
               <div className="mt-4 flex items-center justify-end gap-1 border-t border-border pt-2">
-                <button type="button" onClick={() => openEdit(idea, "content")} className="mr-auto flex min-h-10 items-center gap-1 rounded-md px-2 text-xs text-amber hover:bg-amber/10"><ArrowRight className="h-4 w-4" aria-hidden /> Takvime planla</button>
+                <button type="button" onClick={() => openEdit(idea, "content")} className="mr-auto flex min-h-10 items-center gap-1 rounded-md px-2 text-xs text-accent hover:bg-accent/10"><ArrowRight className="h-4 w-4" aria-hidden /> Takvime planla</button>
                 <RowActions label={idea.title} onEdit={() => openEdit(idea)} onDelete={() => del.ask({ key: "contents", id: idea.id, label: idea.title })} />
               </div>
             </div>

@@ -9,10 +9,10 @@ import type { Priority, Task, TaskStatus } from "@/lib/types";
 
 const PRIORITIES: Priority[] = ["urgent", "high", "medium", "low"];
 
-type Tone = "default" | "amber" | "success" | "warning" | "danger" | "muted";
+type Tone = "default" | "accent" | "success" | "warning" | "danger" | "muted";
 const toneText: Record<Tone, string> = {
   default: "text-foreground",
-  amber: "text-amber",
+  accent: "text-accent",
   success: "text-success",
   warning: "text-warning",
   danger: "text-danger",
@@ -23,12 +23,12 @@ const toneText: Record<Tone, string> = {
 const prioRing: Record<Priority, string> = {
   urgent: "border-danger",
   high: "border-warning",
-  medium: "border-amber/70",
+  medium: "border-accent/70",
   low: "border-muted",
 };
 
 const chipCls =
-  "relative inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs transition-colors hover:bg-surface-2 focus-within:ring-2 focus-within:ring-amber/60 md:h-6";
+  "relative inline-flex h-7 items-center gap-1 rounded-md px-1.5 text-xs transition-colors hover:bg-surface-2 focus-within:ring-2 focus-within:ring-accent/60 md:h-6";
 
 // Masaüstünde ikincil chip'ler hover/focus'ta belirir; dokunmatikte (mobil) hep görünür.
 const revealCls = "md:opacity-0 md:group-hover:opacity-100 md:focus-within:opacity-100";
@@ -126,14 +126,14 @@ const TaskRow = memo(function TaskRow({
                 finishEdit(false);
               }
             }}
-            className="w-full rounded-md border border-amber/60 bg-background/70 px-2 py-0.5 text-sm text-foreground outline-none ring-4 ring-amber/10"
+            className="w-full rounded-md border border-accent/60 bg-background/70 px-2 py-0.5 text-sm text-foreground outline-none"
           />
         ) : (
           <button
             type="button"
             onClick={startEdit}
             title="Düzenlemek için tıkla"
-            className={`block w-full truncate rounded-md px-0.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-amber/60 ${
+            className={`block w-full truncate rounded-md px-0.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-accent/60 ${
               done ? "text-muted line-through" : "text-foreground"
             }`}
           >
@@ -192,7 +192,7 @@ const TaskRow = memo(function TaskRow({
               type="button"
               onClick={() => patchTask(task.id, { due_date: "" })}
               aria-label="Son tarihi kaldır"
-              className="rounded text-muted outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-amber/60"
+              className="rounded text-muted outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent/60"
             >
               <X className="h-3 w-3" aria-hidden />
             </button>

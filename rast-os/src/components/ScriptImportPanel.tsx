@@ -59,11 +59,11 @@ export function ScriptImportPanel({ status, scriptSource, clientName, onApply }:
   }
 
   return (
-    <section aria-label="Senaryo içe aktar" className="rounded-xl border border-border bg-surface-2/40 p-4">
+    <section aria-label="Senaryo içe aktar" className="rounded-lg border border-border bg-surface-2/40 p-4">
       <div className="flex items-center gap-2">
-        <FileDown className="h-4 w-4 text-amber" aria-hidden />
+        <FileDown className="h-4 w-4 text-muted" aria-hidden />
         <h3 className="text-sm font-semibold text-foreground">Senaryo içe aktar</h3>
-        {scriptSource === SCRIPT_SOURCE_CLAUDE_CODE && <span className="ml-auto"><Badge tone="amber">Claude Code</Badge></span>}
+        {scriptSource === SCRIPT_SOURCE_CLAUDE_CODE && <span className="ml-auto"><Badge tone="accent">Claude Code</Badge></span>}
       </div>
       <p className="mt-1 text-xs text-muted">
         Claude Code&apos;da <span className="font-mono text-foreground">senaryo-uret</span> komutunun yazdığı taslağı (writing-draft .md) yapıştırın; hook, senaryo ve caption alanlarına aktarılır.

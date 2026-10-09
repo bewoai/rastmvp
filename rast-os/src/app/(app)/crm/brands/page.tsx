@@ -86,7 +86,7 @@ export default function BrandsPage() {
     },
     { key: "tone", header: "Ton", sort: (b) => b.tone, cell: (b) => <span className="block max-w-[16rem] truncate">{b.tone || "—"}</span> },
     { key: "audience", header: "Hedef kitle", sort: (b) => b.target_audience, cell: (b) => <span className="block max-w-[16rem] truncate">{b.target_audience || "—"}</span> },
-    { key: "ig", header: "Instagram", sort: (b) => b.instagram, cell: (b) => (b.instagram ? <span className="text-amber">{b.instagram}</span> : "—") },
+    { key: "ig", header: "Instagram", sort: (b) => b.instagram, cell: (b) => (b.instagram ? <span className="text-foreground">{b.instagram}</span> : "—") },
   ], [clientMap]);
 
   if (!hydrated) return <PageLoading title="Markalar" />;

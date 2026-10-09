@@ -75,7 +75,7 @@ export default function ActivityHistoryPage() {
         return (
           <>
             {href ? (
-              <Link prefetch={false} href={href} className="block max-w-[18rem] truncate rounded outline-none hover:text-amber focus-visible:ring-2 focus-visible:ring-amber/60">{record}</Link>
+              <Link prefetch={false} href={href} className="block max-w-[18rem] truncate rounded outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-accent/60">{record}</Link>
             ) : (
               <span className="block max-w-[18rem] truncate">{record}</span>
             )}
@@ -104,7 +104,7 @@ export default function ActivityHistoryPage() {
         title="İşlem Geçmişi"
         subtitle="Müşteri, proje, iş, görev, fatura, tahsilat, gider ve tekliflerde yapılan ekleme / güncelleme / silmeler. Kayıtları veritabanı otomatik tutar; buradan değiştirilemez."
         action={
-          <Link prefetch={false} href="/settings" className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-amber/60">
+          <Link prefetch={false} href="/settings" className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-muted outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent/60">
             <ArrowLeft className="h-4 w-4" aria-hidden /> Ayarlar
           </Link>
         }

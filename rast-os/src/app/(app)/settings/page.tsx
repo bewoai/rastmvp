@@ -68,7 +68,7 @@ function MrrTargetForm({ hydrated }: { hydrated: boolean }) {
     <div id="mrr-esigi" className="scroll-mt-20">
       <Panel title="MRR Eşiği">
         <p className="text-sm text-muted">
-          Dashboard&apos;daki aylık tekrarlayan gelir (MRR) kartının hedefi — ör. hastaneden ayrılmak için
+          Ana sayfadaki (Bugün) aylık tekrarlayan gelir (MRR) kartının hedefi — ör. hastaneden ayrılmak için
           gereken aylık gelir. Tutar KDV hariç, TL cinsindendir. Boş bırakırsan hedef kaldırılır.
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -120,7 +120,7 @@ export default function SettingsPage() {
           <ul className="space-y-3">
             {roles.map((r) => (
               <li key={r.name} className="flex items-start gap-3">
-                <Badge tone="amber">{r.name}</Badge>
+                <Badge tone="default">{r.name}</Badge>
                 <span className="text-sm text-muted">{r.desc}</span>
               </li>
             ))}
@@ -176,7 +176,7 @@ export default function SettingsPage() {
           <Link
             prefetch={false}
             href="/settings/islem-gecmisi"
-            className="mt-4 inline-flex items-center gap-1.5 rounded-lg text-sm font-medium text-amber outline-none hover:text-amber-hi focus-visible:ring-2 focus-visible:ring-amber/60"
+            className="mt-4 inline-flex items-center gap-1.5 rounded-lg text-sm font-medium text-accent outline-none hover:text-accent-hi focus-visible:ring-2 focus-visible:ring-accent/60"
           >
             İşlem geçmişini aç <ArrowRight className="h-4 w-4" aria-hidden />
           </Link>

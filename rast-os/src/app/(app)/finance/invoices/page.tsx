@@ -97,13 +97,13 @@ function InvoiceModal({ initial, clients, today, onClose }: { initial: Invoice |
             {statusOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
           </Select>
         </Field>
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface-2/50 px-3.5 py-2.5 text-xs text-muted sm:col-span-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-surface-2/50 px-3.5 py-2.5 text-xs text-muted sm:col-span-2">
           <span>Toplam (KDV dahil): <strong className="text-foreground">{TRY(total)}</strong> · Kalan: <strong className={total - (form.paid_amount || 0) > 0 ? "text-warning" : "text-success"}>{TRY(Math.max(total - (form.paid_amount || 0), 0))}</strong></span>
           <button
             type="button"
             onClick={() => { f.set("paid_amount", total); f.set("status", "paid"); }}
             disabled={total <= 0}
-            className="rounded-md px-1 text-amber outline-none hover:text-amber-hi focus-visible:ring-2 focus-visible:ring-amber/60 disabled:opacity-40"
+            className="rounded-md px-1 text-accent outline-none hover:text-accent-hi focus-visible:ring-2 focus-visible:ring-accent/60 disabled:opacity-40"
           >
             Tamamı tahsil edildi
           </button>
@@ -177,7 +177,7 @@ export default function InvoicesPage() {
         </>
       ),
     },
-    { key: "kind", header: "Tür", mobile: "hide", cell: (r) => <Badge tone={r.kind === "recurring" ? "amber" : "muted"}>{r.kind === "recurring" ? "Aylık" : "Tekil"}</Badge> },
+    { key: "kind", header: "Tür", mobile: "hide", cell: (r) => <Badge tone={r.kind === "recurring" ? "accent" : "muted"}>{r.kind === "recurring" ? "Aylık" : "Tekil"}</Badge> },
     { key: "date", header: "Tarih", sort: (r) => r.date, cell: (r) => dateTR(r.date) },
     { key: "amount", header: "Tutar", tone: "strong", sort: (r) => r.amount, cell: (r) => TRY(r.amount) },
     { key: "paid", header: "Tahsil", sort: (r) => r.paid, cell: (r) => TRY(r.paid) },
@@ -220,7 +220,7 @@ export default function InvoicesPage() {
 
       <StatStrip
         items={[
-          { label: "Toplam gelir", value: TRY(revenue), tone: "amber" },
+          { label: "Toplam gelir", value: TRY(revenue), tone: "accent" },
           { label: "Tahsil edilen", value: TRY(collected), tone: "success", hint: "Ödeme tarihine göre" },
           { label: "Bekleyen tahsilat", value: TRY(outstanding), tone: "warning" },
           { label: "Kayıt sayısı", value: String(rows.length) },

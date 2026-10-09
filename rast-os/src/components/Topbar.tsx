@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowUpRight, Bell, Check, ChevronDown, CircleAlert, FileText, LogOut, Menu, Search, Settings, Wallet } from "lucide-react";
 import { forgetSessionSnapshot, useStore } from "@/lib/store";
-import { NAV, activeNavItem } from "@/lib/nav";
+import { activeNavItem, searchNav } from "@/lib/nav";
 
 type Notice = {
   id: string;
@@ -13,7 +13,7 @@ type Notice = {
   body: string;
   href: string;
   icon: typeof Bell;
-  tone: "amber" | "danger" | "warning";
+  tone: "accent" | "danger" | "warning";
 };
 
 function dayStamp(value?: string) {
@@ -59,7 +59,7 @@ export default function Topbar({
 
     const unpaidInvoices = invoices.filter((invoice) => invoice.status !== "paid" && invoice.status !== "cancelled" && invoice.paid_amount < invoice.amount + invoice.vat);
     if (unpaidInvoices.length) {
-      notices.push({ id: "unpaid-invoices", title: `${unpaidInvoices.length} bekleyen gelir`, body: "Tahsilat bekleyen faturaları kontrol et.", href: "/finance/invoices", icon: FileText, tone: "amber" });
+      notices.push({ id: "unpaid-invoices", title: `${unpaidInvoices.length} bekleyen gelir`, body: "Tahsilat bekleyen faturaları kontrol et.", href: "/finance/invoices", icon: FileText, tone: "accent" });
     }
 
     const pendingExpenses = expenses.filter((expense) => expense.payment_status === "pending");
@@ -74,17 +74,14 @@ export default function Topbar({
 
     const upcomingContents = contents.filter((content) => content.status !== "published" && dayStamp(content.planned_date) >= today.getTime() && dayStamp(content.planned_date) <= nextWeek.getTime());
     if (upcomingContents.length) {
-      notices.push({ id: "upcoming-content", title: `${upcomingContents.length} yaklaşan içerik`, body: "İçerik takvimindeki yayınları kontrol et.", href: "/content", icon: Bell, tone: "amber" });
+      notices.push({ id: "upcoming-content", title: `${upcomingContents.length} yaklaşan içerik`, body: "İçerik takvimindeki yayınları kontrol et.", href: "/content", icon: Bell, tone: "accent" });
     }
 
     return notices;
   }, [contents, expenses, invoices, tasks]);
 
   const unreadCount = notifications.filter((notice) => !readIds.includes(notice.id)).length;
-  const searchResults = useMemo(
-    () => NAV.flatMap((group) => group.items).filter((item) => item.label.toLocaleLowerCase("tr-TR").includes(searchTerm.trim().toLocaleLowerCase("tr-TR"))).slice(0, 7),
-    [searchTerm],
-  );
+  const searchResults = useMemo(() => searchNav(searchTerm), [searchTerm]);
 
   useEffect(() => {
     function closeMenus(event: MouseEvent) {
@@ -131,8 +128,8 @@ export default function Topbar({
   }
 
   return (
-    <header className="relative z-[30] flex h-14 print:hidden shrink-0 items-center gap-2 overflow-visible border-b border-border/70 bg-background/65 px-3 backdrop-blur-xl md:gap-3 md:px-6">
-      <button type="button" onClick={onMenu} className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition-colors hover:bg-surface-2 hover:text-foreground md:hidden" aria-label="Menüyü aç">
+    <header className="relative z-[30] flex h-14 print:hidden shrink-0 items-center gap-2 overflow-visible border-b border-border bg-background px-3 md:gap-3 md:px-6">
+      <button type="button" onClick={onMenu} className="flex h-10 w-10 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground md:hidden" aria-label="Menüyü aç">
         <Menu className="h-5 w-5" />
       </button>
       {/* Mobilde arama yok: bulunduğun bölümü göster */}
@@ -140,27 +137,27 @@ export default function Topbar({
 
       <div ref={searchContainerRef} className="relative hidden max-w-xl flex-1 md:block">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
-        <input ref={searchRef} value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setSearchOpen(true); }} onFocus={() => setSearchOpen(Boolean(searchTerm.trim()))} aria-label="Ekrana git" placeholder="Ekrana git… (Görevler, Projeler, Faturalar)" onKeyDown={(event) => { if (event.key === "Enter" && searchResults[0]) { event.preventDefault(); router.push(searchResults[0].href); setSearchOpen(false); setSearchTerm(""); searchRef.current?.blur(); } }} className="h-9 w-full rounded-xl border border-border/80 bg-surface/60 pl-10 pr-20 text-sm text-foreground outline-none transition-shadow placeholder:text-muted focus:border-amber/60 focus:ring-4 focus:ring-amber/10" />
-        <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded-md border border-border bg-surface-2/70 px-1.5 py-0.5 text-[10px] text-muted">Ctrl K</kbd>
-        {searchOpen && searchTerm.trim() && <div className="absolute left-0 right-0 top-11 z-50 overflow-hidden rounded-2xl border border-border bg-surface p-2 shadow-2xl">
-          {searchResults.length ? searchResults.map((item) => { const Icon = item.icon; return <Link prefetch={false} key={item.href} href={item.href} onClick={() => { setSearchOpen(false); setSearchTerm(""); }} className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-muted outline-none hover:bg-surface-2 hover:text-foreground focus-visible:bg-surface-2 focus-visible:text-foreground"><Icon className="h-4 w-4 text-amber" /><span>{item.label}</span><ArrowUpRight className="ml-auto h-3.5 w-3.5" /></Link>; }) : <p className="px-3 py-3 text-sm text-muted">Eşleşen ekran bulunamadı.</p>}
+        <input ref={searchRef} value={searchTerm} onChange={(event) => { setSearchTerm(event.target.value); setSearchOpen(true); }} onFocus={() => setSearchOpen(Boolean(searchTerm.trim()))} aria-label="Ekrana git" placeholder="Ekrana git… (Görevler, Projeler, Faturalar)" onKeyDown={(event) => { if (event.key === "Enter" && searchResults[0]) { event.preventDefault(); router.push(searchResults[0].href); setSearchOpen(false); setSearchTerm(""); searchRef.current?.blur(); } }} className="h-9 w-full rounded-lg border border-border bg-surface pl-10 pr-20 text-sm text-foreground outline-none transition-colors placeholder:text-faint hover:border-[#333] focus:border-accent/60" />
+        <kbd className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 rounded border border-border px-1.5 py-px font-sans text-[11px] text-faint">Ctrl K</kbd>
+        {searchOpen && searchTerm.trim() && <div className="popover absolute left-0 right-0 top-11 z-50 overflow-hidden p-1.5">
+          {searchResults.length ? searchResults.map((item) => { const Icon = item.icon; return <Link prefetch={false} key={item.href} href={item.href} onClick={() => { setSearchOpen(false); setSearchTerm(""); }} className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted outline-none hover:bg-surface-2 hover:text-foreground focus-visible:bg-surface-2 focus-visible:text-foreground"><Icon className="h-4 w-4 text-faint" /><span>{item.label}</span><ArrowUpRight className="ml-auto h-3.5 w-3.5" /></Link>; }) : <p className="px-3 py-3 text-sm text-muted">Eşleşen ekran bulunamadı.</p>}
         </div>}
       </div>
 
       <div className="ml-auto flex items-center gap-2.5">
         <div ref={notificationRef} className="relative">
-          <button type="button" onClick={toggleNotifications} className={`relative flex h-10 w-10 items-center justify-center rounded-xl text-muted transition-colors hover:bg-surface-2 hover:text-foreground ${notificationOpen ? "bg-surface-2 text-foreground" : ""}`} aria-label={unreadCount ? `Bildirimler (${unreadCount} okunmamış)` : "Bildirimler"} aria-expanded={notificationOpen}>
+          <button type="button" onClick={toggleNotifications} className={`relative flex h-10 w-10 items-center justify-center rounded-md text-muted transition-colors hover:bg-surface-2 hover:text-foreground ${notificationOpen ? "bg-surface-2 text-foreground" : ""}`} aria-label={unreadCount ? `Bildirimler (${unreadCount} okunmamış)` : "Bildirimler"} aria-expanded={notificationOpen}>
             <Bell className="h-5 w-5" aria-hidden />
-            {unreadCount > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-amber" />}
+            {unreadCount > 0 && <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent" />}
           </button>
-          {notificationOpen && <div className="absolute right-0 top-12 z-50 w-[min(23rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl">
-            <div className="flex items-center justify-between border-b border-border/80 px-4 py-4">
+          {notificationOpen && <div className="popover absolute right-0 top-12 z-50 w-[min(23rem,calc(100vw-2rem))] overflow-hidden">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <div><p className="text-sm font-semibold text-foreground">Bildirimler</p><p className="text-xs text-muted">{unreadCount ? `${unreadCount} okunmamış bildirim` : "Güncel bildirim yok"}</p></div>
-              {unreadCount > 0 && <button type="button" onClick={() => setReadIds(notifications.map((notice) => notice.id))} className="flex items-center gap-1 text-xs text-amber hover:text-foreground"><Check className="h-3.5 w-3.5" /> Tümünü okundu işaretle</button>}
+              {unreadCount > 0 && <button type="button" onClick={() => setReadIds(notifications.map((notice) => notice.id))} className="flex items-center gap-1 text-xs text-muted hover:text-foreground"><Check className="h-3.5 w-3.5" /> Tümünü okundu işaretle</button>}
             </div>
-            {notifications.length ? <div className="max-h-[min(22rem,60vh)] overflow-y-auto p-2.5">
-              {notifications.map((notice) => { const Icon = notice.icon; return <Link prefetch={false} key={notice.id} href={notice.href} onClick={() => { setReadIds((ids) => ids.includes(notice.id) ? ids : [...ids, notice.id]); setNotificationOpen(false); }} className={`flex gap-3 rounded-lg p-3 hover:bg-surface-2 ${readIds.includes(notice.id) ? "opacity-60" : ""}`}>
-                <span className={`mt-0.5 rounded-lg p-2 ${notice.tone === "danger" ? "bg-danger/10 text-danger" : notice.tone === "warning" ? "bg-warning/10 text-warning" : "bg-amber/10 text-amber"}`}><Icon className="h-4 w-4" /></span>
+            {notifications.length ? <div className="max-h-[min(22rem,60vh)] overflow-y-auto p-1.5">
+              {notifications.map((notice) => { const Icon = notice.icon; return <Link prefetch={false} key={notice.id} href={notice.href} onClick={() => { setReadIds((ids) => ids.includes(notice.id) ? ids : [...ids, notice.id]); setNotificationOpen(false); }} className={`flex gap-3 rounded-md p-2.5 hover:bg-surface-2 ${readIds.includes(notice.id) ? "opacity-60" : ""}`}>
+                <span className={`mt-0.5 rounded-md p-1.5 ${notice.tone === "danger" ? "bg-danger/10 text-danger" : notice.tone === "warning" ? "bg-warning/10 text-warning" : "bg-surface-2 text-muted"}`}><Icon className="h-4 w-4" /></span>
                 <span className="min-w-0"><span className="block text-sm font-medium text-foreground">{notice.title}</span><span className="mt-0.5 block text-xs text-muted">{notice.body}</span></span>
               </Link>; })}
             </div> : <div className="px-4 py-8 text-center text-sm text-muted">Şu an yeni bildirim yok.</div>}
@@ -168,15 +165,15 @@ export default function Topbar({
         </div>
 
         <div ref={accountRef} className="relative">
-          <button type="button" onClick={toggleAccount} className={`flex items-center gap-2 rounded-xl p-1.5 text-left transition-colors hover:bg-surface-2 ${accountOpen ? "bg-surface-2" : ""}`} aria-label="Hesap menüsü" aria-expanded={accountOpen}>
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-amber/20 text-sm font-semibold text-amber ring-1 ring-amber/30">{initials}</span>
+          <button type="button" onClick={toggleAccount} className={`flex items-center gap-1.5 rounded-md p-1 text-left transition-colors hover:bg-surface-2 ${accountOpen ? "bg-surface-2" : ""}`} aria-label="Hesap menüsü" aria-expanded={accountOpen}>
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-2 text-xs font-semibold text-foreground ring-1 ring-border">{initials}</span>
             <ChevronDown className={`hidden h-4 w-4 text-muted transition-transform sm:block ${accountOpen ? "rotate-180" : ""}`} />
           </button>
-          {accountOpen && <div className="absolute right-0 top-12 z-50 w-64 overflow-hidden rounded-2xl border border-border bg-surface shadow-2xl">
-            <div className="border-b border-border/80 px-4 py-4"><p className="text-sm font-semibold text-foreground">{userName || "Rast kullanıcısı"}</p><p className="mt-0.5 text-xs text-muted">Rast Creative hesabı</p></div>
-            <div className="p-2">
-              <Link prefetch={false} href="/settings" onClick={() => setAccountOpen(false)} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted hover:bg-surface-2 hover:text-foreground"><Settings className="h-4 w-4" /> Hesap ve ayarlar</Link>
-              <form action="/auth/signout" method="post" onSubmit={() => forgetSessionSnapshot()}><button type="submit" className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted hover:bg-danger/10 hover:text-danger"><LogOut className="h-4 w-4" aria-hidden /> Çıkış yap</button></form>
+          {accountOpen && <div className="popover absolute right-0 top-12 z-50 w-64 overflow-hidden">
+            <div className="border-b border-border px-4 py-3"><p className="text-sm font-semibold text-foreground">{userName || "Rast kullanıcısı"}</p><p className="mt-0.5 text-xs text-muted">Rast Creative hesabı</p></div>
+            <div className="p-1.5">
+              <Link prefetch={false} href="/settings" onClick={() => setAccountOpen(false)} className="flex items-center gap-3 rounded-md px-3 py-2 text-sm text-muted hover:bg-surface-2 hover:text-foreground"><Settings className="h-4 w-4" /> Hesap ve ayarlar</Link>
+              <form action="/auth/signout" method="post" onSubmit={() => forgetSessionSnapshot()}><button type="submit" className="flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm text-muted hover:bg-danger/10 hover:text-danger"><LogOut className="h-4 w-4" aria-hidden /> Çıkış yap</button></form>
             </div>
           </div>}
         </div>

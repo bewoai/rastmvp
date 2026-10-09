@@ -230,7 +230,7 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
               onClick={(e) => {
                 if (dirty && !window.confirm("Kaydedilmemiş değişiklikler var. Yine de çıkılsın mı?")) e.preventDefault();
               }}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-xl border border-border px-3 py-2 text-sm text-foreground transition-colors hover:bg-surface-2"
+              className="inline-flex min-h-10 items-center gap-1.5 rounded-lg border border-border px-3 py-2 text-sm text-foreground transition-colors hover:bg-surface-2"
             >
               <ArrowLeft className="h-4 w-4" aria-hidden /> Teklifler
             </Link>
@@ -246,7 +246,7 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
       />
 
       {error && (
-        <p role="alert" className="mb-3 rounded-xl border border-danger/40 bg-danger/10 px-3.5 py-2.5 text-sm text-danger">{error}</p>
+        <p role="alert" className="mb-3 rounded-lg border border-danger/40 bg-danger/10 px-3.5 py-2.5 text-sm text-danger">{error}</p>
       )}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_19rem]">
@@ -322,7 +322,7 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
             ) : (
               <ol className="space-y-2">
                 {items.map((it, idx) => (
-                  <li key={it.id} className="rounded-xl border border-border/70 bg-background/30 p-3">
+                  <li key={it.id} className="rounded-lg border border-border/70 bg-background/30 p-3">
                     <div className="flex items-start gap-2">
                       <span className="mt-3 w-5 shrink-0 text-right text-xs tabular-nums text-muted" aria-hidden>{idx + 1}.</span>
                       <div className="min-w-0 flex-1 space-y-2">
@@ -431,7 +431,7 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
               <div className="flex justify-between gap-3"><dt className="text-muted">KDV (%{head.vat_rate})</dt><dd className="tabular-nums text-foreground">{money(totals.vat)}</dd></div>
               <div className="flex justify-between gap-3 border-t border-border/70 pt-2">
                 <dt className="font-medium text-foreground">Genel toplam{totals.mixed && <span className="block text-[11px] font-normal text-muted">ilk ay (aylık + tek seferlik)</span>}</dt>
-                <dd className="text-lg font-semibold tabular-nums text-amber">{money(totals.total)}</dd>
+                <dd className="text-lg font-semibold tabular-nums text-accent">{money(totals.total)}</dd>
               </div>
             </dl>
             {(totals.recurring.subtotal !== 0 || totals.oneOff.subtotal !== 0) && (
@@ -462,7 +462,7 @@ function ProposalEditor({ proposal }: { proposal: Proposal }) {
                 <Link
                   href={`/projects?ac=${encodeURIComponent(linkedProject.id)}`}
                   prefetch={false}
-                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-2"
+                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-border px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-surface-2"
                 >
                   <FolderKanban className="h-4 w-4" aria-hidden /> Projeyi aç
                 </Link>

@@ -4,15 +4,15 @@ import type {
   PaymentStatus, Priority, ProposalStatus, ActivityAction, ActivityLog, ApprovalStatus,
 } from "./types";
 
-type Tone = "default" | "amber" | "success" | "warning" | "danger" | "muted";
+type Tone = "default" | "accent" | "success" | "warning" | "danger" | "muted";
 
 export const leadStatus: Record<LeadStatus, { label: string; tone: Tone }> = {
   new: { label: "Yeni aday", tone: "muted" },
   contacted: { label: "İletişim kuruldu", tone: "default" },
   needs_assessment: { label: "İhtiyaç görüşmesi", tone: "default" },
   proposal_prep: { label: "Teklif hazırlanıyor", tone: "warning" },
-  proposal_sent: { label: "Teklif gönderildi", tone: "amber" },
-  awaiting_reply: { label: "Geri dönüş bekleniyor", tone: "amber" },
+  proposal_sent: { label: "Teklif gönderildi", tone: "accent" },
+  awaiting_reply: { label: "Geri dönüş bekleniyor", tone: "accent" },
   revision: { label: "Revize istendi", tone: "warning" },
   won: { label: "Kazanıldı", tone: "success" },
   lost: { label: "Kaybedildi", tone: "danger" },
@@ -27,16 +27,16 @@ export const projectStatus: Record<ProjectStatus, { label: string; tone: Tone }>
   planning: { label: "Planlama", tone: "muted" },
   active: { label: "Aktif", tone: "success" },
   on_hold: { label: "Beklemede", tone: "warning" },
-  review: { label: "İncelemede", tone: "amber" },
+  review: { label: "İncelemede", tone: "accent" },
   completed: { label: "Tamamlandı", tone: "default" },
   cancelled: { label: "İptal", tone: "danger" },
 };
 
 export const taskStatus: Record<TaskStatus, { label: string; tone: Tone }> = {
   todo: { label: "Bekliyor", tone: "muted" },
-  in_progress: { label: "Yapılıyor", tone: "amber" },
+  in_progress: { label: "Yapılıyor", tone: "accent" },
   internal_review: { label: "İç kontrol", tone: "warning" },
-  client_review: { label: "Müşteri onayı", tone: "amber" },
+  client_review: { label: "Müşteri onayı", tone: "accent" },
   revision: { label: "Revize", tone: "danger" },
   done: { label: "Tamamlandı", tone: "success" },
 };
@@ -51,9 +51,9 @@ export const contentStatus: Record<ContentStatus, { label: string; tone: Tone }>
   script_ready: { label: "Senaryo hazır", tone: "default" },
   awaiting_shoot: { label: "Çekim bekliyor", tone: "warning" },
   shot: { label: "Çekildi", tone: "default" },
-  editing: { label: "Kurgu", tone: "amber" },
+  editing: { label: "Kurgu", tone: "accent" },
   internal_review: { label: "İç kontrol", tone: "warning" },
-  sent_to_client: { label: "Müşteriye gönderildi", tone: "amber" },
+  sent_to_client: { label: "Müşteriye gönderildi", tone: "accent" },
   revision_requested: { label: "Revize istendi", tone: "danger" },
   approved: { label: "Onaylandı", tone: "success" },
   scheduled: { label: "Planlandı", tone: "default" },
@@ -63,7 +63,7 @@ export const contentStatus: Record<ContentStatus, { label: string; tone: Tone }>
 
 export const shootStatus: Record<ShootStatus, { label: string; tone: Tone }> = {
   planned: { label: "Planlandı", tone: "muted" },
-  confirmed: { label: "Onaylandı", tone: "amber" },
+  confirmed: { label: "Onaylandı", tone: "accent" },
   shooting: { label: "Çekimde", tone: "warning" },
   completed: { label: "Tamamlandı", tone: "success" },
   cancelled: { label: "İptal", tone: "danger" },
@@ -72,7 +72,7 @@ export const shootStatus: Record<ShootStatus, { label: string; tone: Tone }> = {
 export const equipmentStatus: Record<EquipmentStatus, { label: string; tone: Tone }> = {
   planned: { label: "Alınacak", tone: "muted" },
   idle: { label: "Boşta", tone: "success" },
-  reserved: { label: "Ayrıldı", tone: "amber" },
+  reserved: { label: "Ayrıldı", tone: "accent" },
   in_use: { label: "Kullanımda", tone: "warning" },
   assigned: { label: "Zimmetli", tone: "default" },
   maintenance: { label: "Bakımda", tone: "warning" },
@@ -92,7 +92,7 @@ export const invoiceStatus: Record<InvoiceStatus, { label: string; tone: Tone }>
 
 export const jobStatus: Record<JobStatus, { label: string; tone: Tone }> = {
   quote: { label: "Teklif", tone: "muted" },
-  confirmed: { label: "Onaylandı", tone: "amber" },
+  confirmed: { label: "Onaylandı", tone: "accent" },
   in_progress: { label: "Yapılıyor", tone: "warning" },
   delivered: { label: "Teslim edildi", tone: "success" },
   cancelled: { label: "İptal", tone: "danger" },
@@ -106,7 +106,7 @@ export const paymentStatus: Record<PaymentStatus, { label: string; tone: Tone }>
 
 export const proposalStatus: Record<ProposalStatus, { label: string; tone: Tone }> = {
   draft: { label: "Taslak", tone: "muted" },
-  sent: { label: "Gönderildi", tone: "amber" },
+  sent: { label: "Gönderildi", tone: "accent" },
   accepted: { label: "Kabul edildi", tone: "success" },
   rejected: { label: "Reddedildi", tone: "danger" },
   expired: { label: "Süresi doldu", tone: "warning" },
@@ -114,7 +114,7 @@ export const proposalStatus: Record<ProposalStatus, { label: string; tone: Tone 
 
 /** İçerik onayı (0013). `short`: içerik listesindeki küçük rozet. */
 export const approvalStatus: Record<ApprovalStatus, { label: string; short: string; tone: Tone }> = {
-  pending: { label: "Onay bekliyor", short: "Onay bekliyor", tone: "amber" },
+  pending: { label: "Onay bekliyor", short: "Onay bekliyor", tone: "accent" },
   approved: { label: "Onaylandı", short: "Onaylı", tone: "success" },
   changes_requested: { label: "Değişiklik istendi", short: "Değişiklik", tone: "danger" },
   expired: { label: "Süresi doldu / geri çekildi", short: "Onay süresi doldu", tone: "muted" },
@@ -149,7 +149,7 @@ export const dateTimeTR = (s?: string) =>
 
 export const activityAction: Record<ActivityAction, { label: string; verb: string; tone: Tone }> = {
   insert: { label: "Ekleme", verb: "ekledi", tone: "success" },
-  update: { label: "Güncelleme", verb: "güncelledi", tone: "amber" },
+  update: { label: "Güncelleme", verb: "güncelledi", tone: "muted" },
   delete: { label: "Silme", verb: "sildi", tone: "danger" },
 };
 

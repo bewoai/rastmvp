@@ -121,7 +121,7 @@ export function ApprovalForm({ token, approval, demo }: { token: string; approva
 
   const header = (
     <header className="mb-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-amber">{approval.agency_name || "Ajans"}</p>
+      <p className="text-[13px] font-semibold text-accent">{approval.agency_name || "Ajans"}</p>
       <h1 className="mt-1 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">{approval.title}</h1>
       <dl className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
         {approval.client_name && <div><dt className="inline">Müşteri: </dt><dd className="inline text-foreground">{approval.client_name}</dd></div>}
@@ -130,8 +130,8 @@ export function ApprovalForm({ token, approval, demo }: { token: string; approva
         <div><dt className="inline">Gönderim: </dt><dd className="inline text-foreground">{fmt(approval.sent_at)}</dd></div>
       </dl>
       {demo && (
-        <p className="onay-no-print mt-3 rounded-lg border border-amber/40 bg-amber/10 px-3 py-2 text-xs text-foreground">
-          <strong className="text-amber">Demo modu:</strong> veritabanı bağlı değil; karar kaydedilmez, yalnızca akış gösterilir.
+        <p className="onay-no-print mt-3 rounded-lg border border-border bg-surface px-3 py-2 text-xs text-muted">
+          <strong className="font-medium text-foreground">Demo modu:</strong> veritabanı bağlı değil; karar kaydedilmez, yalnızca akış gösterilir.
         </p>
       )}
     </header>
@@ -160,7 +160,7 @@ export function ApprovalForm({ token, approval, demo }: { token: string; approva
             </div>
           </div>
 
-          <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-muted">Onay kaydı özeti</h3>
+          <h3 className="mt-5 text-[13px] font-semibold text-muted">Onay kaydı özeti</h3>
           <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
             <dt className="text-muted">Ajans</dt><dd className="text-foreground">{approval.agency_name || "—"}</dd>
             <dt className="text-muted">İçerik</dt><dd className="text-foreground">{approval.title}</dd>
@@ -243,8 +243,8 @@ export function ApprovalForm({ token, approval, demo }: { token: string; approva
             const on = checked.has(item.key);
             return (
               <li key={item.key}>
-                <label htmlFor={id} className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${on ? "border-success/50 bg-success/5" : "border-border bg-background/40 hover:border-amber/40"}`}>
-                  <input id={id} type="checkbox" checked={on} onChange={() => toggle(item.key)} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--amber)]" />
+                <label htmlFor={id} className={`flex cursor-pointer gap-3 rounded-lg border p-3 transition-colors ${on ? "border-success/50 bg-success/5" : "border-border bg-background/40 hover:border-accent/40"}`}>
+                  <input id={id} type="checkbox" checked={on} onChange={() => toggle(item.key)} className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--accent)]" />
                   <span className="text-sm leading-5 text-foreground">
                     <span className="text-muted">{i + 1}.</span> {item.label}
                     {item.basis && <span className="mt-0.5 block text-[11px] text-muted">Dayanak: md. {item.basis}</span>}
@@ -266,7 +266,7 @@ export function ApprovalForm({ token, approval, demo }: { token: string; approva
             value={note}
             onChange={(e) => { setNote(e.target.value); setError(null); }}
             placeholder="Ör. 2. paragraftaki ifade uzmanlık alanım dışında, çıkarılsın."
-            className="w-full rounded-xl border border-border/80 bg-background/70 px-3.5 py-2.5 text-base text-foreground outline-none placeholder:text-muted/60 focus:border-amber/70 focus:ring-4 focus:ring-amber/10 md:text-sm"
+            className="w-full rounded-lg border border-border/80 bg-background/70 px-3.5 py-2.5 text-base text-foreground outline-none placeholder:text-faint focus:border-accent/70 md:text-sm"
           />
         </div>
         <div>
@@ -279,7 +279,7 @@ export function ApprovalForm({ token, approval, demo }: { token: string; approva
             value={name}
             onChange={(e) => { setName(e.target.value); setError(null); }}
             placeholder="Ör. Uzm. Dr. Ayşe Yılmaz"
-            className="w-full rounded-xl border border-border/80 bg-background/70 px-3.5 py-2.5 text-base text-foreground outline-none placeholder:text-muted/60 focus:border-amber/70 focus:ring-4 focus:ring-amber/10 md:text-sm"
+            className="w-full rounded-lg border border-border/80 bg-background/70 px-3.5 py-2.5 text-base text-foreground outline-none placeholder:text-faint focus:border-accent/70 md:text-sm"
           />
         </div>
 

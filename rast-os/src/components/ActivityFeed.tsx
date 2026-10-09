@@ -29,7 +29,7 @@ export default function ActivityFeed({ logs, limit = 15 }: { logs: ActivityLog[]
                 <span className="font-medium">{log.actor_name || "Sistem"}</span>{" "}
                 <span className="text-muted">{activityEntityLabel(log.entity).toLocaleLowerCase("tr-TR")} {action.verb}:</span>{" "}
                 {href ? (
-                  <Link prefetch={false} href={href} className="rounded outline-none hover:text-amber focus-visible:ring-2 focus-visible:ring-amber/60">
+                  <Link prefetch={false} href={href} className="rounded outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-accent/60">
                     {record}
                   </Link>
                 ) : (

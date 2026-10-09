@@ -5,7 +5,7 @@ import { readFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
-const BG = "#080c0a"; // globals.css --background
+const BG = "#141414"; // globals.css --background
 const svgPath = fileURLToPath(new URL("../public/brand/rast-white.svg", import.meta.url));
 const outDir = fileURLToPath(new URL("../public/icons/", import.meta.url));
 const svg = await readFile(svgPath);

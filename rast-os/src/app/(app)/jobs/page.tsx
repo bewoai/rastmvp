@@ -156,7 +156,7 @@ export default function JobsPage() {
 
       <StatStrip
         items={[
-          { label: "Toplam ciro", value: TRY(stats.revenue), tone: "amber" },
+          { label: "Toplam ciro", value: TRY(stats.revenue), tone: "accent" },
           { label: "Tahsil edilen", value: TRY(stats.collected), tone: "success" },
           { label: "Bekleyen tahsilat", value: TRY(stats.outstanding), tone: "warning" },
           { label: "İş sayısı", value: String(stats.count) },

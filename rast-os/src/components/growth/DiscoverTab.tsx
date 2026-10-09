@@ -109,7 +109,7 @@ export function DiscoverTab({ status }: { status: GrowthStatus | null }) {
         <section aria-label="Arama sonuçları" className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <label className="mr-2 inline-flex items-center gap-2 text-sm text-muted">
-              <input type="checkbox" checked={all} onChange={() => setSelected(all ? new Set() : new Set(results.map((r) => r.place.placeId)))} className="h-4 w-4 accent-[var(--amber)]" />
+              <input type="checkbox" checked={all} onChange={() => setSelected(all ? new Set() : new Set(results.map((r) => r.place.placeId)))} className="h-4 w-4 accent-[var(--accent)]" />
               Tümünü seç ({selected.size}/{results.length})
             </label>
             <Button variant="ghost" disabled={selected.size === 0} onClick={qualify}><Star className="h-4 w-4" aria-hidden /> Kalifiye et</Button>
@@ -126,14 +126,14 @@ export function DiscoverTab({ status }: { status: GrowthStatus | null }) {
                 const host = r.place.website ? r.place.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/.*$/, "") : null;
                 return (
                   <li key={r.place.placeId} className="flex items-start gap-3 px-3 py-2.5">
-                    <input type="checkbox" aria-label={`Seç: ${r.place.name ?? r.place.placeId}`} checked={selected.has(r.place.placeId)} onChange={() => toggle(r.place.placeId)} className="mt-1 h-4 w-4 accent-[var(--amber)]" />
+                    <input type="checkbox" aria-label={`Seç: ${r.place.name ?? r.place.placeId}`} checked={selected.has(r.place.placeId)} onChange={() => toggle(r.place.placeId)} className="mt-1 h-4 w-4 accent-[var(--accent)]" />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium text-foreground">{r.place.name ?? "—"}</p>
                       <p className="truncate text-xs text-muted">{r.place.address ?? ""}</p>
                       <p className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-muted">
                         {typeof r.place.rating === "number" && <span>★ {r.place.rating.toLocaleString("tr-TR")} ({r.place.reviewsCount ?? 0})</span>}
                         {r.place.phone && <span>{r.place.phone}</span>}
-                        {host && <a href={r.place.website} target="_blank" rel="noopener noreferrer" className="text-amber hover:underline">{host}</a>}
+                        {host && <a href={r.place.website} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{host}</a>}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">

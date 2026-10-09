@@ -74,9 +74,9 @@ export function ContentApprovalPanel({ content, draftScript, draftTitle }: {
   }
 
   return (
-    <section aria-label="İçerik onayı" className="rounded-xl border border-border bg-surface-2/40 p-4">
+    <section aria-label="İçerik onayı" className="rounded-lg border border-border bg-surface-2/40 p-4">
       <div className="flex items-center gap-2">
-        <ShieldCheck className="h-4 w-4 text-amber" aria-hidden />
+        <ShieldCheck className="h-4 w-4 text-muted" aria-hidden />
         <h3 className="text-sm font-semibold text-foreground">Onay</h3>
         {latest && latestStatus && (
           <span className="ml-auto"><Badge tone={approvalStatus[latestStatus].tone}>{approvalStatus[latestStatus].label}</Badge></span>
@@ -87,8 +87,8 @@ export function ContentApprovalPanel({ content, draftScript, draftTitle }: {
       </p>
 
       {activeLink && (
-        <div className="mt-3 rounded-lg border border-amber/30 bg-amber/5 p-3">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted">Onay bağlantısı · v{activeLink.version}</p>
+        <div className="mt-3 rounded-lg border border-border bg-surface-2/50 p-3">
+          <p className="text-xs font-medium text-muted">Onay bağlantısı · v{activeLink.version}</p>
           <p className="mt-1 select-all break-all font-mono text-xs text-foreground">{linkUrl}</p>
           <p className="mt-1 text-[11px] text-muted">
             {daysLeft(activeLink, now)} gün geçerli ({dateTimeTR(activeLink.expires_at)}). Bağlantı gizlidir; yalnızca onaylayacak kişiye gönderin.
@@ -101,7 +101,7 @@ export function ContentApprovalPanel({ content, draftScript, draftTitle }: {
               href={whatsappShareUrl(approvalShareText({ title: activeLink.title, version: activeLink.version, url: linkUrl, expiresAt: activeLink.expires_at }))}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-border px-3 text-xs font-medium text-foreground hover:bg-surface-2"
+              className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium text-foreground hover:bg-surface-2"
             >
               <MessageCircle className="h-3.5 w-3.5" aria-hidden /> WhatsApp
             </a>
@@ -109,7 +109,7 @@ export function ContentApprovalPanel({ content, draftScript, draftTitle }: {
               href={approvalPath(activeLink.token)}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-border px-3 text-xs font-medium text-foreground hover:bg-surface-2"
+              className="inline-flex min-h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium text-foreground hover:bg-surface-2"
             >
               <ExternalLink className="h-3.5 w-3.5" aria-hidden /> Önizle
             </a>

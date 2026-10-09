@@ -47,9 +47,9 @@ interface ImportPlan {
   afterApply?: () => void;
 }
 
-const OP_LABEL: Record<PlanOp["op"], { label: string; tone: "success" | "amber" | "danger" }> = {
+const OP_LABEL: Record<PlanOp["op"], { label: string; tone: "success" | "accent" | "danger" }> = {
   insert: { label: "Ekle", tone: "success" },
-  update: { label: "Güncelle", tone: "amber" },
+  update: { label: "Güncelle", tone: "accent" },
   delete: { label: "Sil", tone: "danger" },
 };
 
@@ -549,7 +549,7 @@ export default function ImportPage() {
     <Panel title="Önizleme (kuru çalıştırma) — henüz hiçbir şey yazılmadı">
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <Badge tone="success">{planCounts.insert} eklenecek</Badge>
-        <Badge tone="amber">{planCounts.update + plan.merged} güncellenecek</Badge>
+        <Badge tone="accent">{planCounts.update + plan.merged} güncellenecek</Badge>
         <Badge tone="danger">{planCounts.delete} silinecek</Badge>
         {plan.duplicates > 0 && <Badge tone="muted">{plan.duplicates} zaten var (atlanacak)</Badge>}
         {plan.skipped > 0 && <Badge tone="muted">{plan.skipped} satır tanınmadı</Badge>}
@@ -618,7 +618,7 @@ export default function ImportPage() {
               <p className="text-sm text-foreground">Modülü, sayfayı, başlıkları ve para birimini otomatik tanır.</p>
               <p className="mt-1 text-xs text-muted">Çok sayfalı dosyalarda tanınan tüm tabloları aktarır; aynı kaydı yeniden eklemez. Önce önizleme gösterilir, “Uygula” demeden hiçbir şey yazılmaz.</p>
             </div>
-            <label className="btn-amber inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium">
+            <label className="btn-accent inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium">
               <Sparkles className="h-4 w-4" /> {busy ? "İşleniyor…" : "Dosyayı seç ve önizle"}
               <input type="file" accept=".xlsx,.xls,.csv" onChange={smartImport} disabled={busy || !hydrated} className="hidden" />
             </label>
@@ -642,7 +642,7 @@ export default function ImportPage() {
           </Panel>
 
           <Panel title="2. Dosya seç">
-            <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border py-8 text-center hover:border-amber/60">
+            <label className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-border py-8 text-center hover:border-accent/60">
               <Upload className="mb-2 h-6 w-6 text-muted" />
               <span className="text-sm text-foreground">Dosya seç (.xlsx / .csv)</span>
               <span className="mt-1 text-xs text-muted">tıkla veya sürükle</span>
@@ -650,7 +650,7 @@ export default function ImportPage() {
             </label>
             {fileName && (
               <p className="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted">
-                <FileSpreadsheet className="h-4 w-4 text-amber" /> {fileName}
+                <FileSpreadsheet className="h-4 w-4 text-muted" /> {fileName}
                 <Badge tone="muted">{sheetNames.length} sayfa</Badge>
                 <Badge tone="muted">{dataRows.length} veri satırı</Badge>
               </p>
@@ -685,7 +685,7 @@ export default function ImportPage() {
                         key={i}
                         onClick={() => onHeaderRowChange(i)}
                         className={`cursor-pointer border-b border-border/60 ${
-                          i === headerRow ? "bg-amber/15" : "hover:bg-surface-2/50"
+                          i === headerRow ? "bg-accent/15" : "hover:bg-surface-2/50"
                         }`}
                       >
                         <td className="px-2 py-1.5 text-muted">{i}{i === headerRow ? " ⭑" : ""}</td>

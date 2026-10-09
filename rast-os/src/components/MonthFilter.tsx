@@ -29,12 +29,12 @@ export default function MonthFilter({
 }) {
   return (
     <div role="group" aria-label="Dönem" className="flex flex-wrap items-center gap-1.5">
-      <button type="button" aria-pressed={mode === "month"} onClick={() => onModeChange("month")} className={`h-9 rounded-lg px-3 text-xs font-medium transition-colors md:h-8 ${mode === "month" ? "bg-amber/20 text-amber" : "bg-surface-2/70 text-muted hover:text-foreground"}`}>Seçili Ay</button>
-      <button type="button" aria-pressed={mode === "all"} onClick={() => onModeChange("all")} className={`h-9 rounded-lg px-3 text-xs font-medium transition-colors md:h-8 ${mode === "all" ? "bg-amber/20 text-amber" : "bg-surface-2/70 text-muted hover:text-foreground"}`}>Tüm Dönem</button>
+      <button type="button" aria-pressed={mode === "month"} onClick={() => onModeChange("month")} className={`h-9 rounded-md border px-3 text-[13px] font-medium transition-colors md:h-8 ${mode === "month" ? "border-[#3a3a3a] bg-surface-2 text-foreground" : "border-transparent text-muted hover:bg-surface-2/60 hover:text-foreground"}`}>Seçili Ay</button>
+      <button type="button" aria-pressed={mode === "all"} onClick={() => onModeChange("all")} className={`h-9 rounded-md border px-3 text-[13px] font-medium transition-colors md:h-8 ${mode === "all" ? "border-[#3a3a3a] bg-surface-2 text-foreground" : "border-transparent text-muted hover:bg-surface-2/60 hover:text-foreground"}`}>Tüm Dönem</button>
       {mode === "month" && <div className="flex h-9 items-center overflow-hidden rounded-lg border border-border bg-background md:h-8">
         <button type="button" aria-label="Önceki ay" onClick={() => onMonthChange(shiftMonth(month, -1))} className="flex h-full w-9 items-center justify-center text-muted hover:bg-surface-2 hover:text-foreground md:w-8"><ChevronLeft className="h-4 w-4" /></button>
-        <label className="relative flex min-w-[150px] cursor-pointer items-center justify-center gap-2 px-2 text-xs font-medium capitalize text-foreground focus-within:ring-2 focus-within:ring-amber/60">
-          <CalendarDays className="h-3.5 w-3.5 text-amber" aria-hidden />
+        <label className="relative flex min-w-[150px] cursor-pointer items-center justify-center gap-2 px-2 text-xs font-medium capitalize text-foreground focus-within:ring-2 focus-within:ring-accent/60">
+          <CalendarDays className="h-3.5 w-3.5 text-faint" aria-hidden />
           {monthLabel(month)}
           <input
             type="month"

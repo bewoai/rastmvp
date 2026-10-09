@@ -99,12 +99,12 @@ function MonthlyReportView() {
         </div>
         <div>
           <span className="mb-1 block text-xs font-medium text-muted">Ay</span>
-          <div className="flex h-[2.625rem] items-center overflow-hidden rounded-xl border border-border/80 bg-background/70">
+          <div className="flex h-[2.625rem] items-center overflow-hidden rounded-lg border border-border/80 bg-background/70">
             <button type="button" aria-label="Önceki ay" onClick={() => setMonth((m) => shiftMonth(m, -1))} className="flex h-full w-10 items-center justify-center text-muted hover:bg-surface-2 hover:text-foreground">
               <ChevronLeft className="h-4 w-4" aria-hidden />
             </button>
-            <label className="relative flex h-full min-w-[150px] cursor-pointer items-center justify-center gap-2 px-2 text-sm font-medium text-foreground focus-within:ring-2 focus-within:ring-amber/60">
-              <CalendarDays className="h-4 w-4 text-amber" aria-hidden />
+            <label className="relative flex h-full min-w-[150px] cursor-pointer items-center justify-center gap-2 px-2 text-sm font-medium text-foreground focus-within:ring-2 focus-within:ring-accent/60">
+              <CalendarDays className="h-4 w-4 text-muted" aria-hidden />
               {monthLabelTR(month)}
               <input
                 type="month"
@@ -132,13 +132,13 @@ function MonthlyReportView() {
                 <button
                   type="button"
                   onClick={() => { setClientId(report.client_id); setMonth(m); document.getElementById("main")?.scrollTo({ top: 0 }); }}
-                  className="min-w-0 text-left text-foreground hover:text-amber"
+                  className="min-w-0 text-left text-foreground hover:text-accent"
                 >
                   <span className="font-medium">{client}</span> · {monthLabelTR(m)}
                 </button>
                 <span className="flex items-center gap-3 text-xs text-muted">
                   Son kayıt {dateTimeTR(report.generated_at)}
-                  <Link prefetch={false} href={printHref(report.client_id, m)} className="text-amber hover:text-amber-hi">Yazdır</Link>
+                  <Link prefetch={false} href={printHref(report.client_id, m)} className="text-accent hover:text-accent-hi">Yazdır</Link>
                 </span>
               </li>
             ))}

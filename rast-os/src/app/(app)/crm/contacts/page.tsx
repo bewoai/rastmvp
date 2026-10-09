@@ -55,7 +55,7 @@ function ContactModal({ initial, clients, onClose }: { initial: Contact | null; 
   );
 }
 
-const linkCls = "rounded outline-none hover:text-amber focus-visible:ring-2 focus-visible:ring-amber/60";
+const linkCls = "rounded outline-none hover:text-accent focus-visible:ring-2 focus-visible:ring-accent/60";
 
 export default function ContactsPage() {
   const hydrated = useHydrated(["contacts", "clients", "brands"]);

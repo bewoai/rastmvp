@@ -153,8 +153,8 @@ export const callTaskTitle = (name: string) => `${CALL_TASK_PREFIX}: ${name}`;
 
 export type LeadSourceKind = "hekim" | "site" | "manuel";
 
-export const leadSourceKinds: Record<LeadSourceKind, { label: string; tone: "amber" | "default" | "muted" }> = {
-  hekim: { label: "Hekim", tone: "amber" },
+export const leadSourceKinds: Record<LeadSourceKind, { label: string; tone: "accent" | "default" | "muted" }> = {
+  hekim: { label: "Hekim", tone: "accent" },
   site: { label: "Site", tone: "default" },
   manuel: { label: "Manuel", tone: "muted" },
 };

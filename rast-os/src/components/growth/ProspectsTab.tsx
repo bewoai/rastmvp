@@ -75,7 +75,7 @@ export function ProspectsTab() {
   const columns = useMemo<Column<Prospect>[]>(() => [
     {
       key: "sel", header: "", mobile: "hide", className: "w-8",
-      cell: (p) => <input type="checkbox" aria-label="Seç" checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="h-4 w-4 accent-[var(--amber)]" />,
+      cell: (p) => <input type="checkbox" aria-label="Seç" checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="h-4 w-4 accent-[var(--accent)]" />,
     },
     {
       key: "name", header: "Aday", tone: "primary", mobile: "title",
@@ -187,7 +187,7 @@ export function ProspectsTab() {
                 </a>
               )}
               {p.status !== "replied" && p.status !== "suppressed" && (
-                <button type="button" onClick={() => setReply(p)} title="Yanıt geldi → CRM lead" aria-label={`Yanıt geldi: ${v.name ?? ""}`} className="flex h-10 w-10 items-center justify-center rounded-lg text-amber hover:bg-amber/15 md:h-8 md:w-8">
+                <button type="button" onClick={() => setReply(p)} title="Yanıt geldi → CRM lead" aria-label={`Yanıt geldi: ${v.name ?? ""}`} className="flex h-10 w-10 items-center justify-center rounded-lg text-accent hover:bg-accent/15 md:h-8 md:w-8">
                   <Reply className="h-4 w-4" aria-hidden />
                 </button>
               )}

@@ -18,13 +18,13 @@ export default function Toaster() {
         <div
           key={t.id}
           role={t.tone === "danger" ? "alert" : "status"}
-          className={`card pointer-events-auto flex items-center gap-3 px-4 py-3 text-sm shadow-2xl ${
+          className={`popover pointer-events-auto flex items-center gap-3 px-4 py-3 text-sm ${
             t.tone === "danger" ? "!border-danger/60 text-danger" : "text-foreground"
           }`}
         >
           <span className="min-w-0 flex-1">{t.message}</span>
           {t.href && (
-            <Link prefetch={false} href={t.href} onClick={() => dismiss(t.id)} className="shrink-0 text-xs font-medium text-amber hover:text-amber-hi">
+            <Link prefetch={false} href={t.href} onClick={() => dismiss(t.id)} className="shrink-0 text-xs font-medium text-accent hover:text-accent-hi">
               {t.hrefLabel ?? "Görüntüle"}
             </Link>
           )}
